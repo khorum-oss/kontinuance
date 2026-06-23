@@ -7,8 +7,8 @@ kover = "0.9.1"
 sonarqube = "7.0.0.6105"
 khorum-plugins = "1.0.3"
 khorum-publishing = "1.0.5"
-konstellation-dsl = "1.0.2"
-konstellation-meta-dsl = "1.0.1"
+konstellation-dsl = "2.0.14"
+konstellation-meta-dsl = "1.0.15"
 kotlinpoet = "2.1.0"
 google-auto-service = "1.1.1"
 kotlin-logging = "4.0.0-beta-2"
@@ -30,7 +30,7 @@ kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 
 # Meta DSL
-konstellation-dsl = { module = "org.khorum.oss.konstellation:dsl", version.ref = "konstellation-dsl" }
+konstellation-dsl = { module = "org.khorum.oss.konstellation:konstellation-dsl", version.ref = "konstellation-dsl" }
 konstellation-meta-dsl = { module = "org.khorum.oss.konstellation:konstellation-meta-dsl", version.ref = "konstellation-meta-dsl" }
 
 # Google

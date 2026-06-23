@@ -24,8 +24,9 @@ Stateless: no Docker, persistence, webhooks, or UI (deferred to v1+).
 
 **Primary Dependencies**: Kotlin Coroutines (`kotlinx-coroutines-core` 1.10.0,
 already in the catalog) for structured concurrency; the latest Konstellation
-meta-DSL for the Kotlin pipeline DSL (current pin `konstellation-meta-dsl = 1.0.1`,
-`konstellation-dsl = 1.0.2` — to be upgraded, see research.md); `kotlinx-serialization`
+meta-DSL for the Kotlin pipeline DSL (pinned `konstellation-meta-dsl = 1.0.15`,
+`konstellation-dsl = 2.0.14` — note the 2.x artifactId rename, see research.md R1);
+`kotlinx-serialization`
 (already present) or a YAML library for descriptor parsing (decision in research.md);
 Spring Boot is the platform runtime per the constitution but is **not required for the
 v0 engine core** and is introduced minimally (decision in research.md).

@@ -33,12 +33,14 @@ implementable and testable.
 
 **Purpose**: Stand up the `engine` module within the existing Gradle build.
 
-- [ ] T001 Confirm and bump Konstellation versions in `gradle/libs.versions.toml`
-  (`konstellation-meta-dsl`, `konstellation-dsl`) to the newest releases in the
-  Reliquary repo (research.md R1); add the chosen YAML lib + `kotlinx-coroutines-core`
-  refs if not already exposed.
-- [ ] T002 Regenerate/extend `gradle/verification-metadata.xml` for the new/upgraded
-  dependencies (Constitution Principle V) — verification stays enabled.
+- [X] T001 Bump Konstellation in `gradle/libs.versions.toml`:
+  `konstellation-meta-dsl = 1.0.15`, `konstellation-dsl = 2.0.14` (2.x renamed the
+  module coordinate to `org.khorum.oss.konstellation:konstellation-dsl`). Still TODO
+  here: add the chosen YAML lib + expose `kotlinx-coroutines-core` refs.
+- [X] T002 Regenerated `gradle/verification-metadata.xml`
+  (`./gradlew --write-verification-metadata sha256,pgp build`); `org.khorum.*` is
+  group-trusted so no per-artifact entries were needed, one new transitive key added,
+  verification stays enabled and the build is green.
 - [ ] T003 Create the `engine` module: `engine/build.gradle.kts` (Kotlin/JDK 21,
   coroutines, Konstellation, YAML, `core-test` + JUnit/MockK test deps; detekt + Kover
   wired like the other modules) and register it via `includeModules("engine", ...)` in

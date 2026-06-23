@@ -77,7 +77,7 @@ println(run.status)   // Success — identical to the YAML run (SC-002)
 
 - v0 is stateless: runs are not persisted, logs go to stdout. Docker isolation,
   Postgres persistence, webhook triggers, and a UI arrive in v1.
-- Before implementing, confirm and bump the Konstellation meta-DSL/dsl versions in
-  `gradle/libs.versions.toml` and update `gradle/verification-metadata.xml`
-  (research.md R1, Constitution Principle V).
+- Konstellation is pinned to the latest: `konstellation-meta-dsl = 1.0.15`,
+  `konstellation-dsl = 2.0.14` (2.x renamed the artifactId to `konstellation-dsl`);
+  verification metadata regenerated and the build is green (research.md R1).
 ```
