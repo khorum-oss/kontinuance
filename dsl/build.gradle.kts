@@ -15,7 +15,7 @@ plugins {
     id("org.khorum.oss.plugins.open.publishing.digital-ocean-spaces")
 }
 
-group = "org.khorum.oss.REPLACE_ME"
+group = "org.khorum.oss.kontinuance"
 version = dslVersion
 
 dependencies {
@@ -40,7 +40,7 @@ kover {
     reports {
         filters {
             excludes {
-                annotatedBy("org.khorum.oss.REPLACE_ME_PACKAGE.dsl.common.ExcludeFromCoverage")
+                annotatedBy("org.khorum.oss.kontinuance.dsl.common.ExcludeFromCoverage")
             }
         }
     }
@@ -134,7 +134,7 @@ java {
 }
 
 ksp {
-    arg("projectRootClasspath", "org.khorum.oss.REPLACE_ME_PACKAGE")
-    arg("dslBuilderClasspath", "org.khorum.oss.REPLACE_ME_PACKAGE.common")
-    arg("dslMarkerClass", "org.khorum.oss.REPLACE_ME_PACKAGE.common.REPLACE_ME_CAPITALDsl")
+    arg("projectRootClasspath", "org.khorum.oss.kontinuance")
+    arg("dslBuilderClasspath", "org.khorum.oss.kontinuance.common")
+    arg("dslMarkerClass", "org.khorum.oss.kontinuance.common.KontinuanceDsl")
 }

@@ -1,4 +1,4 @@
-rootProject.name = "REPLACE_ME"
+rootProject.name = "kontinuance"
 
 pluginManagement {
     repositories {

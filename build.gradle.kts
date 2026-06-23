@@ -12,7 +12,7 @@ plugins {
     alias(libs.plugins.khorum.digital.ocean) apply false
 }
 
-group = "org.khorum.oss.REPLACE_ME"
+group = "org.khorum.oss.kontinuance"
 
 extra["dslVersion"] = file("VERSION").readText().trim()
 extra["metaDslVersion"] = libs.versions.konstellation.meta.dsl.get()
@@ -75,7 +75,7 @@ tasks.register("koverMergedReport") {
 
 tasks.register("initProject") {
     group = "setup"
-    description = "Replaces REPLACE_ME, REPLACE_ME_PACKAGE, and REPLACE_ME_CAPITAL across the template"
+    description = "Replaces kontinuance, kontinuance, and Kontinuance across the template"
 
     doLast {
         val projectName = project.findProperty("projectName") as? String
@@ -96,9 +96,9 @@ tasks.register("initProject") {
         targetFiles.forEach { file ->
             val original = file.readText()
             val updated = original
-                .replace("REPLACE_ME_CAPITAL", projectCapitalName)
-                .replace("REPLACE_ME_PACKAGE", projectPackageName)
-                .replace("REPLACE_ME", projectName)
+                .replace("Kontinuance", projectCapitalName)
+                .replace("kontinuance", projectPackageName)
+                .replace("kontinuance", projectName)
 
             if (updated != original) {
                 file.writeText(updated)
@@ -108,13 +108,13 @@ tasks.register("initProject") {
 
         // Rename files and directories containing placeholders
         rootProject.projectDir.walkBottomUp()
-            .filter { "REPLACE_ME" in it.name }
+            .filter { "kontinuance" in it.name }
             .filter { ".gradle/" !in it.path && "/build/" !in it.path }
             .forEach { file ->
                 val newName = file.name
-                    .replace("REPLACE_ME_CAPITAL", projectCapitalName)
-                    .replace("REPLACE_ME_PACKAGE", projectPackageName)
-                    .replace("REPLACE_ME", projectName)
+                    .replace("Kontinuance", projectCapitalName)
+                    .replace("kontinuance", projectPackageName)
+                    .replace("kontinuance", projectName)
                 val target = file.parentFile.resolve(newName)
                 file.renameTo(target)
                 logger.lifecycle("Renamed: ${file.relativeTo(rootProject.projectDir)} -> $newName")
@@ -126,7 +126,7 @@ tasks.register("initProject") {
 
 sonar {
     properties {
-        property("sonar.projectKey", "khorum-oss_REPLACE_ME")
+        property("sonar.projectKey", "khorum-oss_kontinuance")
         property("sonar.organization", "khorum-oss")
         property("sonar.host.url", "https://sonarcloud.io")
         property(
