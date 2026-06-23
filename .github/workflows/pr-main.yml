@@ -1,0 +1,89 @@
+name: PR Tests
+run-name: PR Tests by ${{ github.actor }}
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-check:
+    uses: violabs/public-cicd/.github/workflows/gradle-build.yml@main
+    with:
+      java-version: '21'
+
+  detekt-check:
+    needs: build-check
+    uses: violabs/public-cicd/.github/workflows/gradle-detekt.yml@main
+    with:
+      java-version: '21'
+
+  unit-tests:
+    needs: build-check
+    uses: violabs/public-cicd/.github/workflows/gradle-unit-tests.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      java-version: '21'
+      coverage-enabled: true
+      min-coverage-overall: 40
+
+  coverage-and-sonar:
+    name: Coverage Upload & SonarCloud
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Generate Kover XML report
+        run: ./gradlew koverMergedReport
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: dsl/build/reports/kover/report.xml
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: SonarCloud Scan
+        run: ./gradlew sonar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  notify-discord:
+    name: Notify Discord
+    needs:
+      - build-check
+      - unit-tests
+      - detekt-check
+      - coverage-and-sonar
+    if: always()
+    uses: violabs/public-cicd/.github/workflows/notify-discord.yml@main
+    with:
+      runs-on: ubuntu-latest
+      workflow_name: ${{ github.workflow }}
+      build_result: ${{ needs.build-check.result }}
+      test_result: ${{ needs.unit-tests.result }}
+      detekt_result: ${{ needs.detekt-check.result }}
+      pr_title: ${{ github.event.pull_request.title }}
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets:
+      DISCORD_WEBHOOK_URL: ${{ secrets.PUBLIC_PR_DISCORD_WEBHOOK }}
