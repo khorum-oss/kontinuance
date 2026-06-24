@@ -142,3 +142,12 @@ Kafka (optional, later)     ← event bus for scale
 - **v1** — Docker-based isolation, persistent state, webhook trigger, basic UI.
 - **v2** — Multi-agent, secret management, parallel steps, DSL maturity.
 - **v3** — Plugin system, artifact storage, caching.
+
+## Diagrams
+
+Architecture and flow diagrams (Mermaid) live under [`docs/diagrams/`](./diagrams/):
+
+- [User flow](./diagrams/user-flow.md) — defining and running a pipeline.
+- [Class diagram](./diagrams/class-diagram.md) — the v0 engine model + step-type seam.
+- [Sequence](./diagrams/sequence.md) — a pipeline run execution.
+- [C4](./diagrams/c4.md) — system context and container views.
