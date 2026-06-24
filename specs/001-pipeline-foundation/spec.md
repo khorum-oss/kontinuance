@@ -150,6 +150,11 @@ replaced by a mask in stdout.
   cleaning up running steps and ending the run CANCELLED.
 - **FR-015**: System MUST treat conditional/disabled steps as SKIPPED without failing
   their stage.
+- **FR-016**: System MUST model step execution as an **extensible step-type** seam —
+  the engine selects a `StepExecutor` by the step's type and dispatches to it. v0
+  ships exactly one type (the shell `run` step); new step types (e.g. gradle/docker/
+  npm in a later feature) MUST be addable by registering a new executor, **without
+  changing the engine's stage/step execution loop**.
 
 ### Non-Goals (v0)
 

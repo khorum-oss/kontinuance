@@ -73,8 +73,14 @@ depends on. ⚠️ No user story work begins until this is complete.
 - [ ] T009 [US-shared] Implement the masking filter `logging/SecretMasker.kt` and a
   failing-first test proving a registered secret never appears unmasked in emitted
   lines (SC-003).
+- [ ] T009a [US-shared] Introduce the **step-type seam** (FR-016): sealed
+  `model/StepDefinition.kt` with `RunStep`, the `execution/StepExecutor.kt` interface
+  (`supports`/`execute`) + `StepContext`, and an executor registry the engine selects
+  from. Failing-first test: an unsupported `StepDefinition` is rejected with a clear
+  error; a registered executor is selected by type.
 
-**Checkpoint**: model + status + secret/masking compile and their unit tests pass.
+**Checkpoint**: model + status + secret/masking + step-type seam compile and their
+unit tests pass.
 
 ---
 
@@ -100,11 +106,12 @@ step ⇒ Failed naming the step and no later steps in that stage run.
 
 - [ ] T012 [US1] Implement `descriptor/PipelineDescriptor.kt` (YAML → pipeline model)
   with validation per the descriptor contract (depends on T007).
-- [ ] T013 [US1] Implement `execution/StepRunner.kt`: launch one step via
-  `ProcessBuilder`, capture stdout/stderr, return exit-code → step status.
+- [ ] T013 [US1] Implement `execution/RunStepExecutor.kt` (the `StepExecutor` for
+  `RunStep` from T009a): launch the command via `ProcessBuilder`, capture
+  stdout/stderr, return exit-code → step status.
 - [ ] T014 [US1] Implement `execution/PipelineEngine.kt` `run(...)`: ordered stage/step
-  execution, first-failure short-circuit, Run status aggregation (depends on T006,
-  T013).
+  execution that **dispatches each step through the StepExecutor registry** (T009a),
+  first-failure short-circuit, Run status aggregation (depends on T006, T009a, T013).
 - [ ] T015 [US1] Wire stdout log streaming through `SecretMasker` in the runner
   (FR-010) and add validation/error handling for unlaunchable commands (edge case).
 

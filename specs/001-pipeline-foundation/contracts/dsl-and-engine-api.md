@@ -65,6 +65,28 @@ data class StatusEvent(val target: Target, val status: PipelineStatus)
 - `cancel` terminates in-flight steps and ends the run `Cancelled` (FR-014).
 - `statuses` emits transitions in lifecycle order (FR-006).
 
+## Step-type extension point — `StepExecutor` (FR-016)
+
+The engine never hard-codes "run a shell command". It dispatches each step to a
+registered `StepExecutor`, selected by the step's `StepDefinition` type:
+
+```kotlin
+sealed interface StepDefinition          // RunStep (v0); GradleStep/DockerStep/NpmStep later
+data class RunStep(val command: String) : StepDefinition
+
+interface StepExecutor {
+    fun supports(definition: StepDefinition): Boolean
+    suspend fun execute(context: StepContext): StepRun   // owns workdir, env, timeout, masking
+}
+```
+
+- v0 registers exactly one executor, `RunStepExecutor` (ProcessBuilder-based).
+- Adding a step type = add a `StepDefinition` subtype + a `StepExecutor` and register
+  it; **the engine's stage/step loop is unchanged**. This is the seam feature 002
+  (typed gradle/docker/npm steps) builds on.
+- Isolation, timeout, secret resolution, and log masking are provided to executors
+  via `StepContext`, so every executor inherits those guarantees uniformly.
+
 ## Secret abstraction
 
 ```kotlin

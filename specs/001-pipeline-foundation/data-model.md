@@ -16,14 +16,26 @@ An ordered group of steps within a pipeline.
 - `steps: List<Step>` — ordered; may be empty (an empty stage completes SUCCESS).
 
 ### Step
-A single unit of work that runs a shell command.
+A single unit of work within a stage.
 - `name: String` — non-empty, unique within its stage.
-- `command: String` (or `List<String>`) — the shell command/argv to execute.
+- `definition: StepDefinition` — the typed payload describing what to execute (see
+  the step-type seam below); in v0 always a `RunStep`.
 - `timeout: Duration?` — optional per-step deadline; null ⇒ a sane platform default.
 - `condition: Boolean | Expression?` — when false/unmet ⇒ step is SKIPPED.
 - `secrets: List<SecretRef>` — names of secrets referenced/injected for this step.
 - `workingDirHint: String?` — optional relative subdir; resolved inside the isolated
   working directory, never an absolute escape.
+
+### StepDefinition (sealed) + StepExecutor — extensibility seam (FR-016)
+Step execution is dispatched by type so new step types are additive.
+- `StepDefinition` — a **sealed** hierarchy of typed step payloads. v0 case:
+  - `RunStep(command: String)` — runs a shell command/argv.
+  - (future, feature 002) `GradleStep`, `DockerStep`, `NpmStep` — added as new
+    sealed subtypes; no engine-loop change.
+- `StepExecutor` — interface the engine uses to run a step:
+  `supports(definition): Boolean` and `execute(context): StepRun`. The engine holds a
+  registry of executors and selects the one whose `supports(...)` matches the step's
+  definition. v0 registers exactly one: `RunStepExecutor` (ProcessBuilder-based).
 
 ### Run (Execution)
 One execution of a pipeline.
