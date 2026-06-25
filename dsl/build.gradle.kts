@@ -104,7 +104,7 @@ mavenGeneratedArtifacts {
     description = """
             An annotation based DSL Builder for Kotlin.
         """
-    websiteUrl = "https://github.com/khorum-oss/<project-name>/tree/main"
+    websiteUrl = "https://github.com/khorum-oss/kontinuance/tree/main"
 
     licenses {
         license {
@@ -123,7 +123,7 @@ mavenGeneratedArtifacts {
     }
 
     scm {
-        connection.set("https://github.com/khorum-oss/<project-name>.git")
+        connection.set("https://github.com/khorum-oss/kontinuance.git")
     }
 }
 

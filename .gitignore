@@ -12,3 +12,6 @@ public.key
 .serena
 *.asc
 *.gpg
+
+# Claude Code / agent local settings (may contain tokens) — keep shared skills/commands tracked
+.claude/settings.local.json
