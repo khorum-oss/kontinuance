@@ -17,6 +17,8 @@ junit-jupiter-core-test = "5.13.0-M2"
 mockk = "1.13.17"
 serialization-json = "1.8.1"
 coroutines-core = "1.10.0"
+coroutines-test = "1.10.0"
+snakeyaml-engine = "2.6"
 
 [libraries]
 # Kotlin
@@ -48,6 +50,10 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 # Serialization
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines-core" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines-test" }
+
+# YAML descriptor parsing
+snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml-engine" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
