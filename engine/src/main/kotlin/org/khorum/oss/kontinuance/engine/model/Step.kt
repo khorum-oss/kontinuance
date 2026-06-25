@@ -1,5 +1,8 @@
 package org.khorum.oss.kontinuance.engine.model
 
+import org.khorum.oss.konstellation.metaDsl.annotation.GeneratedDsl
+import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultEmptyList
+import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultTrue
 import kotlin.time.Duration
 
 /**
@@ -14,11 +17,14 @@ import kotlin.time.Duration
  * @param workingDirHint optional relative subdirectory resolved **inside** the step's isolated
  *   working directory; it must never be absolute nor escape via `..`.
  */
+@GeneratedDsl
 data class Step(
     val name: String,
     val definition: StepDefinition,
     val timeout: Duration? = null,
+    @DefaultTrue
     val condition: Boolean = true,
+    @DefaultEmptyList
     val secrets: List<SecretRef> = emptyList(),
     val workingDirHint: String? = null,
 ) {

@@ -26,17 +26,28 @@ class DslDescriptorEquivalenceTest {
                   run: "echo done"
     """.trimIndent()
 
-    private val dsl = pipeline("build-and-test") {
+    private val dsl = pipeline {
+        name = "build-and-test"
         concurrency = 2
-        stage("build") {
-            step("compile") {
-                run("true")
-                timeout = 5.minutes
+        stages {
+            stage {
+                name = "build"
+                steps {
+                    step {
+                        name = "compile"
+                        run("true")
+                        timeout = 5.minutes
+                    }
+                }
             }
-        }
-        stage("test") {
-            step("unit") {
-                run("echo done")
+            stage {
+                name = "test"
+                steps {
+                    step {
+                        name = "unit"
+                        run("echo done")
+                    }
+                }
             }
         }
     }

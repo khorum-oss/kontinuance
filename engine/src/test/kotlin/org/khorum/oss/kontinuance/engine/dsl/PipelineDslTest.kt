@@ -9,20 +9,31 @@ import kotlin.time.Duration.Companion.minutes
 class PipelineDslTest {
 
     @Test
-    fun `builders produce the expected model`() {
-        val pipeline = pipeline("build-and-test") {
+    fun `the generated builders produce the expected model`() {
+        val pipeline = pipeline {
+            name = "build-and-test"
             concurrency = 2
-            stage("build") {
-                step("compile") {
-                    run("./gradlew build")
-                    timeout = 5.minutes
+            stages {
+                stage {
+                    name = "build"
+                    steps {
+                        step {
+                            name = "compile"
+                            run("./gradlew build")
+                            timeout = 5.minutes
+                        }
+                    }
                 }
-            }
-            stage("test") {
-                step("unit") {
-                    run("./gradlew test")
-                    secrets("TOKEN")
-                    condition = false
+                stage {
+                    name = "test"
+                    steps {
+                        step {
+                            name = "unit"
+                            run("./gradlew test")
+                            secrets("TOKEN")
+                            condition(false)
+                        }
+                    }
                 }
             }
         }
@@ -40,19 +51,26 @@ class PipelineDslTest {
     }
 
     @Test
-    fun `a step without a command is rejected`() {
+    fun `a step without a command is rejected at build`() {
         assertFailsWith<IllegalArgumentException> {
-            pipeline("p") {
-                stage("s") {
-                    step("x") { /* no run(...) */ }
+            pipeline {
+                name = "p"
+                stages {
+                    stage {
+                        name = "s"
+                        steps {
+                            step { name = "x" } // no run(...)
+                        }
+                    }
                 }
             }
         }
     }
 
     @Test
-    fun `concurrency defaults to 1`() {
-        val pipeline = pipeline("p") { stage("s") { } }
+    fun `concurrency defaults to 1 and collections default to empty`() {
+        val pipeline = pipeline { name = "p" }
         assertEquals(1, pipeline.concurrency)
+        assertEquals(emptyList(), pipeline.stages)
     }
 }

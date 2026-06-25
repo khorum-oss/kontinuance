@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.engine.dsl.pipeline
+import org.khorum.oss.kontinuance.engine.dsl.run
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.support.CapturingLogSink
@@ -47,10 +48,19 @@ class QuickstartTest {
 
     @Test
     fun `the DSL equivalent produces the identical final status`() = runBlocking {
-        val pipeline = pipeline("build-and-test") {
+        val pipeline = pipeline {
+            name = "build-and-test"
             concurrency = 2
-            stage("build") { step("compile") { run("echo compiling && true") } }
-            stage("test") { step("unit") { run("echo testing && true") } }
+            stages {
+                stage {
+                    name = "build"
+                    steps { step { name = "compile"; run("echo compiling && true") } }
+                }
+                stage {
+                    name = "test"
+                    steps { step { name = "unit"; run("echo testing && true") } }
+                }
+            }
         }
         val run = PipelineEngine.default(CapturingLogSink()).run(pipeline)
         assertEquals(PipelineStatus.Success, run.status)

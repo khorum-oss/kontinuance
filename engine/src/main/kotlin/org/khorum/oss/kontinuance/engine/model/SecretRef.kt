@@ -6,8 +6,7 @@ package org.khorum.oss.kontinuance.engine.model
  * The value is never carried on the model; it is resolved on demand through a
  * [org.khorum.oss.kontinuance.engine.secret.SecretSource] and masked in any log output.
  */
-@JvmInline
-value class SecretRef(val name: String) {
+data class SecretRef(val name: String) {
     init {
         require(name.isNotBlank()) { "secret reference name must be non-empty" }
     }
