@@ -5,6 +5,10 @@ import org.khorum.oss.kontinuance.engine.model.RunStep
 import org.khorum.oss.kontinuance.engine.model.SecretRef
 import org.khorum.oss.kontinuance.engine.model.Stage
 import org.khorum.oss.kontinuance.engine.model.Step
+import org.khorum.oss.kontinuance.engine.model.StepDefinition
+import org.khorum.oss.kontinuance.engine.model.DockerStep
+import org.khorum.oss.kontinuance.engine.model.GradleStep
+import org.khorum.oss.kontinuance.engine.model.NpmStep
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
@@ -27,7 +31,14 @@ object PipelineDescriptor {
 
     private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
     private val STAGE_KEYS = setOf("name", "steps")
-    private val STEP_KEYS = setOf("name", "run", "timeout", "when", "secrets", "workingDir")
+    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm")
+    private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir") + DEFINITION_KEYS
+    private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
+    private val DOCKER_KEYS = setOf("run", "build")
+    private val DOCKER_RUN_KEYS = setOf("image", "command", "env", "volumes")
+    private val DOCKER_BUILD_KEYS = setOf("context", "dockerfile", "tags", "buildArgs")
+    private val NPM_KEYS = setOf("script", "install")
+    private val NPM_INSTALL_KEYS = setOf("clean")
 
     /** Reads the descriptor at [path] and parses it into a [Pipeline]. */
     fun load(path: Path): Pipeline = parse(path.readText())
@@ -65,7 +76,7 @@ object PipelineDescriptor {
         val map = asMap(raw, path)
         checkKeys(map, STEP_KEYS, path)
         val name = asString(requireKey(map, "name", path), "$path.name")
-        val command = asString(requireKey(map, "run", path), "$path.run")
+        val definition = parseDefinition(map, path)
         val timeout = map["timeout"]?.let { parseDescriptorDuration(asString(it, "$path.timeout"), "$path.timeout") }
         val condition = map["when"]?.let { asBoolean(it, "$path.when") } ?: true
         val secrets = asListOrEmpty(map["secrets"], "$path.secrets")
@@ -74,13 +85,98 @@ object PipelineDescriptor {
         return construct(path) {
             Step(
                 name = name,
-                definition = RunStep(command),
+                definition = definition,
                 timeout = timeout,
                 condition = condition,
                 secrets = secrets,
                 workingDirHint = workingDir,
             )
         }
+    }
+
+    /** A step declares exactly one of `run`/`gradle`/`docker`/`npm`; zero or more than one is an error. */
+    private fun parseDefinition(map: Map<String, Any?>, path: String): StepDefinition {
+        val present = DEFINITION_KEYS.filter { map.containsKey(it) }
+        if (present.size != 1) {
+            throw DescriptorException(
+                "$path: a step must declare exactly one of ${DEFINITION_KEYS.sorted()}, found ${present.sorted()}",
+            )
+        }
+        return when (present.single()) {
+            "run" -> RunStep(asString(requireKey(map, "run", path), "$path.run"))
+            "gradle" -> parseGradle(asMap(map["gradle"], "$path.gradle"), "$path.gradle")
+            "docker" -> parseDocker(asMap(map["docker"], "$path.docker"), "$path.docker")
+            else -> parseNpm(asMap(map["npm"], "$path.npm"), "$path.npm")
+        }
+    }
+
+    private fun parseGradle(map: Map<String, Any?>, path: String): StepDefinition {
+        checkKeys(map, GRADLE_KEYS, path)
+        val tasks = asStringList(requireKey(map, "tasks", path), "$path.tasks")
+        val args = asStringList(map["args"], "$path.args")
+        val useWrapper = map["useWrapper"]?.let { asBoolean(it, "$path.useWrapper") } ?: true
+        return construct(path) { GradleStep(tasks, args, useWrapper) }
+    }
+
+    private fun parseDocker(map: Map<String, Any?>, path: String): StepDefinition {
+        checkKeys(map, DOCKER_KEYS, path)
+        val present = DOCKER_KEYS.filter { map.containsKey(it) }
+        if (present.size != 1) {
+            throw DescriptorException(
+                "$path: docker must declare exactly one of ${DOCKER_KEYS.sorted()}, found ${present.sorted()}",
+            )
+        }
+        return if (present.single() == "run") {
+            val run = asMap(map["run"], "$path.run")
+            checkKeys(run, DOCKER_RUN_KEYS, "$path.run")
+            construct("$path.run") {
+                DockerStep.run(
+                    image = asString(requireKey(run, "image", "$path.run"), "$path.run.image"),
+                    command = asStringList(requireKey(run, "command", "$path.run"), "$path.run.command"),
+                    env = asStringMap(run["env"], "$path.run.env"),
+                    volumes = asStringList(run["volumes"], "$path.run.volumes"),
+                )
+            }
+        } else {
+            val build = asMap(map["build"], "$path.build")
+            checkKeys(build, DOCKER_BUILD_KEYS, "$path.build")
+            construct("$path.build") {
+                DockerStep.build(
+                    context = build["context"]?.let { asString(it, "$path.build.context") } ?: ".",
+                    dockerfile = build["dockerfile"]?.let { asString(it, "$path.build.dockerfile") },
+                    tags = asStringList(build["tags"], "$path.build.tags"),
+                    buildArgs = asStringMap(build["buildArgs"], "$path.build.buildArgs"),
+                )
+            }
+        }
+    }
+
+    private fun parseNpm(map: Map<String, Any?>, path: String): StepDefinition {
+        checkKeys(map, NPM_KEYS, path)
+        val present = NPM_KEYS.filter { map.containsKey(it) }
+        if (present.size != 1) {
+            throw DescriptorException(
+                "$path: npm must declare exactly one of ${NPM_KEYS.sorted()}, found ${present.sorted()}",
+            )
+        }
+        return if (present.single() == "script") {
+            construct(path) { NpmStep.script(asString(map["script"], "$path.script")) }
+        } else {
+            val install = asMap(map["install"], "$path.install")
+            checkKeys(install, NPM_INSTALL_KEYS, "$path.install")
+            val clean = install["clean"]?.let { asBoolean(it, "$path.install.clean") } ?: true
+            construct(path) { NpmStep.install(clean) }
+        }
+    }
+
+    /** A list of strings (empty when absent), e.g. Gradle `tasks`/`args` or a docker `command`. */
+    private fun asStringList(value: Any?, path: String): List<String> =
+        asListOrEmpty(value, path).mapIndexed { i, element -> asString(element, "$path[$i]") }
+
+    /** A string→string mapping (empty when absent), e.g. docker `env`/`buildArgs`. */
+    private fun asStringMap(value: Any?, path: String): Map<String, String> {
+        if (value == null) return emptyMap()
+        return asMap(value, path).mapValues { (key, raw) -> asString(raw, "$path.$key") }
     }
 }
 

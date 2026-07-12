@@ -91,13 +91,40 @@ val run = PipelineEngine.default().run(pipeline)
 builders (`dsl/StepDslExtensions.kt`). The DSL and the descriptor produce equal models, so
 they execute with identical ordering and final status.
 
+## Typed step types (Gradle / Docker / NPM)
+
+Beyond the generic `run(...)` shell step, three tools are first-class, typed steps in
+both YAML and the DSL — no hand-written shell strings:
+
+```yaml
+steps:
+  - name: "compile"
+    gradle: { tasks: ["build"], args: ["-x", "test"] }   # ./gradlew build -x test (wrapper preferred)
+  - name: "image"
+    docker: { build: { context: ".", dockerfile: "Dockerfile", tags: ["myapp:ci"] } }
+  - name: "web-tests"
+    npm: { script: "test" }                              # npm run test
+```
+
+```kotlin
+steps {
+    gradleStep("compile") { tasks("build"); args("-x", "test") }
+    dockerStep("image") { build { context = "."; dockerfile = "Dockerfile"; tags("myapp:ci") } }
+    npmStep("web-tests") { script("test") }
+}
+```
+
+A step declares **exactly one** of `run`/`gradle`/`docker`/`npm`. A missing tool binary
+yields a FAILED step naming the tool, never an unhandled exception.
+
 ## Extending step types
 
 Execution is dispatched by `StepDefinition` type through a `StepExecutor` registry
-(the step-type seam, FR-016). v0 ships one executor — `RunStepExecutor` for `RunStep`.
-Adding a step type (e.g. a future `GradleStep`/`DockerStep`) means adding a sealed
-`StepDefinition` subtype and a matching `StepExecutor`; the engine's stage/step loop is
-unchanged.
+(the step-type seam, FR-016). Every command executor — `RunStepExecutor`,
+`GradleStepExecutor`, `DockerStepExecutor`, `NpmStepExecutor` — shares the
+`ProcessStepExecutor` base, so they all inherit identical isolation, timeout, masking,
+and status behavior. Adding a step type means adding a sealed `StepDefinition` subtype
+and a matching `StepExecutor`; the engine's stage/step loop is unchanged.
 
 ## Package layout
 
