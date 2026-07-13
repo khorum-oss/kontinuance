@@ -2,8 +2,10 @@
 
 The runtime model both front-ends produce and the engine consumes. Note the
 **step-type extensibility seam**: `StepDefinition` is a sealed hierarchy and
-`StepExecutor` dispatches by type. v0 ships exactly one type (`RunStep`); feature 002
-adds `GradleStep`/`DockerStep`/`NpmStep` without touching the engine's core loop.
+`StepExecutor` dispatches by type. v0 shipped one type (`RunStep`); feature 002 adds
+`GradleStep`/`DockerStep`/`NpmStep` and their executors **additively** — every command
+executor shares the `ProcessStepExecutor` base (identical isolation, timeout, masking,
+and status), and the engine's core loop is unchanged.
 
 ```mermaid
 classDiagram
@@ -27,6 +29,23 @@ classDiagram
     }
     class RunStep {
       +String command
+    }
+    class GradleStep {
+      +List~String~ tasks
+      +List~String~ args
+      +Boolean useWrapper
+    }
+    class DockerStep {
+      +DockerMode mode
+      +String image
+      +List~String~ command
+      +String context
+      +List~String~ tags
+    }
+    class NpmStep {
+      +NpmMode mode
+      +String script
+      +Boolean clean
     }
     class Run {
       +RunId id

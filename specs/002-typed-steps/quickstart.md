@@ -21,8 +21,16 @@ stages:
 ```
 
 ```kotlin
-stage("build") {
-    gradleStep("compile") { tasks("build"); args("-x", "test") }
+pipeline {
+    name = "web"
+    stages {
+        stage {
+            name = "build"
+            steps {
+                gradleStep("compile") { tasks("build"); args("-x", "test") }
+            }
+        }
+    }
 }
 ```
 
@@ -31,10 +39,18 @@ SUCCESS/FAILED.
 
 ## Docker + NPM steps
 
+The typed builders live inside a `steps { }` block, alongside the v0 `step { run(...) }`:
+
 ```kotlin
-dockerStep("smoke") { run { image = "node:20"; command("node", "--version") } }
-npmStep("web-tests") { script("test") }   // npm run test
+steps {
+    dockerStep("smoke") { run { image = "node:20"; command("node", "--version") } }
+    npmStep("web-tests") { script("test") }   // npm run test
+    npmStep("deps") { installClean() }          // npm ci
+}
 ```
+
+Shared step config (`timeout`, `enabled`, `secrets`, `workingDir`) is passed via a
+`TypedStepOptions` argument, e.g. `gradleStep("compile", TypedStepOptions(timeout = 5.minutes)) { … }`.
 
 ## What to verify (maps to success criteria)
 

@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-24
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Make gradle, docker, and npm first-class in the pipeline DSL — configured, typed step builders (gradleStep/dockerStep/npmStep) instead of hand-written shell strings — built on the v0 step-type seam (StepDefinition + StepExecutor)."
 

@@ -3,6 +3,9 @@ package org.khorum.oss.kontinuance.engine.execution
 import kotlinx.coroutines.flow.Flow
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
+import org.khorum.oss.kontinuance.engine.execution.steps.DockerStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.steps.GradleStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.steps.NpmStepExecutor
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.model.RunId
@@ -29,12 +32,20 @@ interface PipelineEngine {
 
     companion object {
         /**
-         * The default engine: a single [RunStepExecutor] registered for the v0 `RunStep`,
-         * streaming logs to [sink].
+         * The default engine, streaming logs to [sink]. It registers every built-in step executor:
+         * the v0 [RunStepExecutor] for `RunStep`, plus the typed [GradleStepExecutor],
+         * [DockerStepExecutor], and [NpmStepExecutor] for their respective step definitions.
          */
         fun default(sink: LogSink = StdoutLogSink()): PipelineEngine =
             DefaultPipelineEngine(
-                registry = StepExecutorRegistry(listOf(RunStepExecutor())),
+                registry = StepExecutorRegistry(
+                    listOf(
+                        RunStepExecutor(),
+                        GradleStepExecutor(),
+                        DockerStepExecutor(),
+                        NpmStepExecutor(),
+                    ),
+                ),
                 logSink = sink,
             )
     }
