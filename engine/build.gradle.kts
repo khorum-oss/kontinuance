@@ -1,5 +1,6 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
+import org.gradle.api.plugins.JavaApplication
 
 val dslVersion: String by rootProject.extra
 
@@ -10,6 +11,12 @@ plugins {
 
 group = "org.khorum.oss.kontinuance"
 version = dslVersion
+
+// The `application` plugin is applied to every module by the root build; point the engine's runner at
+// the CLI entry point so `./gradlew :engine:run --args="<descriptor.yaml>"` (and installDist) work.
+configure<JavaApplication> {
+    mainClass.set("org.khorum.oss.kontinuance.engine.cli.RunnerKt")
+}
 
 dependencies {
     implementation(kotlin("stdlib"))
