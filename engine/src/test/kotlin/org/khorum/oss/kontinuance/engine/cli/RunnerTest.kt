@@ -51,4 +51,17 @@ class RunnerTest {
         Files.writeString(bad, "not: a valid pipeline descriptor")
         assertEquals(2, Runner.run(arrayOf(bad.toString())))
     }
+
+    @Test
+    fun `check parses without executing (would-fail pipeline still returns 0)`(@TempDir dir: Path) {
+        // The step command exits non-zero; --check must NOT run it, so the result is 0, not 1.
+        assertEquals(0, Runner.run(arrayOf("--check", descriptorWith(dir, "false"))))
+    }
+
+    @Test
+    fun `check returns 2 on a malformed descriptor`(@TempDir dir: Path) {
+        val bad = dir.resolve("bad.yaml")
+        Files.writeString(bad, "not: a valid pipeline descriptor")
+        assertEquals(2, Runner.run(arrayOf("--check", bad.toString())))
+    }
 }
