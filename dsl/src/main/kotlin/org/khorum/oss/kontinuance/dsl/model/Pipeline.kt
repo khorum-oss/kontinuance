@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.engine.model
+package org.khorum.oss.kontinuance.dsl.model
 
 import org.khorum.oss.konstellation.metaDsl.annotation.GeneratedDsl
 import org.khorum.oss.konstellation.metaDsl.annotation.ListDsl
@@ -18,7 +18,7 @@ import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.D
  * @param concurrency the maximum number of simultaneously RUNNING steps (K); must be >= 1.
  */
 @GeneratedDsl
-@RootDsl(name = "pipeline", alias = "")
+@RootDsl(name = "pipeline")
 data class Pipeline(
     val name: String,
     @ListDsl

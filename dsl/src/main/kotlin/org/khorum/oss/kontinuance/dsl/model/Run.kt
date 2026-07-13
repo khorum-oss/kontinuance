@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.engine.model
+package org.khorum.oss.kontinuance.dsl.model
 
 import java.time.Instant
 

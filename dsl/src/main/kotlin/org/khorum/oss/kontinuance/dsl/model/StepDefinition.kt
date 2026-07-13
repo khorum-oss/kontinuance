@@ -1,4 +1,6 @@
-package org.khorum.oss.kontinuance.engine.model
+package org.khorum.oss.kontinuance.dsl.model
+
+import org.khorum.oss.konstellation.metaDsl.annotation.SingleEntryTransformDsl
 
 /**
  * The typed payload describing what a [Step] executes.
@@ -16,6 +18,7 @@ sealed interface StepDefinition
  *
  * @param command the shell command line to run (e.g. `"./gradlew build"`).
  */
+@SingleEntryTransformDsl<String>(String::class, "RunStep(%N)")
 data class RunStep(val command: String) : StepDefinition {
     init {
         require(command.isNotBlank()) { "RunStep command must be non-empty" }

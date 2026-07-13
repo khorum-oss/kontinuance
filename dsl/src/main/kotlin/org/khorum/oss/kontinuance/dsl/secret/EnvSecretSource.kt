@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.engine.secret
+package org.khorum.oss.kontinuance.dsl.secret
 
 /**
  * v0 [SecretSource] backed by environment variables.

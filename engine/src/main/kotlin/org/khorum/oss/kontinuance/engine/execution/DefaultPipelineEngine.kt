@@ -10,17 +10,17 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.supervisorScope
+import org.khorum.oss.kontinuance.dsl.model.Pipeline
+import org.khorum.oss.kontinuance.dsl.model.Stage
+import org.khorum.oss.kontinuance.dsl.model.Step
+import org.khorum.oss.kontinuance.dsl.model.PipelineStatus
+import org.khorum.oss.kontinuance.dsl.model.Run
+import org.khorum.oss.kontinuance.dsl.model.RunId
+import org.khorum.oss.kontinuance.dsl.model.StageRun
+import org.khorum.oss.kontinuance.dsl.model.StepRun
+import org.khorum.oss.kontinuance.dsl.secret.SecretSource
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
-import org.khorum.oss.kontinuance.engine.model.Pipeline
-import org.khorum.oss.kontinuance.engine.model.PipelineStatus
-import org.khorum.oss.kontinuance.engine.model.Run
-import org.khorum.oss.kontinuance.engine.model.RunId
-import org.khorum.oss.kontinuance.engine.model.Stage
-import org.khorum.oss.kontinuance.engine.model.StageRun
-import org.khorum.oss.kontinuance.engine.model.Step
-import org.khorum.oss.kontinuance.engine.model.StepRun
-import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -83,15 +83,15 @@ class DefaultPipelineEngine(
         return supervisorScope {
             val execution = async { executeStages(pipeline, gate, stepRunner, flow, collected) }
             activeRuns[runId] = execution
-            try {
+            return@supervisorScope try {
                 val overall = execution.await()
                 emit(flow, pipelineTarget, overall)
                 Run(runId, pipeline, overall, collected.toList())
-            } catch (cancelled: CancellationException) {
+            } catch (_: CancellationException) {
                 emit(flow, pipelineTarget, PipelineStatus.Cancelled)
                 Run(runId, pipeline, PipelineStatus.Cancelled, collected.toList())
             } finally {
-                activeRuns.remove(runId)
+                activeRuns.remove(runId)?.await()
             }
         }
     }
@@ -160,7 +160,7 @@ class DefaultPipelineEngine(
             return StepRun(step.name, PipelineStatus.Skipped)
         }
         emit(flow, target, PipelineStatus.Running)
-        val stepRun = gate.withPermit { stepRunner.run(step) }
+        val stepRun = gate.withPermit<StepRun> { stepRunner.run(step) }
         emit(flow, target, stepRun.status)
         return stepRun
     }

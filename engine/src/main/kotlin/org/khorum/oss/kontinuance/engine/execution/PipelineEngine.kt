@@ -1,13 +1,13 @@
 package org.khorum.oss.kontinuance.engine.execution
 
 import kotlinx.coroutines.flow.Flow
+import org.khorum.oss.kontinuance.dsl.model.Pipeline
+import org.khorum.oss.kontinuance.dsl.model.Run
+import org.khorum.oss.kontinuance.dsl.model.RunId
+import org.khorum.oss.kontinuance.dsl.secret.EnvSecretSource
+import org.khorum.oss.kontinuance.dsl.secret.SecretSource
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
-import org.khorum.oss.kontinuance.engine.model.Pipeline
-import org.khorum.oss.kontinuance.engine.model.Run
-import org.khorum.oss.kontinuance.engine.model.RunId
-import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
-import org.khorum.oss.kontinuance.engine.secret.SecretSource
 
 /**
  * Executes pipelines in-process and exposes their lifecycle.

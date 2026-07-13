@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.engine.model
+package org.khorum.oss.kontinuance.dsl.model
 
 /**
  * Explicit lifecycle status for a run, stage, or step.

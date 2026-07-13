@@ -1,10 +1,10 @@
 package org.khorum.oss.kontinuance.engine.descriptor
 
-import org.khorum.oss.kontinuance.engine.model.Pipeline
-import org.khorum.oss.kontinuance.engine.model.RunStep
-import org.khorum.oss.kontinuance.engine.model.SecretRef
-import org.khorum.oss.kontinuance.engine.model.Stage
-import org.khorum.oss.kontinuance.engine.model.Step
+import org.khorum.oss.kontinuance.dsl.model.Pipeline
+import org.khorum.oss.kontinuance.dsl.model.RunStep
+import org.khorum.oss.kontinuance.dsl.model.SecretRef
+import org.khorum.oss.kontinuance.dsl.model.Stage
+import org.khorum.oss.kontinuance.dsl.model.Step
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException

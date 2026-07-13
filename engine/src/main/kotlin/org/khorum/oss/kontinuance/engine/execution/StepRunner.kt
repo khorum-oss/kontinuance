@@ -1,13 +1,15 @@
 package org.khorum.oss.kontinuance.engine.execution
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.khorum.oss.kontinuance.dsl.model.Step
+import org.khorum.oss.kontinuance.dsl.model.PipelineStatus
+import org.khorum.oss.kontinuance.dsl.model.StepRun
+import org.khorum.oss.kontinuance.dsl.secret.SecretSource
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.MaskingLogSink
 import org.khorum.oss.kontinuance.engine.logging.SecretMasker
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
-import org.khorum.oss.kontinuance.engine.model.PipelineStatus
-import org.khorum.oss.kontinuance.engine.model.Step
-import org.khorum.oss.kontinuance.engine.model.StepRun
-import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -44,7 +46,9 @@ class StepRunner(
         val resolved = resolveSecrets(step)
         val masker = SecretMasker(resolved.values)
         val maskingSink = MaskingLogSink(masker, logSink)
-        val root = Files.createTempDirectory(WORKDIR_PREFIX)
+        val root = withContext(Dispatchers.IO) {
+            Files.createTempDirectory(WORKDIR_PREFIX)
+        }
         return try {
             val workingDir = resolveWorkingDir(root, step.workingDirHint)
             val context = StepContext(step, workingDir, baseEnvironment + resolved, maskingSink)

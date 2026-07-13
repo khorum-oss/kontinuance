@@ -1,7 +1,7 @@
 package org.khorum.oss.kontinuance.engine.execution
 
+import org.khorum.oss.kontinuance.dsl.model.Step
 import org.khorum.oss.kontinuance.engine.logging.LogSink
-import org.khorum.oss.kontinuance.engine.model.Step
 import java.nio.file.Path
 
 /**

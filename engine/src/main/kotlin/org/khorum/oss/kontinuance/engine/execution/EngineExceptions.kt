@@ -1,6 +1,6 @@
 package org.khorum.oss.kontinuance.engine.execution
 
-import org.khorum.oss.kontinuance.engine.model.StepDefinition
+import org.khorum.oss.kontinuance.dsl.model.StepDefinition
 
 /**
  * Thrown when a pipeline fails validation **before any step executes** (FR-003): malformed

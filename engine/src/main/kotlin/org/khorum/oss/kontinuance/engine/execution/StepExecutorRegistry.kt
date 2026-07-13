@@ -1,6 +1,6 @@
 package org.khorum.oss.kontinuance.engine.execution
 
-import org.khorum.oss.kontinuance.engine.model.StepDefinition
+import org.khorum.oss.kontinuance.dsl.model.StepDefinition
 
 /**
  * Holds the registered [StepExecutor]s and selects one by step definition type.

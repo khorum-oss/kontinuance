@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.engine.model
+package org.khorum.oss.kontinuance.dsl.model
 
 import org.khorum.oss.konstellation.metaDsl.annotation.GeneratedDsl
 import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultEmptyList

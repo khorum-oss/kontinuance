@@ -5,7 +5,6 @@ val dslVersion: String by rootProject.extra
 
 plugins {
     id("io.gitlab.arturbosch.detekt")
-    id("com.google.devtools.ksp")
 }
 
 group = "org.khorum.oss.kontinuance"
@@ -13,27 +12,17 @@ version = dslVersion
 
 dependencies {
     implementation(project(":dsl"))
-    implementation(project(":dsl:extensions"))
+    implementation(rootProject.libs.konstellation.meta.dsl)
     implementation(kotlin("stdlib"))
     implementation(rootProject.libs.kotlin.reflect)
-    implementation(rootProject.libs.coroutines.core)
-    implementation(rootProject.libs.konstellation.meta.dsl)
-    implementation(rootProject.libs.snakeyaml.engine)
 
     testImplementation(project(":core-test"))
     testImplementation(rootProject.libs.mockk)
     testImplementation(rootProject.libs.coroutines.test)
 }
 
-ksp {
-    arg("projectRootClasspath", "org.khorum.oss.kontinuance.engine")
-    arg("dslBuilderClasspath", "org.khorum.oss.kontinuance.engine.dsl")
-    arg("dslMarkerClass", "org.khorum.oss.kontinuance.engine.dsl.KontinuanceDsl")
-    arg("rootDslFileClasspath", "org.khorum.oss.kontinuance.engine.dsl")
-}
-
 tasks.jar {
-    archiveBaseName.set("engine")
+    archiveBaseName.set("kontinuance-dsl-exentions")
 }
 
 kover {

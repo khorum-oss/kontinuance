@@ -24,7 +24,7 @@ class SecretMasker(
 
     /** Returns [line] with every registered secret value replaced by the mask. */
     fun mask(line: String): String {
-        if (values.isEmpty()) return line
+        if (isEmpty) return line
         var result = line
         for (value in values) {
             result = result.replace(value, mask)

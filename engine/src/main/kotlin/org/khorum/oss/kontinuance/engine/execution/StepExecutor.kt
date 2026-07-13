@@ -1,7 +1,7 @@
 package org.khorum.oss.kontinuance.engine.execution
 
-import org.khorum.oss.kontinuance.engine.model.StepDefinition
-import org.khorum.oss.kontinuance.engine.model.StepRun
+import org.khorum.oss.kontinuance.dsl.model.StepDefinition
+import org.khorum.oss.kontinuance.dsl.model.StepRun
 
 /**
  * Runs a step of a particular [StepDefinition] type.

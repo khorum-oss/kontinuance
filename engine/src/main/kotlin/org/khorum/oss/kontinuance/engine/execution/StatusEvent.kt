@@ -1,6 +1,6 @@
 package org.khorum.oss.kontinuance.engine.execution
 
-import org.khorum.oss.kontinuance.engine.model.PipelineStatus
+import org.khorum.oss.kontinuance.dsl.model.PipelineStatus
 
 /** Identifies the unit a [StatusEvent] is about. */
 sealed interface Target {

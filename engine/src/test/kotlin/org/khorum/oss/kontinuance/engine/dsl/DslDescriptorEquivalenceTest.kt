@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.engine.dsl
 
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
+import org.khorum.oss.kontinuance.dsl.common.pipeline
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.support.CapturingLogSink

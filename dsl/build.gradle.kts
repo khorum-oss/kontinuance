@@ -1,46 +1,43 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
-import org.khorum.oss.plugins.open.secrets.getPropertyOrEnv
 
 val dslVersion: String by rootProject.extra
-val metaDslVersion: String by rootProject.extra
 
 plugins {
     id("io.gitlab.arturbosch.detekt")
     id("com.google.devtools.ksp")
-    signing
-
-    id("org.khorum.oss.plugins.open.secrets")
-    id("org.khorum.oss.plugins.open.publishing.maven-generated-artifacts")
-    id("org.khorum.oss.plugins.open.publishing.digital-ocean-spaces")
 }
 
 group = "org.khorum.oss.kontinuance"
 version = dslVersion
 
 dependencies {
-    implementation(rootProject.libs.konstellation.meta.dsl)
-    ksp(rootProject.libs.konstellation.dsl)
     implementation(kotlin("stdlib"))
     implementation(rootProject.libs.kotlin.reflect)
-    implementation(rootProject.libs.kotlinpoet)
-    implementation(rootProject.libs.kotlinpoet.ksp)
-    implementation(rootProject.libs.ksp.api)
-    implementation(rootProject.libs.google.auto.service)
+    implementation(rootProject.libs.konstellation.meta.dsl)
+    ksp(rootProject.libs.konstellation.dsl)
 
     testImplementation(project(":core-test"))
     testImplementation(rootProject.libs.mockk)
+    testImplementation(rootProject.libs.coroutines.test)
+}
+
+ksp {
+    arg("projectRootClasspath", "org.khorum.oss.kontinuance.dsl")
+    arg("dslBuilderClasspath", "org.khorum.oss.kontinuance.dsl.common")
+    arg("dslMarkerClass", "org.khorum.oss.kontinuance.dsl.common.KontinuanceDsl")
+    arg("rootDslFileClasspath", "org.khorum.oss.kontinuance.dsl.common")
 }
 
 tasks.jar {
-    archiveBaseName.set("dsl")
+    archiveBaseName.set("kontinuance-dsl")
 }
 
 kover {
     reports {
         filters {
             excludes {
-                annotatedBy("org.khorum.oss.kontinuance.dsl.common.ExcludeFromCoverage")
+                annotatedBy("org.khorum.oss.kontinuance.engine.common.ExcludeFromCoverage")
             }
         }
     }
@@ -59,9 +56,6 @@ tasks.withType<Detekt>().configureEach {
         sarif.required.set(true)
         md.required.set(true)
     }
-}
-
-tasks.withType<Detekt>().configureEach {
     jvmTarget = JavaVersion.VERSION_21.majorVersion
 }
 
@@ -69,72 +63,8 @@ tasks.withType<DetektCreateBaselineTask>().configureEach {
     jvmTarget = JavaVersion.VERSION_21.majorVersion
 }
 
-digitalOceanSpacesPublishing {
-    bucket = "open-reliquary"
-    accessKey = project.getPropertyOrEnv("spaces.key", "DO_SPACES_API_KEY")
-    secretKey = project.getPropertyOrEnv("spaces.secret", "DO_SPACES_SECRET")
-    publishedVersion = version.toString()
-    signingRequired = true
-}
-
-signing {
-    val signingKey = providers.environmentVariable("GPG_SIGNING_KEY").orNull
-    val signingPassword = providers.environmentVariable("GPG_SIGNING_PASSWORD").orNull
-
-    if (signingKey != null) {
-        useInMemoryPgpKeys(signingKey, signingPassword)
-    } else {
-        useGpgCmd()
-    }
-    sign(publishing.publications)
-    afterEvaluate {
-        tasks.named("uploadToDigitalOceanSpaces") {
-            dependsOn(tasks.withType<Sign>())
-        }
-    }
-}
-
-tasks.withType<PublishToMavenRepository>().configureEach {
-    dependsOn(tasks.withType<Sign>())
-}
-
-mavenGeneratedArtifacts {
-    publicationName = "digitalOceanSpaces"
-    name = "Konstellation DSL Builder"
-    description = """
-            An annotation based DSL Builder for Kotlin.
-        """
-    websiteUrl = "https://github.com/khorum-oss/kontinuance/tree/main"
-
-    licenses {
-        license {
-            name = "Apache License, Version 2.0"
-            url = "https://www.apache.org/licenses/LICENSE-2.0"
-        }
-    }
-
-    developers {
-        developer {
-            id = "khorum-oss"
-            name = "Khorum OSS Team"
-            email = "khorum.oss@gmail.com"
-            organization = "Khorum OSS Software"
-        }
-    }
-
-    scm {
-        connection.set("https://github.com/khorum-oss/kontinuance.git")
-    }
-}
-
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
-}
-
-ksp {
-    arg("projectRootClasspath", "org.khorum.oss.kontinuance")
-    arg("dslBuilderClasspath", "org.khorum.oss.kontinuance.common")
-    arg("dslMarkerClass", "org.khorum.oss.kontinuance.common.KontinuanceDsl")
 }

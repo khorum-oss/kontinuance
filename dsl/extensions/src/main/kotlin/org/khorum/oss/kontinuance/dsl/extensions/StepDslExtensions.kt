@@ -1,8 +1,8 @@
-package org.khorum.oss.kontinuance.engine.dsl
+package org.khorum.oss.kontinuance.dsl.extensions
 
-import org.khorum.oss.kontinuance.engine.model.RunStep
-import org.khorum.oss.kontinuance.engine.model.SecretRef
-import org.khorum.oss.kontinuance.engine.model.StepDslBuilder
+import org.khorum.oss.kontinuance.dsl.model.RunStep
+import org.khorum.oss.kontinuance.dsl.model.SecretRef
+import org.khorum.oss.kontinuance.dsl.model.StepDslBuilder
 
 /**
  * Convenience for the common v0 step type: sets the step's [definition] to a [RunStep] for [command].
