@@ -19,6 +19,7 @@ DSL** generated on Konstellation KSP.
 | **003 github-event-source** | **US1 + US3 + runnable service built** (engine-only, Spring-free) — `github` module: poll GitHub (PRs **and** tracked-branch pushes) → run via the 001 engine → post commit status (`pending→success/failure`) on the head SHA, stable `kontinuance/ci` context, `KONTINUANCE_SHA` from the event. Manual trigger + native config + the installable `kontinuance-ci` service (poll loop, env token, durable cursor); quickstart in `examples/github-ci/`. No new external deps. **31 tests** incl. end-to-end. Remaining: US2 required-check *gating* (a branch-protection config step; the stable context is already guaranteed), the optional webhook mode, and the cursor→persistence fold-in. |
 | **004 khorum-pattern-alignment** | **Built & merged** (PR #10 → `main`, v1.0.13) — fixed Kover/Sonar coverage aggregation to measure `:engine`, shared `config/detekt/detekt.yml`, `dependency.env` public/private switch, dedicated `integration-tests` module, per-feature `checklists/`, and Kotlin 2.1.20→2.3.21 (+KSP 2.3.10, KSP2). |
 | **005 publish-artifacts** | **Built** — native publish pipeline example (`examples/publish-artifacts/`) + `sample-lib` + quickstart; publishes Maven artifacts to a configurable repo via the installed CLI, URL/creds as masked secrets. Verified end-to-end against a `file://` repo (full JAR/POM/checksums land; missing-secret fails fast with no upload). No engine change. |
+| **006 run-persistence** | **Built** — new `persistence` module: durable `RunStore` (file-backed JSON, `recent(limit)` newest-first + `get(id)`, corrupt-record isolation) behind a swappable seam; `RunRecord` captures status + CI context (repo/sha/trigger), no secrets/logs. The `github` CI service records every run; `kontinuance-ci` state consolidated under `~/.kontinuance/`. Engine-only, Spring-free, no new deps. |
 | `engine→dsl` refactor | **Deferred, not a blocker.** 003 will be implemented **engine-only** (depending on `engine` types directly), so this refactor is decoupled from the near-term path and can land later on its own merit. |
 
 ## Decisions locked today (2026-07-12)
@@ -63,8 +64,10 @@ streaming layer — not persistence or approval. What 001 already provides for f
 a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't exposed over a wire
 (001 explicitly deferred "Web UI and remote log streaming over SSE/WebSocket" to v1+).
 
-3. **Persistence** *(006)* — run history + the durable poll cursor (folds in the 003 placeholder
-   store). The store the UI lists runs/history from (beyond the current process's memory).
+3. **Persistence** *(006 — ✅ built)* — durable `RunStore` (file-backed, newest-first listing +
+   fetch-by-id, corrupt-record isolation) recording every CI run with status + context; state under
+   `~/.kontinuance/`. The store the UI lists runs/history from. A DB backend can replace the file
+   default behind the `RunStore` seam when the Server/API arrives.
 4. **Server / API + streaming layer** *(007 — UI prerequisite)* — a long-running Spring Boot
    orchestrator that hosts the engine and exposes it: HTTP for pipelines/runs, **SSE/WebSocket for
    live status + streamed logs** (the surface 001 deferred). This one layer unlocks the UI, gives
@@ -92,9 +95,9 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 
 ## Immediate next step
 
-**003 US1 is built.** Natural continuations, any order: **(a)** wire the long-running service +
-config (repository bindings, poll interval, token) so it actually runs on the Mini — this is really
-the front half of the **Server/API feature (007)**; **(b)** **US3** — push-to-`main` delivery +
-manual trigger (small additions on the same plumbing); **(c)** **Persistence (006)** — swap the
-file-cursor placeholder for the durable store and add run history. The UI cluster (007 API → 009 UI)
-then builds on (a)+(c).
+**Publishing (005), external CI (003, runnable), and persistence (006) are all built** — the engine
+now runs, delivers, gates GitHub PRs, and records history. What's left is the **UI cluster**:
+**Server / API + streaming (007)** — the long-running Spring Boot surface exposing the `RunStore` +
+live status/logs over HTTP + SSE/WebSocket — then the **Web UI (009)** against it. Highest-leverage
+move: pin the **007 API contract to the finished UI design** (the maintainer's screenshots), so we
+build exactly the endpoints/streams the screens consume. `007` is where Spring Boot properly enters.

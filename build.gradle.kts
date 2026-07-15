@@ -84,6 +84,7 @@ dependencies {
     kover(project(":dsl"))
     kover(project(":engine"))
     kover(project(":github"))
+    kover(project(":persistence"))
     kover(project(":integration-tests"))
 }
 

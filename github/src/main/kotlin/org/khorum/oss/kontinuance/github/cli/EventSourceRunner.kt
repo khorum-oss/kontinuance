@@ -9,6 +9,9 @@ import org.khorum.oss.kontinuance.github.poll.FileCursorStore
 import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.trigger.TriggerResolver
+import org.khorum.oss.kontinuance.persistence.FileRunStore
+import org.khorum.oss.kontinuance.persistence.NoOpRunStore
+import org.khorum.oss.kontinuance.persistence.RunStore
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import java.io.IOException
 import java.nio.file.Path
@@ -26,6 +29,7 @@ private const val MILLIS_PER_SECOND = 1000L
 fun eventSourceFrom(
     config: EventSourceConfig,
     cursors: CursorStore,
+    runStore: RunStore = NoOpRunStore,
     env: (String) -> String? = System::getenv,
 ): EventSource {
     val token = env(config.tokenEnv)?.takeIf { it.isNotBlank() }
@@ -35,6 +39,7 @@ fun eventSourceFrom(
         poller = Poller(client, config.bindings, cursors),
         resolver = TriggerResolver(config.bindings),
         reporter = RunReporter(client),
+        runStore = runStore,
     )
 }
 
@@ -42,9 +47,11 @@ fun eventSourceFrom(
 fun main(args: Array<String>) {
     val configPath = args.firstOrNull() ?: fail(USAGE)
     val config = loadConfig(configPath)
-    val cursorFile = Path.of(System.getProperty("user.home"), ".kontinuance", "github-cursors.properties")
+    val stateDir = Path.of(System.getProperty("user.home"), ".kontinuance")
+    val cursors = FileCursorStore(stateDir.resolve("github-cursors.properties"))
+    val runStore = FileRunStore(stateDir.resolve("runs"))
     val source = try {
-        eventSourceFrom(config, FileCursorStore(cursorFile))
+        eventSourceFrom(config, cursors, runStore)
     } catch (e: IllegalStateException) {
         fail(e.message)
     }

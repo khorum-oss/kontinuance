@@ -24,6 +24,7 @@ includeModules(
     "dsl",
     "engine",
     "github",
+    "persistence",
     "integration-tests"
 )
 
