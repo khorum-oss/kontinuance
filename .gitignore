@@ -1,9 +1,12 @@
 .DS_Store
 .idea
 **/build/**
-.gradle/** 
+.gradle/**
 
 **/.gradle/**
+
+# Kotlin compiler/incremental build output
+.kotlin/**
 
 secret.properties
 

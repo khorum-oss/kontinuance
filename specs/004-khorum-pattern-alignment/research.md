@@ -21,6 +21,16 @@ movable. Forcing it would risk generation breakage that surfaces in consumers (P
 version exactly. (b) Skip the bump entirely — rejected as the default; attempt it first, defer only
 on proven incompatibility.
 
+**Outcome (applied, not deferred)**: KSP moved to the decoupled KSP2 versioning line (newest `2.3.10`,
+consistent with the existing `ksp.useKSP2=true`), so the pin became `kotlin = "2.3.21"` +
+`ksp = "2.3.10"`. The Konstellation KSP processor (`meta-dsl 1.0.15` / `dsl 2.0.14`) generates and
+compiles cleanly under it, and the full `./gradlew build` — KSP generation, all module tests, detekt,
+and `koverVerify` — is green. Dependency verification needed **no** change: `org.jetbrains.*` (Kotlin)
+and `com.google.*` (KSP) are already group-trusted with signing keys in
+`verification-metadata.xml`, so the new artifacts verify under existing trust (Principle V upheld),
+proven by the green build with verification enabled. (Verified on Gradle 8.14.3; the repo pins 9.5.1
+in the wrapper — see the note in tasks.md T024.)
+
 ## R2 — `dependency.env` switch shape for kontinuance
 
 **Decision**: Mirror relikquary's mechanism — a single `dependency.env` gradle property gating
