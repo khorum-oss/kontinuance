@@ -66,11 +66,13 @@ fun Project.sharedRepositories() {
     }
 }
 
-tasks.register("koverMergedReport") {
-    group = "verification"
-    description = "Generates coverage report for the dsl module"
-
-    dependsOn(project(":dsl").tasks.named("koverXmlReport"))
+// Aggregate coverage from every production module into the single root Kover report that SonarCloud
+// reads, so the quality gate measures the engine (where the code actually lives) and not only the
+// near-empty dsl stub. core-test is a test-support module and is intentionally left out of the
+// aggregate. New coverage-bearing modules (e.g. integration-tests) are added here.
+dependencies {
+    kover(project(":dsl"))
+    kover(project(":engine"))
 }
 
 tasks.register("initProject") {
@@ -131,7 +133,7 @@ sonar {
         property("sonar.host.url", "https://sonarcloud.io")
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
-            "${project(":dsl").layout.buildDirectory.get()}/reports/kover/report.xml"
+            "${layout.buildDirectory.get()}/reports/kover/report.xml"
         )
     }
 }
