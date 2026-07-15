@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.github.support.FakeGitHubServer
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -52,6 +53,24 @@ class RestGitHubClientIT {
             assertEquals("Bearer t0k3n", request.authorization)
             assertTrue(request.body.contains("\"state\":\"success\""), "body carries the state")
             assertTrue(request.body.contains("\"context\":\"kontinuance/ci\""), "body carries the context")
+        }
+    }
+
+    @Test
+    fun `resolves a branch head SHA`() = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/commits/.+", body = """{"sha":"branchsha","commit":{}}""")
+            val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
+            assertEquals("branchsha", client.branchHead(repo, "main"))
+        }
+    }
+
+    @Test
+    fun `branch head is null for a missing branch`() = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/commits/.+", status = 404, body = """{"message":"Not Found"}""")
+            val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
+            assertNull(client.branchHead(repo, "nope"))
         }
     }
 

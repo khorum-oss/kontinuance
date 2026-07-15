@@ -20,24 +20,34 @@ class Poller(
     private val cursors: CursorStore,
 ) {
 
-    /** Polls every binding once and returns the new PR events observed (recording their cursors). */
+    /**
+     * Polls every binding once and returns the new events observed (recording their cursors): a
+     * [TriggerEvent.Kind.PULL_REQUEST] for each open PR whose head SHA is new, and — for bindings with
+     * a delivery pipeline — a [TriggerEvent.Kind.PUSH] when the tracked branch's head advances.
+     */
     suspend fun poll(): List<TriggerEvent> {
         val events = mutableListOf<TriggerEvent>()
         for (binding in bindings) {
-            for (pr in client.listOpenPullRequests(binding.repo)) {
-                val key = "${binding.repo.slug}#pr-${pr.number}"
-                if (cursors.lastSeen(key) != pr.headSha) {
-                    events += TriggerEvent(
-                        repo = binding.repo,
-                        sha = pr.headSha,
-                        kind = TriggerEvent.Kind.PULL_REQUEST,
-                        ref = pr.headRef,
-                        pullNumber = pr.number,
-                    )
-                    cursors.record(key, pr.headSha)
-                }
-            }
+            events += pollPullRequests(binding)
+            events += pollTrackedBranch(binding)
         }
         return events
+    }
+
+    private suspend fun pollPullRequests(binding: RepositoryBinding): List<TriggerEvent> =
+        client.listOpenPullRequests(binding.repo).mapNotNull { pr ->
+            val key = "${binding.repo.slug}#pr-${pr.number}"
+            if (cursors.lastSeen(key) == pr.headSha) return@mapNotNull null
+            cursors.record(key, pr.headSha)
+            TriggerEvent(binding.repo, pr.headSha, TriggerEvent.Kind.PULL_REQUEST, pr.headRef, pr.number)
+        }
+
+    private suspend fun pollTrackedBranch(binding: RepositoryBinding): List<TriggerEvent> {
+        if (binding.pushPipeline == null) return emptyList()
+        val head = client.branchHead(binding.repo, binding.trackedBranch) ?: return emptyList()
+        val key = "${binding.repo.slug}#push-${binding.trackedBranch}"
+        if (cursors.lastSeen(key) == head) return emptyList()
+        cursors.record(key, head)
+        return listOf(TriggerEvent(binding.repo, head, TriggerEvent.Kind.PUSH, binding.trackedBranch))
     }
 }

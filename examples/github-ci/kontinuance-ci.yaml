@@ -1,0 +1,19 @@
+# Kontinuance event-source configuration.
+#
+# Native Kontinuance schema — this is NOT a GitHub Actions workflow and is not derived from any GitHub
+# YAML. It tells the `kontinuance-ci` service which repositories to watch and which pipeline to run for
+# pull requests and (optionally) for pushes to a tracked branch.
+eventSource:
+  # Env var holding the GitHub token (a PAT with `repo`/`repo:status`). Never inline the token here.
+  tokenEnv: "GITHUB_TOKEN"
+  # Optional; set for GitHub Enterprise. Default: https://api.github.com
+  # baseUrl: "https://github.example.com/api/v3"
+  pollIntervalSeconds: 30
+  repositories:
+    - owner: "khorum-oss"
+      name: "relikquary"
+      # Run for every open PR head commit — reported back as the `kontinuance/ci` check.
+      prPipeline: "pipelines/pr.yaml"
+      # Optional: run on a push to trackedBranch (delivery). Omit to only gate PRs.
+      pushPipeline: "pipelines/deliver.yaml"
+      trackedBranch: "main"

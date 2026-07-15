@@ -47,6 +47,13 @@ class RestGitHubClient(
         }
     }
 
+    override suspend fun branchHead(repo: RepoRef, branch: String): String? {
+        val response = send(get("$root/repos/${repo.slug}/commits/$branch"))
+        if (response.statusCode() == NOT_FOUND) return null
+        requireSuccess(response)
+        return Json.parseToJsonElement(response.body()).jsonObject.getValue("sha").jsonPrimitive.content
+    }
+
     override suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus) {
         val body = buildJsonObject {
             put("state", status.state.wire)
@@ -83,5 +90,6 @@ class RestGitHubClient(
 
     private companion object {
         val SUCCESS_RANGE = 200..299
+        const val NOT_FOUND = 404
     }
 }
