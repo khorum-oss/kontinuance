@@ -12,6 +12,7 @@ import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.support.FakeGitHubServer
 import org.khorum.oss.kontinuance.github.trigger.RepositoryBinding
 import org.khorum.oss.kontinuance.github.trigger.TriggerResolver
+import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import java.nio.file.Path
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
@@ -103,6 +104,31 @@ class EventSourceIT {
             val source = eventSource(server, descriptor(dir, "pr.yaml", "true"))
             assertNull(source.triggerManual(RepoRef("someone", "else"), "sha"))
             assertTrue(server.requests.none { it.method == "POST" }, "no status posted for an unconfigured repo")
+        }
+    }
+
+    @Test
+    fun `a CI run is recorded to the store with its context`(@TempDir dir: Path) = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/pulls", body = pullsBody())
+            server.on("POST", "/repos/.+/statuses/.+", status = 201, body = "{}")
+            val store = InMemoryRunStore()
+            val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
+            val binding = RepositoryBinding(repo, descriptor(dir, "pr.yaml", "true"))
+            val source = EventSource(
+                poller = Poller(client, listOf(binding), InMemoryCursorStore()),
+                resolver = TriggerResolver(listOf(binding)),
+                reporter = RunReporter(client),
+                runStore = store,
+            )
+
+            source.pollAndRun()
+
+            val record = store.recent(10).single()
+            assertEquals(headSha, record.sha)
+            assertEquals("khorum-oss/kontinuance", record.repo)
+            assertEquals("PULL_REQUEST", record.trigger)
+            assertEquals("Success", record.status)
         }
     }
 

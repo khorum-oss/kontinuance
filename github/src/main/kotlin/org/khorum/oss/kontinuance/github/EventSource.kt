@@ -12,7 +12,11 @@ import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.trigger.TriggerEvent
 import org.khorum.oss.kontinuance.github.trigger.TriggerResolver
+import org.khorum.oss.kontinuance.persistence.NoOpRunStore
+import org.khorum.oss.kontinuance.persistence.RunRecord
+import org.khorum.oss.kontinuance.persistence.RunStore
 import java.nio.file.Path
+import java.time.Instant
 
 /**
  * The external-CI loop (US1): poll GitHub for new PR head commits, run each repository's pipeline via
@@ -34,6 +38,7 @@ class EventSource(
     private val reporter: RunReporter,
     private val engine: PipelineEngine = PipelineEngine.default(),
     private val baseSecrets: SecretSource = EnvSecretSource(),
+    private val runStore: RunStore = NoOpRunStore,
 ) {
 
     /**
@@ -51,11 +56,12 @@ class EventSource(
     suspend fun triggerManual(repo: RepoRef, sha: String, ref: String = "manual"): Run? =
         runAndReport(TriggerEvent(repo, sha, TriggerEvent.Kind.MANUAL, ref))
 
-    /** Resolves [event] to a pipeline, posts pending, runs it, posts the terminal status. Null if unconfigured. */
+    /** Resolves [event] to a pipeline, posts pending, runs it, records it, posts the terminal status. */
     private suspend fun runAndReport(event: TriggerEvent): Run? {
         val descriptor = resolver.resolve(event) ?: return null
         reporter.reportPending(event.repo, event.sha)
         val run = runPipeline(descriptor, event)
+        runStore.record(RunRecord.from(run, Instant.now(), event.repo.slug, event.sha, event.kind.name))
         reporter.reportOutcome(event.repo, event.sha, run)
         return run
     }

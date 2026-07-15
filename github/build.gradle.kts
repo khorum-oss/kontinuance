@@ -15,6 +15,7 @@ group = "org.khorum.oss.kontinuance"
 
 dependencies {
     implementation(project(":engine"))
+    implementation(project(":persistence"))
     implementation(rootProject.libs.coroutines.core)
     implementation(rootProject.libs.serialization.json)
     implementation(rootProject.libs.snakeyaml.engine)
