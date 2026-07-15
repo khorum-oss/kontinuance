@@ -57,12 +57,22 @@ allprojects {
 }
 
 fun Project.sharedRepositories() {
+    // dependency.env selects internal vs. public resolution (stage|dev|prod|public); CI passes
+    // -Pdependency.env=public. The open-reliquary CDN (khorum plugins + Konstellation) is present in
+    // every selection. A non-public selection routes through proxy.location when set, otherwise falls
+    // back to the public repositories so a build without an internal proxy still resolves.
+    val depEnv = providers.gradleProperty("dependency.env").orNull ?: "stage"
+    val proxyLocation = providers.gradleProperty("proxy.location").orNull
     repositories {
         mavenLocal()
-        mavenCentral()
-        google()
-        maven { url = uri("https://www.jetbrains.com/intellij-repository/releases") }
         maven { url = uri("https://open-reliquary.nyc3.cdn.digitaloceanspaces.com") }
+        if (depEnv != "public" && proxyLocation != null) {
+            maven { url = uri(proxyLocation) }
+        } else {
+            mavenCentral()
+            google()
+            maven { url = uri("https://www.jetbrains.com/intellij-repository/releases") }
+        }
     }
 }
 
