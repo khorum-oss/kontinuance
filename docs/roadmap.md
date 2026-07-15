@@ -18,6 +18,7 @@ DSL** generated on Konstellation KSP.
 | **002 typed-steps** | **Built** — `gradleStep`/`dockerStep`/`npmStep` on the 001 seam (models + DSL builders + executors + descriptor keys + tests); all impl tasks complete. Lives on feature branches alongside 001. |
 | **003 github-event-source** | **Spec/plan/tasks drafted today** (PR #4). Poll-based external CI. **Blocked-on** the `engine→dsl` refactor merging. |
 | **004 khorum-pattern-alignment** | **Built & merged** (PR #10 → `main`, v1.0.13) — fixed Kover/Sonar coverage aggregation to measure `:engine`, shared `config/detekt/detekt.yml`, `dependency.env` public/private switch, dedicated `integration-tests` module, per-feature `checklists/`, and Kotlin 2.1.20→2.3.21 (+KSP 2.3.10, KSP2). |
+| **005 publish-artifacts** | **Built** — native publish pipeline example (`examples/publish-artifacts/`) + `sample-lib` + quickstart; publishes Maven artifacts to a configurable repo via the installed CLI, URL/creds as masked secrets. Verified end-to-end against a `file://` repo (full JAR/POM/checksums land; missing-secret fails fast with no upload). No engine change. |
 | `engine→dsl` refactor | **Deferred, not a blocker.** 003 will be implemented **engine-only** (depending on `engine` types directly), so this refactor is decoupled from the near-term path and can land later on its own merit. |
 
 ## Decisions locked today (2026-07-12)
@@ -40,10 +41,11 @@ DSL** generated on Konstellation KSP.
 > conceptual items below list their expected spec number where one is assigned.
 
 **Near-term — make it usable**
-1. **Publish-artifacts enablement** *(005, next)* — the installable `kontinuance` CLI (done) plus a
-   **native** publish pipeline example + quickstart, so artifacts can be published to a private repo
-   from your own environment by hand. Descriptors are authored in Kontinuance's own schema — never
-   copied from GitHub Actions or the `hestia-systems` descriptors.
+1. **Publish-artifacts enablement** *(005 — ✅ built)* — the installable `kontinuance` CLI plus a
+   **native** publish pipeline example (`examples/publish-artifacts/`) + quickstart, so artifacts are
+   published to a private repo from your own environment by hand. Descriptors are authored in
+   Kontinuance's own schema — never copied from GitHub Actions or the `hestia-systems` descriptors.
+   Verified end-to-end against a `file://` repo.
 2. **003 external CI (engine-only)** — poll → pending check → run → terminal → required-check gate;
    implemented against the current `engine` layout (the `engine→dsl` refactor is **deferred**, not a
    prerequisite). This is what lets Kontinuance *replace* GitHub Actions for PRs and merges, and
@@ -69,7 +71,7 @@ DSL** generated on Konstellation KSP.
 
 ## Immediate next step
 
-**Publish-artifacts enablement (005):** ship a native publish pipeline example + quickstart on top of
-the installable `kontinuance` CLI, so artifacts can be published to a private repo from the
-maintainer's own environment — then implement **003 external CI (engine-only)** to auto-trigger it
-from GitHub pushes/merges.
+**003 external CI (engine-only):** with publishing usable by hand (005 ✅), implement the GitHub
+trigger — poll → pending commit status → run the pipeline → terminal status → required-check gate —
+so a push/merge auto-runs the publish (or any) pipeline. Implemented against the current `engine`
+layout; the `engine→dsl` refactor stays deferred.
