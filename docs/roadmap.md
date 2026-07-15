@@ -51,17 +51,35 @@ DSL** generated on Konstellation KSP.
    prerequisite). This is what lets Kontinuance *replace* GitHub Actions for PRs and merges, and
    auto-triggers the publish pipeline from (1).
 
-**Then — make it a platform (maps to overview v1/v2)**
-3. **Persistence** *(006)* — run history + the durable poll cursor (folds in the 003 placeholder store).
-4. **Approval / promotion step** *(007)* — the prod gate as a first-class primitive (environment
-   promotion + manual approval), replacing today's manual prod pipeline.
-5. **Web UI** *(spec TBD — design from provided screenshots)* — a dashboard to view pipelines, runs,
-   live/streamed logs, statuses, and to drive manual approvals/promotions. Expected to follow the
-   khorum stack (SvelteKit frontend against an engine-backed API); persistence (3) is its natural
-   backing store. Design to be pinned down from screenshots the maintainer will supply.
-6. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
+**Then — make it a platform (maps to overview v1/v2 — "persistent state … basic UI")**
+
+The Web UI sits at the top of a short dependency chain. Today Kontinuance is a **CLI + in-process
+engine with no long-running server**, so the true gating prerequisite for any UI is a server/API +
+streaming layer — not persistence or approval. What 001 already provides for free: the sealed
+`PipelineStatus` FSM (incl. the reserved `WaitingOnApproval` state) and `StatusEvent` transitions over
+a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't exposed over a wire
+(001 explicitly deferred "Web UI and remote log streaming over SSE/WebSocket" to v1+).
+
+3. **Persistence** *(006)* — run history + the durable poll cursor (folds in the 003 placeholder
+   store). The store the UI lists runs/history from (beyond the current process's memory).
+4. **Server / API + streaming layer** *(007 — UI prerequisite)* — a long-running Spring Boot
+   orchestrator that hosts the engine and exposes it: HTTP for pipelines/runs, **SSE/WebSocket for
+   live status + streamed logs** (the surface 001 deferred). This one layer unlocks the UI, gives
+   003 a home for its status reporting, and carries remote approval actions. **Design the API contract
+   *from* the finished UI** (the maintainer's screenshots) — build the endpoints the UI actually
+   needs, not a speculative API.
+5. **Approval / promotion step** *(008)* — makes the reserved `WaitingOnApproval` state actionable
+   (environment promotion + manual approval), replacing today's manual prod pipeline. The UI's
+   control surface drives it.
+6. **Web UI** *(009+ — design already in hand; screenshots to spec against)* — SvelteKit frontend
+   against the (4) API. Naturally splits by dependency:
+   - **Observe UI** (read-only): list pipelines/runs, watch live status + streamed logs. Needs (4) +
+     light (3) only — deliverable soon after the API layer.
+   - **Control UI**: trigger runs, click-to-approve promotions. Additionally needs (5).
+   The existing UI design guides the API shape (4) and where the observe/control line falls.
+7. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
    `UAT`→**euri** (Playwright), each a `StepExecutor` plugin.
-7. **Runner isolation** (Docker/k8s) — overview v1 item; when parallel/multi-tenant runs matter.
+8. **Runner isolation** (Docker/k8s) — overview v1 item; when parallel/multi-tenant runs matter.
 
 ## Cross-repo artifacts (today)
 
