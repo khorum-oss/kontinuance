@@ -22,6 +22,10 @@ dependencies {
     testImplementation(rootProject.libs.mockk)
 }
 
+// Test-only module: it hosts no production sources, so the jar it would assemble is empty and unused
+// by any other module. Disable it so the module genuinely ships no artifact (FR-006).
+tasks.named<Jar>("jar") { enabled = false }
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.layout.projectDirectory.file("config/detekt/detekt.yml"))
