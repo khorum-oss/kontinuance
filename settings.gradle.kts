@@ -22,7 +22,8 @@ pluginManagement {
 includeModules(
     "core-test",
     "dsl",
-    "engine"
+    "engine",
+    "integration-tests"
 )
 
 class Module(private val moduleName: String) {

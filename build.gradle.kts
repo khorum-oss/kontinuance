@@ -83,6 +83,7 @@ fun Project.sharedRepositories() {
 dependencies {
     kover(project(":dsl"))
     kover(project(":engine"))
+    kover(project(":integration-tests"))
 }
 
 tasks.register("initProject") {
