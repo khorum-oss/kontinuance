@@ -1,0 +1,12 @@
+# Kontinuance detekt configuration. Layered on top of detekt's default rules
+# (buildUponDefaultConfig = true); only deliberate deviations are listed here.
+# Shared across every module via config.setFrom(...) — matches the khorum-oss
+# convention (cf. relikquary's config/detekt/detekt.yml).
+style:
+  MaxLineLength:
+    # Slightly wider than the 120 default to accommodate descriptive test names
+    # and assertion messages without awkward wrapping.
+    maxLineLength: 140
+  ReturnCount:
+    # Multiple/early returns are an accepted style in this codebase.
+    active: false

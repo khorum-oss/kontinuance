@@ -11,6 +11,10 @@ concurrency:
   group: pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Dependency resolution: these reusable jobs resolve through the public repositories by design —
+# the committed default is `dependency.env=stage` with `proxy.location` unset, which falls back to the
+# public repository set (see settings.gradle.kts / root build.gradle.kts). No internal proxy is
+# reachable from GitHub-hosted runners, so public resolution is the intended CI behavior.
 jobs:
   build-check:
     uses: khorum-oss/public-cicd/.github/workflows/gradle-build.yml@main

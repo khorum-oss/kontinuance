@@ -47,7 +47,7 @@ jobs:
           java-version: '21'
 
       - name: Publish dsl module to DigitalOcean Spaces
-        run: ./gradlew :dsl:uploadToDigitalOceanSpaces --no-daemon
+        run: ./gradlew :dsl:uploadToDigitalOceanSpaces --no-daemon -Pdependency.env=public
         env:
           DO_SPACES_API_KEY: ${{ secrets.DO_SPACES_API_KEY }}
           DO_SPACES_SECRET: ${{ secrets.DO_SPACES_SECRET }}

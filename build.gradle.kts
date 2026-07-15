@@ -57,20 +57,33 @@ allprojects {
 }
 
 fun Project.sharedRepositories() {
+    // dependency.env selects internal vs. public resolution (stage|dev|prod|public); CI passes
+    // -Pdependency.env=public. The open-reliquary CDN (khorum plugins + Konstellation) is present in
+    // every selection. A non-public selection routes through proxy.location when set, otherwise falls
+    // back to the public repositories so a build without an internal proxy still resolves.
+    val depEnv = providers.gradleProperty("dependency.env").orNull ?: "stage"
+    val proxyLocation = providers.gradleProperty("proxy.location").orNull
     repositories {
         mavenLocal()
-        mavenCentral()
-        google()
-        maven { url = uri("https://www.jetbrains.com/intellij-repository/releases") }
         maven { url = uri("https://open-reliquary.nyc3.cdn.digitaloceanspaces.com") }
+        if (depEnv != "public" && proxyLocation != null) {
+            maven { url = uri(proxyLocation) }
+        } else {
+            mavenCentral()
+            google()
+            maven { url = uri("https://www.jetbrains.com/intellij-repository/releases") }
+        }
     }
 }
 
-tasks.register("koverMergedReport") {
-    group = "verification"
-    description = "Generates coverage report for the dsl module"
-
-    dependsOn(project(":dsl").tasks.named("koverXmlReport"))
+// Aggregate coverage from every production module into the single root Kover report that SonarCloud
+// reads, so the quality gate measures the engine (where the code actually lives) and not only the
+// near-empty dsl stub. core-test is a test-support module and is intentionally left out of the
+// aggregate. New coverage-bearing modules (e.g. integration-tests) are added here.
+dependencies {
+    kover(project(":dsl"))
+    kover(project(":engine"))
+    kover(project(":integration-tests"))
 }
 
 tasks.register("initProject") {
@@ -131,7 +144,7 @@ sonar {
         property("sonar.host.url", "https://sonarcloud.io")
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
-            "${project(":dsl").layout.buildDirectory.get()}/reports/kover/report.xml"
+            "${layout.buildDirectory.get()}/reports/kover/report.xml"
         )
     }
 }

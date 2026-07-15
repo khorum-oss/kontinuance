@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/001-pipeline-foundation/plan.md
+at specs/004-khorum-pattern-alignment/plan.md
 <!-- SPECKIT END -->

@@ -2,10 +2,19 @@ rootProject.name = "kontinuance"
 
 pluginManagement {
     repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        maven {
-            url = uri("https://open-reliquary.nyc3.cdn.digitaloceanspaces.com")
+        // dependency.env selects internal vs. public resolution (stage|dev|prod|public); CI passes
+        // -Pdependency.env=public. The open-reliquary CDN hosts the khorum plugins + Konstellation and
+        // is required in every selection. A non-public selection routes through proxy.location when it
+        // is set, otherwise falls back to the public repositories so a build without an internal proxy
+        // still resolves.
+        val depEnv = providers.gradleProperty("dependency.env").orNull ?: "stage"
+        val proxyLocation = providers.gradleProperty("proxy.location").orNull
+        maven { url = uri("https://open-reliquary.nyc3.cdn.digitaloceanspaces.com") }
+        if (depEnv != "public" && proxyLocation != null) {
+            maven { url = uri(proxyLocation) }
+        } else {
+            gradlePluginPortal()
+            mavenCentral()
         }
     }
 }
@@ -13,7 +22,8 @@ pluginManagement {
 includeModules(
     "core-test",
     "dsl",
-    "engine"
+    "engine",
+    "integration-tests"
 )
 
 class Module(private val moduleName: String) {

@@ -80,6 +80,7 @@ kover {
 detekt {
     buildUponDefaultConfig = true
     allRules = false
+    config.setFrom(rootProject.layout.projectDirectory.file("config/detekt/detekt.yml"))
 }
 
 tasks.withType<Detekt>().configureEach {
