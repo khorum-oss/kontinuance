@@ -20,6 +20,7 @@ DSL** generated on Konstellation KSP.
 | **004 khorum-pattern-alignment** | **Built & merged** (PR #10 → `main`, v1.0.13) — fixed Kover/Sonar coverage aggregation to measure `:engine`, shared `config/detekt/detekt.yml`, `dependency.env` public/private switch, dedicated `integration-tests` module, per-feature `checklists/`, and Kotlin 2.1.20→2.3.21 (+KSP 2.3.10, KSP2). |
 | **005 publish-artifacts** | **Built** — native publish pipeline example (`examples/publish-artifacts/`) + `sample-lib` + quickstart; publishes Maven artifacts to a configurable repo via the installed CLI, URL/creds as masked secrets. Verified end-to-end against a `file://` repo (full JAR/POM/checksums land; missing-secret fails fast with no upload). No engine change. |
 | **006 run-persistence** | **Built** — new `persistence` module: durable `RunStore` (file-backed JSON, `recent(limit)` newest-first + `get(id)`, corrupt-record isolation) behind a swappable seam; `RunRecord` captures status + CI context (repo/sha/trigger), no secrets/logs. The `github` CI service records every run; `kontinuance-ci` state consolidated under `~/.kontinuance/`. Engine-only, Spring-free, no new deps. |
+| **007 server-api** | **Read API built** (increment 1, Spring-free) — new `server` module: `GET /api/health`, `/api/runs?limit=N` (newest-first, default 50 / cap 500), `/api/runs/{id}` (404 absent). Transport-agnostic `RunApi` handlers + `HttpApiServer` on the JDK HttpServer + installable `kontinuance-api` launcher (host/port/store configurable) serving the 006 store. No new deps; verified via real `HttpClient` round-trip + live `curl`. Deferred: SSE/WebSocket streaming, manual-trigger POST, auth, real Spring Boot. |
 | `engine→dsl` refactor | **Deferred, not a blocker.** 003 will be implemented **engine-only** (depending on `engine` types directly), so this refactor is decoupled from the near-term path and can land later on its own merit. |
 
 ## Decisions locked today (2026-07-12)
@@ -68,7 +69,7 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    fetch-by-id, corrupt-record isolation) recording every CI run with status + context; state under
    `~/.kontinuance/`. The store the UI lists runs/history from. A DB backend can replace the file
    default behind the `RunStore` seam when the Server/API arrives.
-4. **Server / API + streaming layer** *(007 — UI prerequisite)* — a long-running Spring Boot
+4. **Server / API + streaming layer** *(007 — read API ✅ built; streaming + Spring next)* — a long-running Spring Boot
    orchestrator that hosts the engine and exposes it: HTTP for pipelines/runs, **SSE/WebSocket for
    live status + streamed logs** (the surface 001 deferred). This one layer unlocks the UI, gives
    003 a home for its status reporting, and carries remote approval actions. **Design the API contract
