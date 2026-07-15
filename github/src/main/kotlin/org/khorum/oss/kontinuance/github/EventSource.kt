@@ -7,6 +7,7 @@ import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
+import org.khorum.oss.kontinuance.github.client.RepoRef
 import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.trigger.TriggerEvent
@@ -40,16 +41,23 @@ class EventSource(
      * pipeline, and posts the terminal status. Returns the runs started this cycle. Events for
      * unconfigured repos/refs are skipped silently (no status posted).
      */
-    suspend fun pollAndRun(): List<Run> {
-        val runs = mutableListOf<Run>()
-        for (event in poller.poll()) {
-            val descriptor = resolver.resolve(event) ?: continue
-            reporter.reportPending(event.repo, event.sha)
-            val run = runPipeline(descriptor, event)
-            reporter.reportOutcome(event.repo, event.sha, run)
-            runs += run
-        }
-        return runs
+    suspend fun pollAndRun(): List<Run> = poller.poll().mapNotNull { runAndReport(it) }
+
+    /**
+     * Manually (re-)triggers a run for [repo]@[sha] without a GitHub event (US3): runs the repo's
+     * pipeline with `KONTINUANCE_SHA = sha` and reports the outcome. Returns the run, or `null` if the
+     * repository has no configured pipeline.
+     */
+    suspend fun triggerManual(repo: RepoRef, sha: String, ref: String = "manual"): Run? =
+        runAndReport(TriggerEvent(repo, sha, TriggerEvent.Kind.MANUAL, ref))
+
+    /** Resolves [event] to a pipeline, posts pending, runs it, posts the terminal status. Null if unconfigured. */
+    private suspend fun runAndReport(event: TriggerEvent): Run? {
+        val descriptor = resolver.resolve(event) ?: return null
+        reporter.reportPending(event.repo, event.sha)
+        val run = runPipeline(descriptor, event)
+        reporter.reportOutcome(event.repo, event.sha, run)
+        return run
     }
 
     /**

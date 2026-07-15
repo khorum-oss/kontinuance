@@ -48,4 +48,32 @@ class PollerTest {
         val events = poller(listOf(PullRequest(7, "sha-b", "feature", "main")), cursors).poll()
         assertEquals("sha-b", events.single().sha)
     }
+
+    @Test
+    fun `a tracked-branch advance emits a push event when a delivery pipeline is configured`() = runTest {
+        val cursors = InMemoryCursorStore()
+        val delivery = RepositoryBinding(repo, Path.of("pr.yaml"), Path.of("deliver.yaml"), trackedBranch = "main")
+        val client = RecordingGitHubClient(branchHeads = mapOf("main" to "push-sha"))
+
+        val events = Poller(client, listOf(delivery), cursors).poll()
+
+        val push = events.single { it.kind == TriggerEvent.Kind.PUSH }
+        assertEquals("push-sha", push.sha)
+        assertEquals("main", push.ref)
+    }
+
+    @Test
+    fun `a tracked-branch head is not re-emitted, and no push event without a delivery pipeline`() = runTest {
+        val cursors = InMemoryCursorStore()
+        val client = RecordingGitHubClient(branchHeads = mapOf("main" to "push-sha"))
+
+        // No pushPipeline configured -> no push event at all.
+        val prOnly = Poller(client, listOf(RepositoryBinding(repo, Path.of("pr.yaml"))), cursors).poll()
+        assertTrue(prOnly.none { it.kind == TriggerEvent.Kind.PUSH })
+
+        // With a delivery pipeline, the same head dedups on re-poll.
+        val delivery = RepositoryBinding(repo, Path.of("pr.yaml"), Path.of("deliver.yaml"))
+        assertEquals(1, Poller(client, listOf(delivery), cursors).poll().count { it.kind == TriggerEvent.Kind.PUSH })
+        assertTrue(Poller(client, listOf(delivery), cursors).poll().none { it.kind == TriggerEvent.Kind.PUSH })
+    }
 }

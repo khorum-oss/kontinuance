@@ -10,6 +10,9 @@ interface GitHubClient {
     /** Lists the open pull requests for [repo] (their head SHA/ref and base ref). */
     suspend fun listOpenPullRequests(repo: RepoRef): List<PullRequest>
 
+    /** The head commit SHA of [branch] on [repo], or `null` if the branch does not exist. */
+    suspend fun branchHead(repo: RepoRef, branch: String): String?
+
     /** Posts [status] on [repo]@[sha]. Throws [GitHubApiException] on a non-success response. */
     suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus)
 }

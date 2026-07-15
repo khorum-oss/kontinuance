@@ -18,11 +18,21 @@
 > `TriggerResolverTest`, `PollerTest` (dedup). Covers FR-001/002/003/004 and the stable check context;
 > `KONTINUANCE_SHA` is injected into each run from the trigger event.
 >
-> **Deferred (own follow-up passes):** US2 required-check gating (mostly branch-protection config +
-> the stable-context guarantee, already honored), US3 push-to-`main` delivery / manual trigger /
-> optional webhook, the durable-cursor→persistence fold-in, and the long-running service wiring
-> (arrives with the Server/API feature). The task list below is the original Spring/post-refactor
-> draft, kept for reference; the engine-only delivery above supersedes its US1 items.
+> **US3 + runnable service added — 2026-07-15 (follow-up).** The source is now operational:
+> - **Push delivery**: `Poller` also polls each binding's tracked-branch head (`GitHubClient.branchHead`)
+>   and emits a `PUSH` event when it advances, running the configured `pushPipeline` (US3 AS1).
+> - **Manual trigger**: `EventSource.triggerManual(repo, sha)` runs + reports a `MANUAL` event (US3 AS2).
+> - **Config + service**: native `config/EventSourceConfig` (Kontinuance schema, not GitHub YAML) +
+>   the `kontinuance-ci` launcher (`cli/EventSourceRunner`) — `./gradlew :github:install` then
+>   `kontinuance-ci <config.yaml>` polls forever on the configured cadence, token from env, durable
+>   file cursor. Quickstart + sample config in `examples/github-ci/`.
+> - **Tests now 31** (added config parse/defaults/validation, push-poll + dedup, manual trigger,
+>   `branchHead` client IT, and the runner wiring). Full build green; detekt clean.
+>
+> **Still deferred:** US2 required-check *gating* is a branch-protection config step (the stable
+> `kontinuance/ci` context it needs is already guaranteed); the optional signature-verified **webhook**
+> mode; a CLI subcommand for manual trigger; and folding the durable cursor into the persistence
+> feature. The task list below is the original Spring/post-refactor draft, kept for reference.
 
 **Feature**: `003-github-event-source` | **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 

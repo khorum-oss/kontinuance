@@ -15,6 +15,7 @@ import org.khorum.oss.kontinuance.github.trigger.TriggerResolver
 import java.nio.file.Path
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -78,6 +79,30 @@ class EventSourceIT {
 
             assertTrue(run.status is PipelineStatus.Failed)
             assertTrue(statusPostsFor(server).last().body.contains("\"state\":\"failure\""))
+        }
+    }
+
+    @Test
+    fun `a manual trigger runs the pipeline and reports on the given SHA`(@TempDir dir: Path) = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("POST", "/repos/.+/statuses/.+", status = 201, body = "{}")
+            val source = eventSource(server, descriptor(dir, "pr.yaml", "true"))
+
+            val run = source.triggerManual(repo, "manualsha")
+
+            assertEquals(PipelineStatus.Success, run?.status)
+            val posts = server.requests.filter { it.method == "POST" && it.path.endsWith("/statuses/manualsha") }
+            assertEquals(2, posts.size)
+            assertTrue(posts.last().body.contains("\"state\":\"success\""))
+        }
+    }
+
+    @Test
+    fun `a manual trigger for an unconfigured repo does nothing`(@TempDir dir: Path) = runBlocking {
+        FakeGitHubServer().use { server ->
+            val source = eventSource(server, descriptor(dir, "pr.yaml", "true"))
+            assertNull(source.triggerManual(RepoRef("someone", "else"), "sha"))
+            assertTrue(server.requests.none { it.method == "POST" }, "no status posted for an unconfigured repo")
         }
     }
 

@@ -14,12 +14,15 @@ import org.khorum.oss.kontinuance.github.client.RepoRef
 class RecordingGitHubClient(
     private val pulls: List<PullRequest> = emptyList(),
     private var failuresBeforeSuccess: Int = 0,
+    private val branchHeads: Map<String, String> = emptyMap(),
 ) : GitHubClient {
 
     /** Every (repo, sha, status) successfully posted, in order. */
     val posted: MutableList<Triple<RepoRef, String, CommitStatus>> = mutableListOf()
 
     override suspend fun listOpenPullRequests(repo: RepoRef): List<PullRequest> = pulls
+
+    override suspend fun branchHead(repo: RepoRef, branch: String): String? = branchHeads[branch]
 
     override suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus) {
         if (failuresBeforeSuccess > 0) {
