@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-12
 
-**Status**: Draft
+**Status**: Implemented (US1 MVP — engine-only; US2/US3 deferred, see tasks.md)
 
 **Input**: User description: "Let Kontinuance act as an external CI for GitHub: detect new PRs and pushes, run the matching pipeline via the v0 engine, and report the outcome back to GitHub as a commit status / check so a required check gates merges. Poll GitHub by default (no inbound exposure); a webhook via Cloudflare Tunnel is an optional lower-latency mode later. This is the piece that lets Kontinuance replace GitHub Actions for the Hestia/Relikquary delivery flow without exposing the LAN."
 

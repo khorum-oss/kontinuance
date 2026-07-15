@@ -1,5 +1,29 @@
 # Tasks: GitHub Event Source & External-CI Integration
 
+> ## ✅ Implementation status — 2026-07-15 (engine-only, Spring-free)
+>
+> **US1 (P1) MVP delivered** in the `github` module — poll → run via the 001 engine → report a commit
+> status (`pending → success | failure`) on the head SHA. Built **engine-only** (depends on `:engine`
+> alone; `Run`/`PipelineStatus` live there — the `engine→dsl` refactor is deferred, **not** a blocker)
+> and **Spring-free** (coroutine poll loop; no Spring/`@Scheduled`). **No new dependency**: the client
+> uses JDK `java.net.http.HttpClient`, JSON uses the catalog's `kotlinx-serialization-json`, and the
+> integration seam is a JDK `HttpServer` fake (no WireMock → no `verification-metadata` churn). See the
+> plan's "Engine-only + Spring-free adaptation" note.
+>
+> **Delivered files** (`github/src/main/.../github/`): `client/{GitHubModels,GitHubClient,RestGitHubClient}`,
+> `report/{CheckContext,RunReporter}`, `trigger/{TriggerEvent,RepositoryBinding,TriggerResolver}`,
+> `poll/{CursorStore(+InMemory/File),Poller}`, `EventSource`.
+> **Tests (19, green):** `RestGitHubClientIT` (real HTTP round-trip), `EventSourceIT` (end-to-end
+> poll→run→pending→terminal, real engine), `RunReporterTest` (status mapping + retry/backoff),
+> `TriggerResolverTest`, `PollerTest` (dedup). Covers FR-001/002/003/004 and the stable check context;
+> `KONTINUANCE_SHA` is injected into each run from the trigger event.
+>
+> **Deferred (own follow-up passes):** US2 required-check gating (mostly branch-protection config +
+> the stable-context guarantee, already honored), US3 push-to-`main` delivery / manual trigger /
+> optional webhook, the durable-cursor→persistence fold-in, and the long-running service wiring
+> (arrives with the Server/API feature). The task list below is the original Spring/post-refactor
+> draft, kept for reference; the engine-only delivery above supersedes its US1 items.
+
 **Feature**: `003-github-event-source` | **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
 **Organization**: grouped by user story (US1 P1 → US3 P3) so each is independently

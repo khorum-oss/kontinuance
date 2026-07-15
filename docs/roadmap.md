@@ -16,7 +16,7 @@ DSL** generated on Konstellation KSP.
 |---|---|
 | **001 pipeline-foundation** | **Built** — engine runs stages/steps in-process (coroutines/ProcessBuilder), hybrid YAML+Kotlin DSL, sealed-class status, secret masking, `StepDefinition`+`StepExecutor` seam. ⚠️ Lives on feature branches — **not yet merged to `main`** (main has only `dsl/common` scaffolding). |
 | **002 typed-steps** | **Built** — `gradleStep`/`dockerStep`/`npmStep` on the 001 seam (models + DSL builders + executors + descriptor keys + tests); all impl tasks complete. Lives on feature branches alongside 001. |
-| **003 github-event-source** | **Spec/plan/tasks drafted today** (PR #4). Poll-based external CI. **Blocked-on** the `engine→dsl` refactor merging. |
+| **003 github-event-source** | **US1 MVP built** (engine-only, Spring-free) — new `github` module: poll GitHub → run via the 001 engine → post commit status (`pending→success/failure`) on the head SHA, stable `kontinuance/ci` context, `KONTINUANCE_SHA` from the event. No new deps (JDK HttpClient + serialization-json; JDK HttpServer fake, no WireMock). 19 tests green incl. end-to-end. US2 gating / US3 push+manual+webhook deferred. |
 | **004 khorum-pattern-alignment** | **Built & merged** (PR #10 → `main`, v1.0.13) — fixed Kover/Sonar coverage aggregation to measure `:engine`, shared `config/detekt/detekt.yml`, `dependency.env` public/private switch, dedicated `integration-tests` module, per-feature `checklists/`, and Kotlin 2.1.20→2.3.21 (+KSP 2.3.10, KSP2). |
 | **005 publish-artifacts** | **Built** — native publish pipeline example (`examples/publish-artifacts/`) + `sample-lib` + quickstart; publishes Maven artifacts to a configurable repo via the installed CLI, URL/creds as masked secrets. Verified end-to-end against a `file://` repo (full JAR/POM/checksums land; missing-secret fails fast with no upload). No engine change. |
 | `engine→dsl` refactor | **Deferred, not a blocker.** 003 will be implemented **engine-only** (depending on `engine` types directly), so this refactor is decoupled from the near-term path and can land later on its own merit. |
@@ -46,10 +46,13 @@ DSL** generated on Konstellation KSP.
    published to a private repo from your own environment by hand. Descriptors are authored in
    Kontinuance's own schema — never copied from GitHub Actions or the `hestia-systems` descriptors.
    Verified end-to-end against a `file://` repo.
-2. **003 external CI (engine-only)** — poll → pending check → run → terminal → required-check gate;
-   implemented against the current `engine` layout (the `engine→dsl` refactor is **deferred**, not a
-   prerequisite). This is what lets Kontinuance *replace* GitHub Actions for PRs and merges, and
-   auto-triggers the publish pipeline from (1).
+2. **003 external CI (engine-only)** — *US1 MVP ✅ built*: poll → pending status → run via the engine
+   → terminal `success`/`failure` on the head SHA (stable `kontinuance/ci` context, `KONTINUANCE_SHA`
+   from the event). Implemented against the current `engine` layout (the `engine→dsl` refactor stays
+   **deferred**), Spring-free, no new deps, 19 tests incl. end-to-end. This lets Kontinuance *replace*
+   GitHub Actions for PRs. **Remaining:** US2 required-check gating (branch-protection config + the
+   already-honored stable context) and US3 push-to-`main` delivery / manual trigger / optional
+   webhook; the long-running service wiring arrives with the Server/API feature (007).
 
 **Then — make it a platform (maps to overview v1/v2 — "persistent state … basic UI")**
 
@@ -89,7 +92,9 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 
 ## Immediate next step
 
-**003 external CI (engine-only):** with publishing usable by hand (005 ✅), implement the GitHub
-trigger — poll → pending commit status → run the pipeline → terminal status → required-check gate —
-so a push/merge auto-runs the publish (or any) pipeline. Implemented against the current `engine`
-layout; the `engine→dsl` refactor stays deferred.
+**003 US1 is built.** Natural continuations, any order: **(a)** wire the long-running service +
+config (repository bindings, poll interval, token) so it actually runs on the Mini — this is really
+the front half of the **Server/API feature (007)**; **(b)** **US3** — push-to-`main` delivery +
+manual trigger (small additions on the same plumbing); **(c)** **Persistence (006)** — swap the
+file-cursor placeholder for the durable store and add run history. The UI cluster (007 API → 009 UI)
+then builds on (a)+(c).

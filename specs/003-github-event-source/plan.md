@@ -135,7 +135,32 @@ No constitution violations — table intentionally empty.
 
 ## Coordination note
 
-The repo has an in-flight `engine → dsl` model refactor. This plan targets the **post-
-refactor** layout (`dsl/model/Run`, `engine/execution/PipelineEngine`,
-`engine/descriptor/PipelineDescriptor`). Land that refactor before `/speckit-tasks` so the
-contracts in Phase 1 pin the settled interfaces.
+The repo has an in-flight `engine → dsl` model refactor. This plan originally targeted the
+post-refactor layout. **Superseded (2026-07-15): 003 is implemented ENGINE-ONLY.** The
+`engine → dsl` refactor is deferred (roadmap), so the `github` module depends on `engine`
+**alone** — `Run`, `PipelineStatus`, `Pipeline`, `PipelineDescriptor`, and `PipelineEngine`
+all live under `engine/…` today. No dependency on the `dsl` module.
+
+## Engine-only + Spring-free adaptation (2026-07-15)
+
+Two deliberate deviations from the drafted plan above, to match the current codebase and keep
+this feature self-contained:
+
+- **Spring-free.** The v0 engine uses no Spring (the constitution notes Spring Boot is the
+  platform runtime but *not required* for the engine core). Introducing Spring/DI/`@Scheduled`
+  is deferred to the future **Server/API + streaming** feature (roadmap 007), which is where the
+  long-running service and HTTP surface properly belong. 003 is a plain-Kotlin **library module**
+  plus a small runner: the poll loop is a **coroutine loop** (as the engine already uses
+  coroutines), not `@Scheduled`; wiring is constructor injection, not a Spring context.
+- **No new runtime HTTP/JSON deps.** The GitHub client uses the JDK-built-in
+  `java.net.http.HttpClient` (JDK 21) and the catalog's existing `kotlinx-serialization-json`;
+  the only new dependency is **WireMock** (test scope) for the integration seam. Integration
+  tests are plain JUnit 5 + WireMock (no `@SpringBootTest`), still exercising the real client
+  boundary with zero real network (Constitution II).
+- **Toolchain**: Kotlin 2.3.21 / JDK 21 (repo current, post-004), not 2.1.20.
+
+Scope for this pass: the **US1 MVP** — poll → resolve → run via `PipelineEngine` → report a
+commit status (`pending → success | failure`) on the head SHA, with a stable check context
+(FR-004) and reporter retry/backoff. US2 (required-check gating — mostly repo config + the
+stable-context guarantee) and US3 (push/main delivery, manual trigger, optional webhook) follow
+on the same plumbing.

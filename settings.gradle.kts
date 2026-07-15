@@ -23,6 +23,7 @@ includeModules(
     "core-test",
     "dsl",
     "engine",
+    "github",
     "integration-tests"
 )
 
