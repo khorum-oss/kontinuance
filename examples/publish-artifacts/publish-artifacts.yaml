@@ -1,0 +1,35 @@
+# Kontinuance pipeline — publish Maven artifacts to a configurable repository.
+#
+# This descriptor is authored entirely in Kontinuance's own schema (pipeline / stages / steps / run /
+# secrets / workingDir). It is NOT derived from, and contains none of, GitHub Actions' workflow
+# constructs (no `on:`, `jobs:`, `uses:`) — Kontinuance descriptors stand on their own model.
+#
+# How the engine runs each step:
+#   * every step runs in a fresh, isolated temp working directory, and the parent environment is
+#     cleared except a small passthrough set (PATH, HOME, LANG, LC_ALL, TMPDIR);
+#   * the ONLY way to hand a value to a step is `secrets:` — the engine resolves each name from the
+#     environment and injects it (masked in logs). So the project path, repository URL, and
+#     credentials are all listed under `secrets:` and read as $VARS inside the shell command.
+#
+# Required environment (export these before running; the engine resolves them by name):
+#   PROJECT_DIR            absolute path to the Gradle project to build and publish
+#   PUBLISH_REPO_URL       target Maven repository URL   (https://…  or  file:///abs/path)
+#   PUBLISH_REPO_USER      repository username / token id (leave empty for a file:// repo)
+#   PUBLISH_REPO_PASSWORD  repository password / token    (leave empty for a file:// repo)
+#
+# The target project supplies the actual `publish` task + repository wiring (see sample-lib for a
+# minimal, self-contained example). Run with:  kontinuance publish-artifacts.yaml
+pipeline:
+  name: "publish-artifacts"
+  concurrency: 1
+  stages:
+    - name: "build"
+      steps:
+        - name: "assemble"
+          run: 'cd "$PROJECT_DIR" && ./gradlew build --no-daemon'
+          secrets: ["PROJECT_DIR"]
+    - name: "publish"
+      steps:
+        - name: "publish-to-maven"
+          run: 'cd "$PROJECT_DIR" && ./gradlew publish --no-daemon'
+          secrets: ["PROJECT_DIR", "PUBLISH_REPO_URL", "PUBLISH_REPO_USER", "PUBLISH_REPO_PASSWORD"]
