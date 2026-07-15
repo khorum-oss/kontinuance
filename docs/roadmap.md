@@ -17,6 +17,7 @@ DSL** generated on Konstellation KSP.
 | **001 pipeline-foundation** | **Built** — engine runs stages/steps in-process (coroutines/ProcessBuilder), hybrid YAML+Kotlin DSL, sealed-class status, secret masking, `StepDefinition`+`StepExecutor` seam. ⚠️ Lives on feature branches — **not yet merged to `main`** (main has only `dsl/common` scaffolding). |
 | **002 typed-steps** | **Built** — `gradleStep`/`dockerStep`/`npmStep` on the 001 seam (models + DSL builders + executors + descriptor keys + tests); all impl tasks complete. Lives on feature branches alongside 001. |
 | **003 github-event-source** | **Spec/plan/tasks drafted today** (PR #4). Poll-based external CI. **Blocked-on** the `engine→dsl` refactor merging. |
+| **004 khorum-pattern-alignment** | **Built** — aligned build tooling with the khorum-oss/relikquary reference: fixed Kover/Sonar coverage aggregation to measure `:engine` (was blind, measuring the empty `:dsl` stub), shared `config/detekt/detekt.yml`, `dependency.env` public/private switch, dedicated `integration-tests` module, per-feature `checklists/`, and Kotlin 2.1.20→2.3.21 (+KSP 2.3.10, KSP2). Verified on Gradle 8.14.3. |
 | `engine→dsl` refactor | Committed today (wip) on `claude/specify-implement-7gqci3` — moves the pipeline model + secret sources into a `dsl` module. Local, not pushed. |
 
 ## Decisions locked today (2026-07-12)
