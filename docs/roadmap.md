@@ -10,12 +10,12 @@ planes (one process now, separable later): **orchestrator** (schedule/track runs
 (execute steps), **event source** (triggers). Pipelines are authored as a **hybrid YAML + Kotlin
 DSL** generated on Konstellation KSP.
 
-## Current state (2026-07-12)
+## Current state (2026-07-15)
 
 | Feature | State |
 |---|---|
 | **001 pipeline-foundation** | **Built** — engine runs stages/steps in-process (coroutines/ProcessBuilder), hybrid YAML+Kotlin DSL, sealed-class status, secret masking, `StepDefinition`+`StepExecutor` seam. ⚠️ Lives on feature branches — **not yet merged to `main`** (main has only `dsl/common` scaffolding). |
-| **002 typed-steps** | Spec/plan/tasks drafted; **26 open impl tasks** — `gradleStep`/`dockerStep`/`npmStep` on the 001 seam. |
+| **002 typed-steps** | **Built** — `gradleStep`/`dockerStep`/`npmStep` on the 001 seam (models + DSL builders + executors + descriptor keys + tests); all impl tasks complete. Lives on feature branches alongside 001. |
 | **003 github-event-source** | **Spec/plan/tasks drafted today** (PR #4). Poll-based external CI. **Blocked-on** the `engine→dsl` refactor merging. |
 | `engine→dsl` refactor | Committed today (wip) on `claude/specify-implement-7gqci3` — moves the pipeline model + secret sources into a `dsl` module. Local, not pushed. |
 
