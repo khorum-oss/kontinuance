@@ -117,7 +117,14 @@ class DefaultPipelineEngine(
             val stageRun = executeStage(pipeline.name, stage, gate, stepRunner, flow)
             collected.add(stageRun)
             if (stageRun.status.isFailure) {
-                return PipelineStatus.Failed(failingStep(stageRun), "stage '${stage.name}' failed")
+                // A rejected approval gate ends the step Cancelled — surface that as a Cancelled run
+                // (a deliberate stop), not a Failed one, so it is not styled/treated as a breakage.
+                val failing = stageRun.stepRuns.firstOrNull { it.status.isFailure }
+                return if (failing?.status == PipelineStatus.Cancelled) {
+                    PipelineStatus.Cancelled
+                } else {
+                    PipelineStatus.Failed(failingStep(stageRun), "stage '${stage.name}' failed")
+                }
             }
         }
         return PipelineStatus.Success

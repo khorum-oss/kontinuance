@@ -1,5 +1,6 @@
 package org.khorum.oss.kontinuance.engine.descriptor
 
+import org.khorum.oss.kontinuance.engine.model.ApprovalStep
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.RunStep
 import org.khorum.oss.kontinuance.engine.model.SecretRef
@@ -31,7 +32,7 @@ object PipelineDescriptor {
 
     private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
     private val STAGE_KEYS = setOf("name", "steps")
-    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm")
+    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval")
     private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir") + DEFINITION_KEYS
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
     private val DOCKER_KEYS = setOf("run", "build")
@@ -106,6 +107,7 @@ object PipelineDescriptor {
             "run" -> RunStep(asString(requireKey(map, "run", path), "$path.run"))
             "gradle" -> parseGradle(asMap(map["gradle"], "$path.gradle"), "$path.gradle")
             "docker" -> parseDocker(asMap(map["docker"], "$path.docker"), "$path.docker")
+            "approval" -> ApprovalStep(asString(requireKey(map, "approval", path), "$path.approval"))
             else -> parseNpm(asMap(map["npm"], "$path.npm"), "$path.npm")
         }
     }

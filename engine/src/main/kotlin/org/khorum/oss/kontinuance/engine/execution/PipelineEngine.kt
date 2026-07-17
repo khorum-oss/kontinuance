@@ -3,6 +3,7 @@ package org.khorum.oss.kontinuance.engine.execution
 import kotlinx.coroutines.flow.Flow
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
+import org.khorum.oss.kontinuance.engine.execution.steps.ApprovalStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.DockerStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.GradleStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.NpmStepExecutor
@@ -33,10 +34,15 @@ interface PipelineEngine {
     companion object {
         /**
          * The default engine, streaming logs to [sink]. It registers every built-in step executor:
-         * the v0 [RunStepExecutor] for `RunStep`, plus the typed [GradleStepExecutor],
-         * [DockerStepExecutor], and [NpmStepExecutor] for their respective step definitions.
+         * the v0 [RunStepExecutor] for `RunStep`, the typed [GradleStepExecutor], [DockerStepExecutor],
+         * and [NpmStepExecutor], and the [ApprovalStepExecutor] for manual gates — the last backed by
+         * [approvalGate], which defaults to [AutoApprovingGate] so non-interactive hosts still run
+         * gated pipelines to completion.
          */
-        fun default(sink: LogSink = StdoutLogSink()): PipelineEngine =
+        fun default(
+            sink: LogSink = StdoutLogSink(),
+            approvalGate: ApprovalGate = AutoApprovingGate,
+        ): PipelineEngine =
             DefaultPipelineEngine(
                 registry = StepExecutorRegistry(
                     listOf(
@@ -44,6 +50,7 @@ interface PipelineEngine {
                         GradleStepExecutor(),
                         DockerStepExecutor(),
                         NpmStepExecutor(),
+                        ApprovalStepExecutor(approvalGate),
                     ),
                 ),
                 logSink = sink,
