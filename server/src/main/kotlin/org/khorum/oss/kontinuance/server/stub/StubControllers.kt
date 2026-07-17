@@ -29,12 +29,6 @@ class DeployStubController {
 }
 
 @RestController
-class CoverageStubController {
-    @GetMapping("/api/coverage")
-    fun coverage(): ResponseEntity<ByteArray> = json(StubFixtures.coverage())
-}
-
-@RestController
 class ConfigStubController {
     @GetMapping("/api/config")
     fun config(): ResponseEntity<ByteArray> = json(StubFixtures.config())
