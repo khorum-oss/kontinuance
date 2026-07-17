@@ -49,6 +49,31 @@ describe('api.getRun', () => {
 	});
 });
 
+describe('api.triggerRun', () => {
+	it('POSTs the trigger endpoint and returns the new run id', async () => {
+		const seen: { url: string; method?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method });
+				return Promise.resolve(json({ runId: 'run-abcd1234' }, { status: 202 }));
+			})
+		);
+		const id = await api.triggerRun();
+		expect(seen[0].url).toBe('/api/runs/trigger');
+		expect(seen[0].method).toBe('POST');
+		expect(id).toBe('run-abcd1234');
+	});
+
+	it('throws ApiError carrying the server message on a 400', async () => {
+		mockFetch(() => json({ error: 'no pipeline descriptor' }, { status: 400, statusText: 'Bad Request' }));
+		const err = await api.triggerRun().catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(400);
+		expect(err.message).toBe('no pipeline descriptor');
+	});
+});
+
 describe('error handling', () => {
 	it('throws ApiError with the status on a non-2xx response', async () => {
 		mockFetch(() => json({ error: 'not found' }, { status: 404, statusText: 'Not Found' }));
