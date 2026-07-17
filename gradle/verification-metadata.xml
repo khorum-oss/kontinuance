@@ -42,6 +42,17 @@
          <trust group="^org[.]apache[.]logging($|([.].*))" regex="true"/>
          <trust group="^biz[.]aQute[.]bnd($|([.].*))" regex="true"/>
          <trust group="commons-logging"/>
+         <trust group="^org[.]assertj($|([.].*))" regex="true"/>
+         <trust group="^org[.]mockito($|([.].*))" regex="true"/>
+         <trust group="^org[.]xmlunit($|([.].*))" regex="true"/>
+         <trust group="^org[.]skyscreamer($|([.].*))" regex="true"/>
+         <trust group="^org[.]awaitility($|([.].*))" regex="true"/>
+         <trust group="^org[.]ow2($|([.].*))" regex="true"/>
+         <trust group="^net[.]minidev($|([.].*))" regex="true"/>
+         <trust group="^com[.]jayway[.]jsonpath($|([.].*))" regex="true"/>
+         <trust group="^com[.]vaadin[.]external($|([.].*))" regex="true"/>
+         <trust group="^org[.]hdrhistogram($|([.].*))" regex="true"/>
+         <trust group="^org[.]latencyutils($|([.].*))" regex="true"/>
       </trusted-artifacts>
       <ignored-keys>
          <ignored-key id="2161D72E7DCD4258" reason="Key couldn't be downloaded from any key server"/>

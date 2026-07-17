@@ -19,6 +19,7 @@ serialization-json = "1.8.1"
 coroutines-core = "1.10.0"
 coroutines-test = "1.10.0"
 snakeyaml-engine = "2.6"
+spring-boot = "4.1.0"
 
 [libraries]
 # Kotlin
@@ -50,13 +51,23 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 # Serialization
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines-core" }
+coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "coroutines-core" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines-test" }
 
 # YAML descriptor parsing
 snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml-engine" }
 
+# Spring Boot (server runtime). Starters carry an explicit version rather than importing the
+# spring-boot-dependencies BOM as a platform: a BOM import forces Gradle to resolve every third-party
+# BOM it imports (selenium, mongodb, cassandra, …), which would balloon the verification trust set;
+# pinning the starters lets Gradle resolve only the actual WebFlux/actuator/test graph (research 008 R2).
+spring-boot-starter-webflux = { module = "org.springframework.boot:spring-boot-starter-webflux", version.ref = "spring-boot" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator", version.ref = "spring-boot" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
+
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

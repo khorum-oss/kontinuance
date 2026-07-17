@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: kontinuance-api
+
+# The read API binds loopback:8077 by default (matching the retired 007 launcher). Override with
+# SERVER_ADDRESS / SERVER_PORT (Spring relaxed binding) when exposing on a private network.
+server:
+  address: 127.0.0.1
+  port: 8077
+
+# Store location the CI service writes run history to. Override with KONTINUANCE_STORE.
+kontinuance:
+  store: ${user.home}/.kontinuance/runs
+
+# Actuator: expose only the health endpoint (FR-002) — no secrets or sensitive endpoints published.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

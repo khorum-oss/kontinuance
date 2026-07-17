@@ -30,6 +30,26 @@ achievable in-sandbox and mirrors existing metadata. Verification is never disab
 **Alternatives**: `--write-verification-metadata sha256,pgp` — rejected (key-servers disabled, and the
 pinned Gradle 9.5.1 is blocked here). Disabling verification — forbidden (Principle V).
 
+**IMPLEMENTATION OUTCOME (full graph, verification enabled, Gradle 8.14.3 — `:server:test` + `:server:detekt`
+BUILD SUCCESSFUL):** the initial 13-trust probe covered only `spring-boot-starter-webflux` *compile*.
+Wiring the whole feature surfaced two things:
+- **The Spring Boot *Gradle plugin* is not used.** Applying `org.springframework.boot` drags
+  antlr / jna / opentelemetry / tomlj / httpclient5 / io.spring.gradle onto the *build* classpath (more
+  trusts, for tooling). Instead the app runs via the already-applied `application` plugin's plain `main`
+  (`runApplication`), versions come from pinning the starters to `4.1.0` in the catalog (importing the
+  `spring-boot-dependencies` BOM as a `platform()` forces resolving every third-party BOM it imports —
+  selenium/mongodb/cassandra/… — an even larger explosion), and classes are opened with `kotlin-spring`
+  (already under the `org.jetbrains` trust). No `bootJar`; `installDist` ships the full classpath.
+- **Actuator + the full `spring-boot-starter-test` add runtime/test groups** beyond the 13. Final extra
+  group trusts added (all group-level, no per-artifact PGP): test — `org.assertj`, `org.mockito`,
+  `org.xmlunit`, `org.skyscreamer`, `org.awaitility`, `org.ow2` (covers `org.ow2.asm`), `net.minidev`,
+  `com.jayway.jsonpath`, `com.vaadin.external`; micrometer runtime — `org.hdrhistogram`,
+  `org.latencyutils`. Suspend `@RestController` handlers additionally need the
+  `kotlinx-coroutines-reactor` bridge (group `org.jetbrains.kotlinx`, already trusted) — Spring's
+  `CoroutinesUtils` adapts suspend→`Mono` through it. Verification remained **enabled** throughout
+  (`verify-metadata` + `verify-signatures` = true); nothing was disabled or baselined. CI on 9.5.1 stays
+  the authoritative gate (R5).
+
 ## R3 — Reuse the 007 read logic behind a suspend facade
 
 **Decision**: keep the transport-agnostic `RunApi` (pure logic) and add a **`RunReadFacade`** with

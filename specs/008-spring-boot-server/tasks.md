@@ -24,19 +24,19 @@ US3 (verification stays enabled) are additive quality/architecture outcomes.
 
 **Purpose**: Introduce Spring Boot through the version catalog + module build, keeping verification enabled.
 
-- [ ] T001 Add Spring Boot to the version catalog in `gradle/libs.versions.toml`: `springBoot = "4.1.0"` +
+- [X] T001 Add Spring Boot to the version catalog in `gradle/libs.versions.toml`: `springBoot = "4.1.0"` +
   `springDependencyManagement` version; `[plugins]` `spring-boot` (`org.springframework.boot`),
   `spring-dependency-management` (`io.spring.dependency-management`), `kotlin-spring`
   (`org.jetbrains.kotlin.plugin.spring`, `version.ref = "kotlin"`); `[libraries]`
   `spring-boot-starter-webflux`, `spring-boot-starter-actuator`, `spring-boot-starter-test`,
   `reactor-test` (`io.projectreactor:reactor-test`) — modules only, versions from the Boot BOM.
-- [ ] T002 Rewrite `server/build.gradle.kts`: apply `spring-boot`, `spring-dependency-management`,
+- [X] T002 Rewrite `server/build.gradle.kts`: apply `spring-boot`, `spring-dependency-management`,
   `kotlin-spring` (+ keep `detekt`); `implementation` webflux + actuator + `:persistence` +
   `serialization.json` + `coroutines.core`; `testImplementation` `spring-boot-starter-test`,
   `reactor-test`, `:core-test`; point the `application` `mainClass` at
   `org.khorum.oss.kontinuance.server.KontinuanceApiApplicationKt` and rename the install launcher target;
   drop the `serialization.json`-only comment header for the Spring rationale.
-- [ ] T003 Verify `gradle/verification-metadata.xml` carries the 13 group trusts from research R2
+- [X] T003 Verify `gradle/verification-metadata.xml` carries the 13 group trusts from research R2
   (`org.springframework`, `io.micrometer`, `io.projectreactor`, `org.reactivestreams`, `ch.qos.logback`,
   `jakarta`, `tools.jackson`, `org.yaml`, `org.osgi`, `org.bouncycastle`, `org.apache.logging`,
   `biz.aQute.bnd`, `commons-logging`) as `<trusted-artifact group="^…($|([.].*))"/>` regex trusts, and
@@ -52,12 +52,12 @@ US3 (verification stays enabled) are additive quality/architecture outcomes.
 
 **⚠️ CRITICAL**: No controller/facade work runs until the app context boots.
 
-- [ ] T004 Create `server/src/main/kotlin/org/khorum/oss/kontinuance/server/KontinuanceApiApplication.kt` —
+- [X] T004 Create `server/src/main/kotlin/org/khorum/oss/kontinuance/server/KontinuanceApiApplication.kt` —
   `@SpringBootApplication` class + `main(args)` calling `runApplication<KontinuanceApiApplication>(*args)`.
-- [ ] T005 [P] Create `server/src/main/kotlin/org/khorum/oss/kontinuance/server/ServerConfig.kt` —
+- [X] T005 [P] Create `server/src/main/kotlin/org/khorum/oss/kontinuance/server/ServerConfig.kt` —
   `@Configuration` exposing a `RunStore` `@Bean` resolved from the `kontinuance.store` property /
   `KONTINUANCE_STORE` env (default `~/.kontinuance/runs`) as a `FileRunStore`, plus a `RunApi` `@Bean` over it.
-- [ ] T006 [P] Create `server/src/main/resources/application.yml` — expose actuator `health`
+- [X] T006 [P] Create `server/src/main/resources/application.yml` — expose actuator `health`
   (`management.endpoints.web.exposure.include: health`), default `kontinuance.store`, and a sensible
   `server.port`/`spring.application.name`.
 
@@ -74,7 +74,7 @@ detail/404/405 match the 007 contract exactly, and `/actuator/health` reports UP
 
 ### Tests for User Story 1 ⚠️ (write first, expect red)
 
-- [ ] T007 [P] [US1] `server/src/test/kotlin/.../server/RunApiContractIT.kt` —
+- [X] T007 [P] [US1] `server/src/test/kotlin/.../server/RunApiContractIT.kt` —
   `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `WebTestClient`: seed an in-memory/temp store bean,
   assert `GET /api/health` → 200 `{"status":"ok"}`; `GET /api/runs?limit=2` newest-first + bound;
   `GET /api/runs/{id}` 200 with body / 404 `{"error":"not found"}` for unknown; unknown path → 404;
@@ -82,15 +82,15 @@ detail/404/405 match the 007 contract exactly, and `/actuator/health` reports UP
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `server/src/main/kotlin/.../server/RunReadFacade.kt` — `suspend` `health()`,
+- [X] T008 [US1] Create `server/src/main/kotlin/.../server/RunReadFacade.kt` — `suspend` `health()`,
   `listRuns(limit: Int?)`, `getRun(id)` delegating to the injected `RunApi` inside
   `withContext(Dispatchers.IO)` (the file store is blocking). Returns the existing `ApiResponse`.
-- [ ] T009 [US1] Create `server/src/main/kotlin/.../server/RunController.kt` — `@RestController` with
+- [X] T009 [US1] Create `server/src/main/kotlin/.../server/RunController.kt` — `@RestController` with
   `suspend` handlers: `GET /api/health`, `GET /api/runs` (`@RequestParam limit: Int?`),
   `GET /api/runs/{id}`; map `ApiResponse(status,json)` → `ResponseEntity` with that status,
   `Content-Type: application/json`, and the raw JSON body (bypass Jackson re-serialization to keep the
   byte shape identical to 007).
-- [ ] T010 [US1] Delete `server/src/main/kotlin/.../server/HttpApiServer.kt` and
+- [X] T010 [US1] Delete `server/src/main/kotlin/.../server/HttpApiServer.kt` and
   `server/src/main/kotlin/.../server/cli/ApiServerMain.kt` (replaced by the Spring app); delete the now-stale
   `server/src/test/kotlin/.../server/HttpApiServerIT.kt` (superseded by T007).
 
@@ -107,15 +107,15 @@ a `withContext(Dispatchers.IO)` boundary (no blocking store call on the event-lo
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T011 [P] [US2] Add a concurrency test to `RunApiContractIT.kt` (or a sibling IT): issue N simultaneous
+- [X] T011 [P] [US2] Add a concurrency test to `RunApiContractIT.kt` (or a sibling IT): issue N simultaneous
   `WebTestClient` calls and assert all return the correct, non-interfering responses.
-- [ ] T012 [P] [US2] `server/src/test/kotlin/.../server/RunReadFacadeTest.kt` — a `runTest`/coroutine unit
+- [X] T012 [P] [US2] `server/src/test/kotlin/.../server/RunReadFacadeTest.kt` — a `runTest`/coroutine unit
   test asserting the `suspend` facade returns the same `ApiResponse` as the underlying `RunApi` (the
   offload boundary is exercised without blocking the caller).
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Confirm the T008 facade offloads via `withContext(Dispatchers.IO)` and the T009 handlers
+- [X] T013 [US2] Confirm the T008 facade offloads via `withContext(Dispatchers.IO)` and the T009 handlers
   are `suspend` calling only the facade (no direct blocking `RunApi`/store call on the request thread);
   adjust if T007's design left any blocking hop on the event loop.
 
@@ -132,10 +132,10 @@ no `verification=false` / removed gate exists anywhere.
 
 ### Implementation for User Story 3
 
-- [ ] T014 [US3] Resolve `:server` with verification enabled and confirm the 13 trusts (T003) cover the full
+- [X] T014 [US3] Resolve `:server` with verification enabled and confirm the 13 trusts (T003) cover the full
   Spring/WebFlux/actuator graph on Gradle 8.14.3; record any additional group surfaced by the resolve into
   `verification-metadata.xml` (group trust only — no per-artifact PGP) and note the result in research R2.
-- [ ] T015 [US3] Guard check: confirm no `verification` element is set to `false` and no
+- [X] T015 [US3] Guard check: confirm no `verification` element is set to `false` and no
   `--no-verify`/baseline was introduced in `gradle/` or module builds (Principle V); CI on 9.5.1 is the
   authoritative gate (research R5) — note this in the PR/commit body when the work lands.
 
@@ -145,11 +145,11 @@ no `verification=false` / removed gate exists anywhere.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T016 [P] Update `docs/roadmap.md` — mark 007's "real Spring Boot" deferral as delivered by 008
+- [X] T016 [P] Update `docs/roadmap.md` — mark 007's "real Spring Boot" deferral as delivered by 008
   (Spring Boot 4.1.0 WebFlux + actuator, suspend controllers), keeping the streaming/write/auth follow-ups.
-- [ ] T017 [P] Run `specs/008-spring-boot-server/quickstart.md` validation (build, run, `curl` the endpoints
+- [X] T017 [P] Run `specs/008-spring-boot-server/quickstart.md` validation (build, run, `curl` the endpoints
   + `/actuator/health`) and reconcile any drift.
-- [ ] T018 Run `./gradlew :server:detekt :server:test` (system Gradle 8.14.3) and clear any detekt/test
+- [X] T018 Run `./gradlew :server:detekt :server:test` (system Gradle 8.14.3) and clear any detekt/test
   findings on the new files; confirm the module stays under the shared gates (Constitution III).
 
 ---

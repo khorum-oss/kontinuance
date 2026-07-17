@@ -2,29 +2,44 @@ import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
 import org.gradle.api.plugins.JavaApplication
 
-// The read API: a small long-running HTTP service exposing the run history (:persistence RunStore) so
-// the Web UI and operators can list/inspect runs. Spring-free first increment on the JDK HttpServer,
-// no new external dependency (JSON via the catalog's serialization-json). Read logic (RunApi) is kept
-// separate from the transport (HttpApiServer) so a Spring/SSE layer can wrap it later.
+// The read API, now on the platform runtime the constitution names: a Spring Boot 4.1 application
+// (WebFlux + actuator) with Kotlin coroutines. Suspend @RestController handlers reuse the transport-
+// agnostic read logic (RunApi over the :persistence RunStore) behind a suspend RunReadFacade that
+// offloads the blocking file store with withContext(Dispatchers.IO). Versions come from the Spring Boot
+// BOM (platform) and the app runs via the `application` plugin's plain `main` (runApplication) rather
+// than the Spring Boot Gradle plugin — that plugin drags antlr/jna/opentelemetry/tomlj/httpclient5 onto
+// the build classpath, which would widen the verification trust set. Managing versions via the BOM and
+// opening classes with kotlin-spring (already under the org.jetbrains trust) keeps dependency
+// verification at the empirically-probed group-trust set (gradle/verification-metadata.xml; research
+// 008 R2), never disabled (Principle V). A `bootJar` fat-jar is not needed — installDist ships the full
+// classpath and a Spring Boot app boots fine from a normal classpath.
 plugins {
     id("io.gitlab.arturbosch.detekt")
+    alias(libs.plugins.kotlin.spring)
 }
 
 group = "org.khorum.oss.kontinuance"
 
 dependencies {
     implementation(project(":persistence"))
+    implementation(rootProject.libs.spring.boot.starter.webflux)
+    implementation(rootProject.libs.spring.boot.starter.actuator)
     implementation(rootProject.libs.serialization.json)
+    implementation(rootProject.libs.coroutines.core)
+    // Bridges suspend @RestController handlers to Reactor Mono (Spring's CoroutinesUtils needs it).
+    implementation(rootProject.libs.coroutines.reactor)
 
+    testImplementation(rootProject.libs.spring.boot.starter.test)
+    testImplementation(rootProject.libs.coroutines.test)
     testImplementation(project(":core-test"))
     testImplementation(rootProject.libs.mockk)
 }
 
-// The `application` plugin is applied to every module by the root build; point this module's launcher
-// at the API server main so `./gradlew :server:run` and installDist work.
+// The `application` plugin is applied to every module by the root build; the Spring Boot plugin uses its
+// mainClass for `bootRun`/`bootJar`. Point the launcher at the Spring Boot application main.
 configure<JavaApplication> {
     applicationName = "kontinuance-api"
-    mainClass.set("org.khorum.oss.kontinuance.server.cli.ApiServerMainKt")
+    mainClass.set("org.khorum.oss.kontinuance.server.KontinuanceApiApplicationKt")
 }
 
 // `./gradlew :server:install` installs the `kontinuance-api` launcher into ~/.local (mirrors the

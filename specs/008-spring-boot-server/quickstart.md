@@ -2,8 +2,10 @@
 
 ## Run it
 ```bash
-./gradlew :server:bootRun                                   # Spring Boot app, serves ~/.kontinuance/runs on :8077
+./gradlew :server:run                                       # Spring Boot app (application plugin), serves ~/.kontinuance/runs on :8077
 # config: --args='--server.port=9000 --kontinuance.store=/path/to/runs'  (or env KONTINUANCE_STORE, SERVER_PORT)
+# or install the launcher: ./gradlew :server:install && kontinuance-api --server.port=9000
+# (no Boot Gradle plugin / no bootRun — the app runs via the application plugin's main; research R2)
 ```
 
 ## Validate (US1–US3)
