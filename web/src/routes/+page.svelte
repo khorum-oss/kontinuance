@@ -26,4 +26,10 @@
 	});
 </script>
 
-<Runs {runs} {loading} {error} onopen={(id) => goto(`/runs/${id}`)} onretry={load} />
+<Runs
+	{runs}
+	{loading}
+	{error}
+	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
+	onretry={load}
+/>
