@@ -34,27 +34,27 @@
 
 ## Phase 5: US2/US1 — run detail (Priority: P1)
 
-- [ ] T013 [P] [US1] `LogLine` + `CoverageBar` components + stories.
-- [ ] T014 [US1] `screens/RunDetail.svelte` — run header + streamed log view + coverage sidebar, wired to `getRun(id)` + live stream.
+- [x] T013 [P] [US1] `LogLine` + `CoverageBar` components + stories.
+- [x] T014 [US1] `screens/RunDetail.svelte` — run header + streamed log view + coverage sidebar, wired to `getRun(id)` + live stream.
 
 ## Phase 6: Stub endpoints (server) + forward-looking screens (Priority: P2)
 
-- [ ] T015 [P] Server: `stub/PipelineController.kt` `GET /api/runs/{id}/pipeline` — typed stages/tasks (fixture).
-- [ ] T016 [P] Server: `stub/DeployController.kt` `GET /api/deploy` — nodes + artifact manifest + env health (fixture).
-- [ ] T017 [P] Server: `stub/CoverageController.kt` `GET /api/coverage` — Kover line/branch/module (read `build/reports/kover/report.xml` when present, else fixture).
-- [ ] T018 [P] Server: `stub/ConfigController.kt` `GET /api/config` — resolved config text + plan summary (fixture).
-- [ ] T019 Server tests: `@SpringBootTest` + `WebTestClient` for the four stub endpoints; confirm `/api` contract + verification unchanged.
-- [ ] T020 [P] [US3] `StageCard` + stage-flow + telemetry-feed components + stories.
-- [ ] T021 [US3] `screens/Pipeline.svelte` wired to `getPipeline(id)` (stage/task flow + dependency tracing + telemetry).
-- [ ] T022 [US3] `screens/Deploy.svelte` wired to `getDeploy()` (promotion nodes + artifact manifest + env health).
-- [ ] T023 [US3] `screens/Coverage.svelte` wired to `getCoverage()` (Kover table + module drill-down).
-- [ ] T024 [US3] `screens/Config.svelte` wired to `getConfig()` (resolved config view + plan summary).
+- [x] T015 [P] Server: `stub/PipelineController.kt` `GET /api/runs/{id}/pipeline` — typed stages/tasks (fixture).
+- [x] T016 [P] Server: `stub/DeployController.kt` `GET /api/deploy` — nodes + artifact manifest + env health (fixture).
+- [x] T017 [P] Server: `stub/CoverageController.kt` `GET /api/coverage` — Kover line/branch/module (read `build/reports/kover/report.xml` when present, else fixture).
+- [x] T018 [P] Server: `stub/ConfigController.kt` `GET /api/config` — resolved config text + plan summary (fixture).
+- [x] T019 Server tests: `@SpringBootTest` + `WebTestClient` for the four stub endpoints; confirm `/api` contract + verification unchanged.
+- [x] T020 [P] [US3] `StageCard` + stage-flow + telemetry-feed components + stories.
+- [x] T021 [US3] `screens/Pipeline.svelte` wired to `getPipeline(id)` (stage/task flow + dependency tracing + telemetry).
+- [x] T022 [US3] `screens/Deploy.svelte` wired to `getDeploy()` (promotion nodes + artifact manifest + env health).
+- [x] T023 [US3] `screens/Coverage.svelte` wired to `getCoverage()` (Kover table + module drill-down).
+- [x] T024 [US3] `screens/Config.svelte` wired to `getConfig()` (resolved config view + plan summary).
 
 ## Phase 7: Polish
 
-- [ ] T025 [P] Empty/loading/error states audited across all seven screens.
-- [ ] T026 [P] `web/README.md` + `specs/009-web-ui/quickstart.md` (run dev, storybook, point at a server).
-- [ ] T027 Lint + type-check + Vitest + `pnpm build` + `pnpm build-storybook` green; roadmap updated (009 built).
+- [x] T025 [P] Empty/loading/error states audited across all seven screens.
+- [x] T026 [P] `web/README.md` + `specs/009-web-ui/quickstart.md` (run dev, storybook, point at a server).
+- [x] T027 Lint + type-check + Vitest + `pnpm build` + `pnpm build-storybook` green; roadmap updated (009 built).
 
 ---
 
