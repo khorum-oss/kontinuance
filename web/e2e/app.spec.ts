@@ -6,6 +6,7 @@ import {
 	mockConfig,
 	mockCoverage,
 	mockDeploy,
+	mockPipeline,
 	mockStream,
 	sampleRuns
 } from './mock';
@@ -88,12 +89,30 @@ test.describe('navigation', () => {
 		await page.goto('/');
 		await enterApp(page);
 
-		await page.getByRole('link', { name: 'PIPELINE' }).click();
-		await expect(page).toHaveURL(/\/pipeline$/);
-		await expect(page.getByText('arriving in a later increment')).toBeVisible();
+		await page.getByRole('link', { name: 'DEPLOY' }).click();
+		await expect(page).toHaveURL(/\/deploy$/);
 
 		await page.getByRole('link', { name: 'COVERAGE' }).click();
 		await expect(page).toHaveURL(/\/coverage$/);
+		await expect(page.getByRole('link', { name: 'COVERAGE' })).toBeVisible();
+	});
+});
+
+test.describe('pipeline screen', () => {
+	test('renders the stage flow and traces dependencies on hover', async ({ page }) => {
+		await mockApi(page);
+		await mockPipeline(page);
+		await page.goto('/pipeline');
+		await enterApp(page);
+
+		await expect(page.getByText('TOTAL PROGRESS')).toBeVisible();
+		await expect(page.getByText('CHECKOUT', { exact: true })).toBeVisible();
+		await expect(page.getByText('legacy-adapter package').first()).toBeVisible();
+		await expect(page.getByText(/TELEMETRY/)).toBeVisible();
+
+		// hovering a task keeps its dependency traceable (deps rendered on the card)
+		await page.getByText(':core assemble').first().hover();
+		await expect(page.getByText('unit tests').first()).toBeVisible();
 	});
 });
 
