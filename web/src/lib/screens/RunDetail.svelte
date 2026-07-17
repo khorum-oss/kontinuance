@@ -16,16 +16,24 @@
 		loading = false,
 		error = null,
 		notFound = false,
+		deciding = false,
+		decideError = null,
 		onback,
-		onretry
+		onretry,
+		onapprove,
+		onreject
 	}: {
 		run?: RunRecord | null;
 		coverage?: Coverage | null;
 		loading?: boolean;
 		error?: string | null;
 		notFound?: boolean;
+		deciding?: boolean;
+		decideError?: string | null;
 		onback?: () => void;
 		onretry?: () => void;
+		onapprove?: () => void;
+		onreject?: () => void;
 	} = $props();
 
 	const status = $derived(run ? normalizeStatus(run.status) : 'pending');
@@ -82,6 +90,18 @@
 			<button class="k-mono retry" onclick={() => onretry?.()}>RETRY</button>
 		</div>
 	{:else if run}
+		{#if status === 'waiting'}
+			<div class="gate">
+				<span class="k-mono gmsg">this run is paused for manual approval</span>
+				<div class="gactions">
+					<button class="k-mono approve" disabled={deciding} onclick={() => onapprove?.()}>
+						{deciding ? 'WORKING…' : 'APPROVE'}
+					</button>
+					<button class="k-mono reject" disabled={deciding} onclick={() => onreject?.()}>REJECT</button>
+				</div>
+				{#if decideError}<span class="k-mono gerror">{decideError}</span>{/if}
+			</div>
+		{/if}
 		<div class="body">
 			<div class="logpanel">
 				<div class="k-mono lhead">LOG STREAM</div>
@@ -156,6 +176,57 @@
 	}
 	.v {
 		color: var(--k-muted);
+	}
+	.gate {
+		flex: none;
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 12px 16px;
+		border: 1px solid rgba(251, 212, 107, 0.4);
+		background: rgba(251, 212, 107, 0.06);
+		border-radius: 6px;
+	}
+	.gmsg {
+		font-size: 11px;
+		color: var(--k-warn);
+		letter-spacing: 0.5px;
+	}
+	.gactions {
+		display: flex;
+		gap: 10px;
+	}
+	.approve,
+	.reject {
+		font-size: 10px;
+		letter-spacing: 1.5px;
+		border-radius: 4px;
+		padding: 7px 16px;
+		background: none;
+		cursor: pointer;
+	}
+	.approve {
+		color: var(--k-ok);
+		border: 1px solid rgba(52, 211, 153, 0.5);
+	}
+	.approve:hover:not(:disabled) {
+		background: rgba(52, 211, 153, 0.1);
+	}
+	.reject {
+		color: var(--k-fail);
+		border: 1px solid rgba(248, 113, 113, 0.45);
+	}
+	.reject:hover:not(:disabled) {
+		background: rgba(248, 113, 113, 0.1);
+	}
+	.approve:disabled,
+	.reject:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.gerror {
+		font-size: 10px;
+		color: var(--k-fail);
 	}
 	.body {
 		flex: 1;

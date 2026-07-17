@@ -8,6 +8,7 @@ import {
 	mockDeploy,
 	mockPipeline,
 	mockStream,
+	mockWaitingRun,
 	sampleRuns
 } from './mock';
 
@@ -60,6 +61,17 @@ test.describe('runs screen', () => {
 		await page.goto('/runs/nope-404');
 		await enterApp(page);
 		await expect(page.getByText('run not found')).toBeVisible();
+	});
+
+	test('a run paused at a gate can be approved from its detail view', async ({ page }) => {
+		await mockWaitingRun(page);
+		await page.goto('/runs/run-approve-1');
+		await enterApp(page);
+
+		await expect(page.getByText('paused for manual approval')).toBeVisible();
+		await page.getByRole('button', { name: 'APPROVE' }).click();
+		await expect(page.getByText('paused for manual approval')).toHaveCount(0);
+		await expect(page.getByText('Success', { exact: true })).toBeVisible();
 	});
 
 	test('shows an error state with a retry when the API fails', async ({ page }) => {

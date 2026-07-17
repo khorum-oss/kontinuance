@@ -10,6 +10,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let notFound = $state(false);
+	let deciding = $state(false);
+	let decideError = $state<string | null>(null);
 
 	async function load() {
 		loading = true;
@@ -27,6 +29,20 @@
 		}
 	}
 
+	async function decide(action: 'approve' | 'reject') {
+		deciding = true;
+		decideError = null;
+		try {
+			if (action === 'approve') await api.approveRun(page.params.id ?? '');
+			else await api.rejectRun(page.params.id ?? '');
+			await load();
+		} catch (e) {
+			decideError = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			deciding = false;
+		}
+	}
+
 	$effect(() => {
 		load();
 	});
@@ -38,6 +54,10 @@
 	{loading}
 	{error}
 	{notFound}
+	{deciding}
+	{decideError}
 	onback={() => goto('/')}
 	onretry={load}
+	onapprove={() => decide('approve')}
+	onreject={() => decide('reject')}
 />
