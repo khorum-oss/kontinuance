@@ -1,0 +1,48 @@
+# nginx site for the Kontinuance web UI. The official nginx image renders this template through
+# `envsubst` at container start, substituting only defined environment variables (e.g.
+# ${KONTINUANCE_BACKEND}); nginx's own runtime variables ($uri, $host, $http_upgrade, …) are left intact.
+#
+# Serves the static SPA and proxies the API, the SSE run stream, and the WebSocket to the server on the
+# SAME ORIGIN, so the browser needs no cross-origin setup.
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Static single-page app with client-side routing fallback.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Server-sent events: the live run stream. Buffering off so events flush immediately.
+    # Declared before the generic /api/ block so it wins for this exact path.
+    location = /api/runs/stream {
+        proxy_pass ${KONTINUANCE_BACKEND};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_set_header Host $host;
+    }
+
+    # REST API (read + trigger/approve/reject).
+    location /api/ {
+        proxy_pass ${KONTINUANCE_BACKEND};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Live WebSocket.
+    location /ws/runs {
+        proxy_pass ${KONTINUANCE_BACKEND};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 1h;
+        proxy_set_header Host $host;
+    }
+}

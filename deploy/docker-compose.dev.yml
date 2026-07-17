@@ -1,0 +1,10 @@
+# Local-iteration override — leaves docker-compose.yml untouched. Use with:
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up --build
+#
+# Publishes the server port directly (so you can curl the API / point tools at it) alongside the
+# single-origin web service.
+services:
+  server:
+    ports:
+      - "${KONTINUANCE_SERVER_PORT:-8077}:8077"

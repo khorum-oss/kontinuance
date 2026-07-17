@@ -1,0 +1,45 @@
+# Kontinuance local stack: the API server + the web UI on a single origin.
+#
+#   cp deploy/.env.example deploy/.env       # then set a real DEPLOY_TOKEN
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up --build
+#   open http://localhost:${KONTINUANCE_WEB_PORT:-8080}
+#
+# Only the web service is published, so the browser talks to one origin; the web container proxies
+# /api, the SSE stream, and /ws/runs to the server over the internal network.
+name: kontinuance
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/server.Dockerfile
+    environment:
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 8077
+      KONTINUANCE_STORE: ${KONTINUANCE_STORE:-/data/runs}
+      KONTINUANCE_CONFIG_DESCRIPTOR: ${KONTINUANCE_CONFIG_DESCRIPTOR:-/etc/kontinuance/kontinuance.yml}
+      # Pipeline secrets referenced by the descriptor, passed through from the host env — never baked in.
+      DEPLOY_TOKEN: ${DEPLOY_TOKEN:-}
+    volumes:
+      - kontinuance-runs:/data/runs
+      # Default pipeline descriptor (read-only). Point at your own by changing this mount.
+      - ./kontinuance.yml:/etc/kontinuance/kontinuance.yml:ro
+    expose:
+      - "8077"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    environment:
+      KONTINUANCE_BACKEND: ${KONTINUANCE_BACKEND:-http://server:8077}
+    ports:
+      - "${KONTINUANCE_WEB_PORT:-8080}:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  # Run history persists here across restarts (remove with `docker compose down -v`).
+  kontinuance-runs:
