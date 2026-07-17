@@ -29,6 +29,19 @@
          <trust group="^org[.]junit($|([.].*))" regex="true"/>
          <trust group="^org[.]khorum($|([.].*))" regex="true"/>
          <trust group="^org[.]sonarsource($|([.].*))" regex="true"/>
+         <trust group="^org[.]springframework($|([.].*))" regex="true"/>
+         <trust group="^io[.]micrometer($|([.].*))" regex="true"/>
+         <trust group="^io[.]projectreactor($|([.].*))" regex="true"/>
+         <trust group="^ch[.]qos[.]logback($|([.].*))" regex="true"/>
+         <trust group="^jakarta($|([.].*))" regex="true"/>
+         <trust group="^org[.]reactivestreams($|([.].*))" regex="true"/>
+         <trust group="^tools[.]jackson($|([.].*))" regex="true"/>
+         <trust group="^org[.]yaml($|([.].*))" regex="true"/>
+         <trust group="^org[.]osgi($|([.].*))" regex="true"/>
+         <trust group="^org[.]bouncycastle($|([.].*))" regex="true"/>
+         <trust group="^org[.]apache[.]logging($|([.].*))" regex="true"/>
+         <trust group="^biz[.]aQute[.]bnd($|([.].*))" regex="true"/>
+         <trust group="commons-logging"/>
       </trusted-artifacts>
       <ignored-keys>
          <ignored-key id="2161D72E7DCD4258" reason="Key couldn't be downloaded from any key server"/>
