@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { enterApp, mockApi, mockApiError, mockCoverage, mockStream, sampleRuns } from './mock';
+import {
+	enterApp,
+	mockApi,
+	mockApiError,
+	mockConfig,
+	mockCoverage,
+	mockDeploy,
+	mockStream,
+	sampleRuns
+} from './mock';
 
 test.describe('entry shell', () => {
 	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {
@@ -79,8 +88,8 @@ test.describe('navigation', () => {
 		await page.goto('/');
 		await enterApp(page);
 
-		await page.getByRole('link', { name: 'DEPLOY' }).click();
-		await expect(page).toHaveURL(/\/deploy$/);
+		await page.getByRole('link', { name: 'PIPELINE' }).click();
+		await expect(page).toHaveURL(/\/pipeline$/);
 		await expect(page.getByText('arriving in a later increment')).toBeVisible();
 
 		await page.getByRole('link', { name: 'COVERAGE' }).click();
@@ -103,5 +112,34 @@ test.describe('coverage screen', () => {
 		await expect(page.getByText(/class-level breakdown for/)).toBeVisible();
 		await page.getByRole('button', { name: 'ALL MODULES' }).click();
 		await expect(page.getByRole('button', { name: /server/ })).toBeVisible();
+	});
+});
+
+test.describe('deploy screen', () => {
+	test('renders the promotion nodes, artifact manifest, and environment', async ({ page }) => {
+		await mockApi(page);
+		await mockDeploy(page);
+		await page.goto('/deploy');
+		await enterApp(page);
+
+		await expect(page.getByText('SOURCE')).toBeVisible();
+		await expect(page.getByText('ARTIFACT MANIFEST')).toBeVisible();
+		await expect(page.getByText('kontinuance-core-1.4.2.jar')).toBeVisible();
+		await expect(page.getByText('STAGE ENVIRONMENT')).toBeVisible();
+		await expect(page.getByText('PODS READY')).toBeVisible();
+	});
+});
+
+test.describe('config screen', () => {
+	test('renders the resolved config source and plan summary', async ({ page }) => {
+		await mockApi(page);
+		await mockConfig(page);
+		await page.goto('/config');
+		await enterApp(page);
+
+		await expect(page.getByText('kontinuance.yml', { exact: true })).toBeVisible();
+		await expect(page.getByText('RESOLVED PLAN')).toBeVisible();
+		await expect(page.getByText(/max parallelism/)).toBeVisible();
+		await expect(page.getByText('KONTINUANCE DSL')).toBeVisible();
 	});
 });
