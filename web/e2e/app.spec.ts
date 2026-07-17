@@ -1,0 +1,72 @@
+import { expect, test } from '@playwright/test';
+import { enterApp, mockApi, mockApiError, sampleRuns } from './mock';
+
+test.describe('entry shell', () => {
+	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+
+		await expect(page.getByText('MISSION CONTROL ACCESS')).toBeVisible();
+		await enterApp(page);
+
+		// overlay gone, shell visible
+		await expect(page.getByText('MISSION CONTROL ACCESS')).toHaveCount(0);
+		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
+		await expect(page.getByText('MISSION CLOCK')).toBeVisible();
+	});
+});
+
+test.describe('runs screen', () => {
+	test('renders the runs newest-first with their ids and refs', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		for (const run of sampleRuns) {
+			await expect(page.getByText(run.id, { exact: true })).toBeVisible();
+		}
+		await expect(page.getByText('integration tests: 2 failed')).toBeVisible();
+	});
+
+	test('opening a run navigates to its detail route', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		await page.getByText('#KX-2045', { exact: true }).click();
+		await expect(page).toHaveURL(/\/runs\/%23KX-2045$/);
+		await expect(page.getByText('RUN DETAIL')).toBeVisible();
+	});
+
+	test('shows an error state with a retry when the API fails', async ({ page }) => {
+		await mockApiError(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		await expect(page.getByText(/request failed/)).toBeVisible();
+		await expect(page.getByRole('button', { name: 'RETRY' })).toBeVisible();
+	});
+
+	test('shows an empty state when there are no runs', async ({ page }) => {
+		await mockApi(page, []);
+		await page.goto('/');
+		await enterApp(page);
+
+		await expect(page.getByText('no runs recorded yet')).toBeVisible();
+	});
+});
+
+test.describe('navigation', () => {
+	test('the sidebar navigates and highlights the active screen', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		await page.getByRole('link', { name: 'DEPLOY' }).click();
+		await expect(page).toHaveURL(/\/deploy$/);
+		await expect(page.getByText('arriving in a later increment')).toBeVisible();
+
+		await page.getByRole('link', { name: 'COVERAGE' }).click();
+		await expect(page).toHaveURL(/\/coverage$/);
+	});
+});
