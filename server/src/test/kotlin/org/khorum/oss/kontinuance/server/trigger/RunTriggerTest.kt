@@ -11,6 +11,7 @@ import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.model.RunId
+import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import java.nio.file.Files
@@ -30,7 +31,11 @@ class RunTriggerTest {
         private val outcome: PipelineStatus = PipelineStatus.Success,
         private val failWith: Throwable? = null,
     ) : PipelineEngine {
-        override suspend fun run(pipeline: Pipeline, secrets: SecretSource): Run {
+        override suspend fun run(
+            pipeline: Pipeline,
+            secrets: SecretSource,
+            completedStages: List<StageRun>,
+        ): Run {
             failWith?.let { throw it }
             return Run(RunId("engine-generated"), pipeline, outcome, emptyList())
         }
@@ -45,8 +50,10 @@ class RunTriggerTest {
           stages: []
     """.trimIndent()
 
-    private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path) =
-        RunTrigger(store, engine, CoroutineScope(Dispatchers.Unconfined), path.toString())
+    private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {
+        val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined))
+        return RunTrigger(store, launcher, path.toString())
+    }
 
     @Test
     fun `rejects when no descriptor file is present`(@TempDir dir: Path) {

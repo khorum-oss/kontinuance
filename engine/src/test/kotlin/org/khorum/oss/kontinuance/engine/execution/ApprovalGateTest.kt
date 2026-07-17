@@ -1,7 +1,5 @@
 package org.khorum.oss.kontinuance.engine.execution
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Test
@@ -11,6 +9,7 @@ import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.support.CapturingLogSink
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class ApprovalGateTest {
@@ -23,6 +22,15 @@ class ApprovalGateTest {
                 name = "promote"
                 steps { approvalStep("approve", message = "Promote to production?") }
             }
+        }
+    }
+
+    /** Two gated stages, so a resume can skip the first and continue at the second. */
+    private fun twoStagePipeline(): Pipeline = pipeline {
+        name = "gated2"
+        stages {
+            stage { name = "prep"; steps { approvalStep("prep-gate") } }
+            stage { name = "promote"; steps { approvalStep("promote-gate") } }
         }
     }
 
@@ -45,31 +53,66 @@ class ApprovalGateTest {
     }
 
     @Test
-    fun `the gate receives the ApprovalToken run id and resumes on approval`() = runBlocking {
-        val seenRunId = CompletableDeferred<String?>()
-        val decide = CompletableDeferred<ApprovalDecision>()
+    fun `no decision yet pauses the run WaitingOnApproval, preserving completed stages`() = runBlocking {
+        val engine = PipelineEngine.default(CapturingLogSink()) { _, _ -> null }
+
+        val paused = engine.run(gatedPipeline())
+
+        assertEquals(PipelineStatus.WaitingOnApproval, paused.status)
+        assertEquals(PipelineStatus.WaitingOnApproval, paused.stageRuns[0].stepRuns[0].status)
+    }
+
+    @Test
+    fun `the gate receives the ApprovalToken run id`() = runBlocking {
+        var seenRunId: String? = "unset"
         val engine = PipelineEngine.default(CapturingLogSink()) { runId, _ ->
-            seenRunId.complete(runId)
-            decide.await()
+            seenRunId = runId
+            ApprovalDecision.APPROVED
         }
 
-        val run = async { withContext(ApprovalToken("run-42")) { engine.run(gatedPipeline()) } }
+        withContext(ApprovalToken("run-42")) { engine.run(gatedPipeline()) }
 
-        assertEquals("run-42", seenRunId.await())
-        decide.complete(ApprovalDecision.APPROVED)
-        assertEquals(PipelineStatus.Success, run.await().status)
+        assertEquals("run-42", seenRunId)
     }
 
     @Test
     fun `without an ApprovalToken the gate run id is null`() = runBlocking {
-        val seenRunId = CompletableDeferred<String?>()
+        var seenRunId: String? = "unset"
         val engine = PipelineEngine.default(CapturingLogSink()) { runId, _ ->
-            seenRunId.complete(runId)
+            seenRunId = runId
             ApprovalDecision.APPROVED
         }
 
         engine.run(gatedPipeline())
 
-        assertNull(seenRunId.await())
+        assertNull(seenRunId)
+    }
+
+    @Test
+    fun `resuming with completed stages skips them and continues at the paused gate`() = runBlocking {
+        val asked = mutableListOf<String>()
+        var promoteApproved = false
+        val engine = PipelineEngine.default(CapturingLogSink()) { _, step ->
+            asked.add(step)
+            when {
+                step == "promote-gate" && !promoteApproved -> null // pause on the first pass
+                else -> ApprovalDecision.APPROVED
+            }
+        }
+
+        // First pass: prep is approved, promote pauses → run WaitingOnApproval with prep completed.
+        val paused = engine.run(twoStagePipeline())
+        assertEquals(PipelineStatus.WaitingOnApproval, paused.status)
+        val prep = paused.stageRuns.first { it.name == "prep" }
+        assertEquals(PipelineStatus.Success, prep.status)
+
+        // Resume: prep is supplied as completed and must not be re-run; promote is now approved.
+        promoteApproved = true
+        asked.clear()
+        val resumed = engine.run(twoStagePipeline(), completedStages = listOf(prep))
+
+        assertEquals(PipelineStatus.Success, resumed.status)
+        assertFalse("prep-gate" in asked, "the completed prep stage should be skipped on resume")
+        assertEquals(listOf("prep", "promote"), resumed.stageRuns.map { it.name })
     }
 }
