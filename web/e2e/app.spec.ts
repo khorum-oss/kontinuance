@@ -38,14 +38,28 @@ test.describe('runs screen', () => {
 		await expect(page.getByText('integration tests: 2 failed')).toBeVisible();
 	});
 
-	test('opening a run navigates to its detail route', async ({ page }) => {
+	test('opening a run shows its detail: header, log stream, and coverage sidebar', async ({ page }) => {
 		await mockApi(page);
+		await mockCoverage(page);
 		await page.goto('/');
 		await enterApp(page);
 
 		await page.getByText('#KX-2045', { exact: true }).click();
 		await expect(page).toHaveURL(/\/runs\/%23KX-2045$/);
 		await expect(page.getByText('RUN DETAIL')).toBeVisible();
+		await expect(page.getByText('LOG STREAM', { exact: true })).toBeVisible();
+		await expect(page.getByText(/live step-log streaming/)).toBeVisible();
+		await expect(page.getByText('84.2%')).toBeVisible(); // coverage sidebar total
+
+		await page.getByRole('button', { name: '← RUNS' }).click();
+		await expect(page).toHaveURL(/\/$/);
+	});
+
+	test('an unknown run id shows a not-found state', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/runs/nope-404');
+		await enterApp(page);
+		await expect(page.getByText('run not found')).toBeVisible();
 	});
 
 	test('shows an error state with a retry when the API fails', async ({ page }) => {
