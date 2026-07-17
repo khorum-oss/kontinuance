@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { color, normalizeStatus, statusColor, statusPulses, toolAccent } from './tokens';
+import { color, coverageColor, normalizeStatus, statusColor, statusPulses, toolAccent } from './tokens';
 
 describe('normalizeStatus', () => {
 	it('maps engine status strings to the canonical vocabulary', () => {
@@ -42,5 +42,14 @@ describe('toolAccent', () => {
 		expect(toolAccent('gradle')).toBe('#5eead4');
 		expect(toolAccent('git')).toBe('#f0a36b');
 		expect(toolAccent('nope')).toBe(color.muted2);
+	});
+});
+
+describe('coverageColor', () => {
+	it('maps coverage percentage to a threshold band', () => {
+		expect(coverageColor(91)).toBe(color.teal); // healthy ≥80
+		expect(coverageColor(80)).toBe(color.teal);
+		expect(coverageColor(68)).toBe(color.warn); // warning 60–79
+		expect(coverageColor(44)).toBe(color.fail); // poor <60
 	});
 });

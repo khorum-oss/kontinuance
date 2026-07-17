@@ -65,6 +65,13 @@ export function statusPulses(status: Status): boolean {
 	return status === 'running';
 }
 
+/** Coverage color by threshold: healthy at/above target, warning in the band below, poor beneath. */
+export function coverageColor(pct: number): string {
+	if (pct >= 80) return color.teal;
+	if (pct >= 60) return color.warn;
+	return color.fail;
+}
+
 /** Per-tool accent colors used by task/tool badges. */
 export const toolColor: Record<string, string> = {
 	git: '#f0a36b',
