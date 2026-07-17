@@ -11,6 +11,11 @@ server:
 # Store location the CI service writes run history to. Override with KONTINUANCE_STORE.
 kontinuance:
   store: ${user.home}/.kontinuance/runs
+  # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
+  # and the bound on the initial newest-first snapshot sent on connect.
+  stream:
+    poll-interval-ms: 1000
+    snapshot-limit: 50
 
 # Actuator: expose only the health endpoint (FR-002) — no secrets or sensitive endpoints published.
 management:

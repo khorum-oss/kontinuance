@@ -70,13 +70,15 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    fetch-by-id, corrupt-record isolation) recording every CI run with status + context; state under
    `~/.kontinuance/`. The store the UI lists runs/history from. A DB backend can replace the file
    default behind the `RunStore` seam when the Server/API arrives.
-4. **Server / API + streaming layer** *(007 read API ✅ + 008 Spring Boot ✅; streaming next)* — a
-   long-running **Spring Boot 4.1 (WebFlux + actuator)** orchestrator that hosts the engine and exposes
-   it: HTTP for pipelines/runs (built), **SSE/WebSocket for live status + streamed logs** (the surface
-   001 deferred — next, on the coroutine/`Flow` base 008 established). This one layer unlocks the UI,
-   gives 003 a home for its status reporting, and carries remote approval actions. **Design the API
-   contract *from* the finished UI** (the maintainer's screenshots) — build the endpoints the UI
-   actually needs, not a speculative API.
+4. **Server / API + streaming layer** *(007 read API ✅ + 008 Spring Boot ✅ + live streaming ✅)* — a
+   long-running **Spring Boot 4.1 (WebFlux + actuator)** orchestrator exposing the run history: HTTP for
+   pipelines/runs (built) **and live SSE (`GET /api/runs/stream`) + WebSocket (`/ws/runs`)** streaming run
+   records as they appear (the surface 001 deferred), built on the coroutine/`Flow` base 008 established —
+   a cold `RunStream` Flow (initial snapshot + polled updates, blocking read offloaded) fanned out to both
+   transports. This layer unlocks the UI, gives 003 a home for its status reporting, and carries remote
+   approval actions. **Design the remaining API contract *from* the finished UI** (the maintainer's
+   screenshots). *Next here:* streamed step **logs** (vs. run-status records) and a push/DB-notify source
+   behind the same `RunStream` seam to replace polling. **Design the API contract *from* the finished UI.**
 5. **Approval / promotion step** *(009)* — makes the reserved `WaitingOnApproval` state actionable
    (environment promotion + manual approval), replacing today's manual prod pipeline. The UI's
    control surface drives it.
@@ -100,7 +102,8 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 
 **Publishing (005), external CI (003, runnable), persistence (006), the read API (007), and the Spring
 Boot migration (008)** are all built — the engine now runs, delivers, gates GitHub PRs, records history,
-and serves the run history from a real Spring Boot 4.1 (WebFlux + coroutine) application. What's left in
-the **UI cluster** is **live streaming** — **SSE/WebSocket over `Flow`** on the 008 coroutine base — then
-the **Web UI (010)** against it. Highest-leverage move: pin the streaming API contract to the finished UI
-design (the maintainer's screenshots), so we build exactly the endpoints/streams the screens consume.
+serves the run history from a real Spring Boot 4.1 (WebFlux + coroutine) application, and now **streams
+run updates live over SSE + WebSocket**. What's left in the **UI cluster** is the **Web UI (010)** against
+this API, plus streamed step **logs** and a push source to retire polling behind the `RunStream` seam.
+Highest-leverage move: pin the remaining API contract to the finished UI design (the maintainer's
+screenshots), so we build exactly the endpoints/streams the screens consume.
