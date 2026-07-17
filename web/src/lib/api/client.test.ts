@@ -74,6 +74,32 @@ describe('api.triggerRun', () => {
 	});
 });
 
+describe('api.approveRun / rejectRun', () => {
+	it('POSTs the approve action on the run path', async () => {
+		const seen: { url: string; method?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method });
+				return Promise.resolve(json({ status: 'approved' }));
+			})
+		);
+		await api.approveRun('#KX 9');
+		expect(seen[0].url).toBe('/api/runs/%23KX%209/approve');
+		expect(seen[0].method).toBe('POST');
+	});
+
+	it('throws ApiError with the server message when nothing is waiting', async () => {
+		mockFetch(() =>
+			json({ error: 'no run awaiting approval' }, { status: 404, statusText: 'Not Found' })
+		);
+		const err = await api.rejectRun('x').catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(404);
+		expect(err.message).toBe('no run awaiting approval');
+	});
+});
+
 describe('error handling', () => {
 	it('throws ApiError with the status on a non-2xx response', async () => {
 		mockFetch(() => json({ error: 'not found' }, { status: 404, statusText: 'Not Found' }));

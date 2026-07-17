@@ -81,6 +81,32 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 	});
 }
 
+/** Serve a single run paused at a manual-approval gate; approving flips it to Success. */
+export async function mockWaitingRun(page: Page, id = 'run-approve-1'): Promise<void> {
+	let approved = false;
+	await page.route(/\/api\/runs\/[^/?]+\/approve$/, (route) => {
+		approved = true;
+		return route.fulfill({ status: 200, json: { status: 'approved' } });
+	});
+	await page.route(/\/api\/runs\/[^/?]+\/reject$/, (route) =>
+		route.fulfill({ status: 200, json: { status: 'rejected' } })
+	);
+	// coverage sidebar is best-effort; 404 keeps it out of the way (the client swallows it)
+	await page.route(/\/api\/coverage/, (route) => route.fulfill({ status: 404, json: {} }));
+	await page.route(detailUrl, (route) =>
+		route.fulfill({
+			json: {
+				id,
+				pipeline: 'kontinuance-service',
+				status: approved ? 'Success' : 'WaitingOnApproval',
+				repo: 'khorum-oss/kontinuance',
+				sha: 'c0ffee12',
+				startedAt: '2026-07-17T00:00:00Z'
+			}
+		})
+	);
+}
+
 /** Serve the coverage stub (Kover-shaped) for the coverage screen. */
 export async function mockCoverage(page: Page): Promise<void> {
 	await page.route(/\/api\/coverage/, (route) =>
