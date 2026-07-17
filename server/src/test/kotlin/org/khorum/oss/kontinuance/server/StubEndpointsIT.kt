@@ -11,7 +11,11 @@ import kotlin.test.assertTrue
  * Exercises the additive STUB endpoints on the real Spring Boot runtime via a live HTTP round-trip. Also
  * asserts the existing `/api/health` contract is unchanged, so adding the stubs did not disturb routing.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    // point coverage at a non-existent report so this suite exercises the fixture fallback deterministically
+    properties = ["kontinuance.coverage.report=/does-not-exist/kover-report.xml"],
+)
 class StubEndpointsIT(
     @param:Value("\${local.server.port}") private val port: Int,
 ) {
