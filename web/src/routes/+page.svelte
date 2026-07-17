@@ -13,6 +13,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let degraded = $state(false);
+	let triggering = $state(false);
+	let triggerError = $state<string | null>(null);
 
 	function render() {
 		runs = mergeNewestFirst(byId.values()).map((r) => toRunView(r));
@@ -28,6 +30,22 @@
 			error = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function trigger() {
+		triggering = true;
+		triggerError = null;
+		try {
+			const id = await api.triggerRun();
+			// Reflect the just-started run immediately; the SSE stream keeps it current after this.
+			if (id) byId.set(id, { id, pipeline: '', status: 'Running' });
+			render();
+			await load();
+		} catch (e) {
+			triggerError = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			triggering = false;
 		}
 	}
 
@@ -53,6 +71,9 @@
 	{loading}
 	{error}
 	{degraded}
+	{triggering}
+	{triggerError}
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
+	ontrigger={trigger}
 />

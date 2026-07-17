@@ -48,9 +48,24 @@ export async function mockStream(page: Page, runs = sampleRuns): Promise<void> {
 	);
 }
 
+const triggerUrl = /\/api\/runs\/trigger$/;
+
+/** The run a trigger starts; folded into the list once POST /api/runs/trigger has been called. */
+const startedRun = {
+	id: '#KX-2100',
+	pipeline: 'kontinuance-service',
+	status: 'Running',
+	repo: 'khorum-oss/kontinuance',
+	sha: 'deadbeef1a',
+	startedAt: '2026-07-17T00:10:00Z'
+};
+
 /** Serve the runs list + run-by-id + live stream from an in-memory fixture set. */
 export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
-	await page.route(listUrl, (route) => route.fulfill({ json: { runs } }));
+	let triggered = false;
+	await page.route(listUrl, (route) =>
+		route.fulfill({ json: { runs: triggered ? [startedRun, ...runs] : runs } })
+	);
 	await page.route(detailUrl, (route) => {
 		const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop() ?? '');
 		const run = runs.find((r) => r.id === id);
@@ -58,8 +73,12 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 			? route.fulfill({ json: run })
 			: route.fulfill({ status: 404, json: { error: 'not found' } });
 	});
-	// registered last so it wins over detailUrl for /api/runs/stream
 	await mockStream(page, runs);
+	// Registered after detailUrl (which also matches /api/runs/trigger) so this wins for the POST.
+	await page.route(triggerUrl, (route) => {
+		triggered = true;
+		return route.fulfill({ status: 202, json: { runId: startedRun.id } });
+	});
 }
 
 /** Serve the coverage stub (Kover-shaped) for the coverage screen. */

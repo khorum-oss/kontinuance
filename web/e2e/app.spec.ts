@@ -95,6 +95,16 @@ test.describe('runs screen', () => {
 
 		await expect(page.getByText('#KX-2099', { exact: true })).toBeVisible();
 	});
+
+	test('triggering a run starts a pipeline and shows the new run', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		await expect(page.getByText('#KX-2100', { exact: true })).toHaveCount(0);
+		await page.getByRole('button', { name: 'RUN PIPELINE' }).click();
+		await expect(page.getByText('#KX-2100', { exact: true })).toBeVisible();
+	});
 });
 
 test.describe('navigation', () => {

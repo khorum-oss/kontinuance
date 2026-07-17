@@ -7,15 +7,21 @@
 		loading = false,
 		error = null,
 		degraded = false,
+		triggering = false,
+		triggerError = null,
 		onopen,
-		onretry
+		onretry,
+		ontrigger
 	}: {
 		runs?: RunView[];
 		loading?: boolean;
 		error?: string | null;
 		degraded?: boolean;
+		triggering?: boolean;
+		triggerError?: string | null;
 		onopen?: (id: string) => void;
 		onretry?: () => void;
+		ontrigger?: () => void;
 	} = $props();
 </script>
 
@@ -23,6 +29,19 @@
 	{#if degraded}
 		<div class="degraded k-mono">live stream disconnected — showing last known state, retrying…</div>
 	{/if}
+
+	<div class="bar">
+		<button
+			class="k-mono trigger"
+			disabled={triggering}
+			onclick={() => ontrigger?.()}
+		>
+			{triggering ? 'STARTING…' : 'RUN PIPELINE'}
+		</button>
+		{#if triggerError}
+			<span class="k-mono terror">{triggerError}</span>
+		{/if}
+	</div>
 
 	<div class="head k-mono">
 		<span></span><span>RUN</span><span>REF</span><span>COMMIT</span><span>PROGRESS</span><span>TIME</span
@@ -50,6 +69,33 @@
 <style>
 	.screen {
 		padding: 22px 26px;
+	}
+	.bar {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		margin-bottom: 16px;
+	}
+	.trigger {
+		font-size: 10px;
+		letter-spacing: 2px;
+		color: var(--k-teal);
+		border: 1px solid rgba(94, 234, 212, 0.4);
+		background: none;
+		border-radius: 4px;
+		padding: 9px 20px;
+		cursor: pointer;
+	}
+	.trigger:hover:not(:disabled) {
+		background: rgba(94, 234, 212, 0.08);
+	}
+	.trigger:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.terror {
+		font-size: 10px;
+		color: var(--k-fail);
 	}
 	.head {
 		display: grid;
