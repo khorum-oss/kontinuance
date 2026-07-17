@@ -73,6 +73,18 @@ function fmtAge(fromMs: number, nowMs: number): string {
 	return `${Math.floor(h / 24)}d`;
 }
 
+/** Sort key for newest-first ordering: latest activity (end, else start). */
+export function runSortKey(r: RunRecord): string {
+	return r.endedAt ?? r.startedAt ?? '';
+}
+
+/** Merge records by id (later wins) and return them newest-first. */
+export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
+	const byId = new Map<string, RunRecord>();
+	for (const r of records) byId.set(r.id, r);
+	return [...byId.values()].sort((a, b) => runSortKey(b).localeCompare(runSortKey(a)));
+}
+
 /** Project a record into its display view. [nowMs] lets callers/tests pin "now". */
 export function toRunView(r: RunRecord, nowMs: number = Date.now()): RunView {
 	const status = normalizeStatus(r.status);

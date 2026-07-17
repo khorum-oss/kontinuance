@@ -29,8 +29,8 @@
 
 ## Phase 4: US2 — live updates (Priority: P1)
 
-- [ ] T011 [US2] `src/lib/api/live.ts` — SSE (`/api/runs/stream`) + WebSocket (`/ws/runs`) client exposing a Svelte store of run updates, with reconnect + degraded state.
-- [ ] T012 [US2] Wire the runs list (and open detail) to the live store: new/updated runs appear within ~3s without reload; degraded indicator on disconnect.
+- [x] T011 [US2] `src/lib/api/live.ts` — SSE (`/api/runs/stream`) + WebSocket (`/ws/runs`) client exposing a Svelte store of run updates, with reconnect + degraded state.
+- [x] T012 [US2] Wire the runs list (and open detail) to the live store: new/updated runs appear within ~3s without reload; degraded indicator on disconnect.
 
 ## Phase 5: US2/US1 — run detail (Priority: P1)
 

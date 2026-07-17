@@ -35,8 +35,20 @@ export const sampleRuns = [
 
 const listUrl = /\/api\/runs(\?.*)?$/;
 const detailUrl = /\/api\/runs\/[^/?]+$/;
+const streamUrl = /\/api\/runs\/stream/;
 
-/** Serve the runs list + run-by-id from an in-memory fixture set. */
+function sseBody(runs: typeof sampleRuns): string {
+	return runs.map((r) => `event: run\ndata: ${JSON.stringify(r)}\n\n`).join('');
+}
+
+/** Mock the SSE stream to emit `runs` as `run` events. */
+export async function mockStream(page: Page, runs = sampleRuns): Promise<void> {
+	await page.route(streamUrl, (route) =>
+		route.fulfill({ contentType: 'text/event-stream', body: sseBody(runs) })
+	);
+}
+
+/** Serve the runs list + run-by-id + live stream from an in-memory fixture set. */
 export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 	await page.route(listUrl, (route) => route.fulfill({ json: { runs } }));
 	await page.route(detailUrl, (route) => {
@@ -46,6 +58,8 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 			? route.fulfill({ json: run })
 			: route.fulfill({ status: 404, json: { error: 'not found' } });
 	});
+	// registered last so it wins over detailUrl for /api/runs/stream
+	await mockStream(page, runs);
 }
 
 /** Make every runs request fail, to exercise the error state. */
