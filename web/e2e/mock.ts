@@ -80,6 +80,46 @@ export async function mockCoverage(page: Page): Promise<void> {
 	);
 }
 
+/** Serve the deploy stub for the deploy screen. */
+export async function mockDeploy(page: Page): Promise<void> {
+	await page.route(/\/api\/deploy/, (route) =>
+		route.fulfill({
+			json: {
+				nodes: [
+					{ id: 'build', label: 'SOURCE', title: 'kontinuance-service', status: 'synced', meta: 'commit a3f19c2' },
+					{ id: 'stage', label: 'STAGE', title: 'argocd / kontinuance-stage', status: 'progressing', meta: 'rollout 2/3' },
+					{ id: 'prod', label: 'PROD', title: 'manual promotion gate', status: 'pending', meta: 'awaiting approval' }
+				],
+				artifacts: [
+					{ kind: 'JAR', name: 'kontinuance-core-1.4.2.jar', digest: 'sha256:8c1e42aa', state: 'published' },
+					{ kind: 'OCI', name: 'kontinuance:1.4.2', digest: 'sha256:8c1e42aa', state: 'pushed' }
+				],
+				environment: { podsReady: '2/3', syncRevision: '1.4.2', health: 'Progressing', meta: 'namespace kontinuance-stage' }
+			}
+		})
+	);
+}
+
+/** Serve the config stub for the config screen. */
+export async function mockConfig(page: Page): Promise<void> {
+	await page.route(/\/api\/config/, (route) =>
+		route.fulfill({
+			json: {
+				source: 'kontinuance.yml',
+				text: '# kontinuance.yml — pipeline definition\nversion: 0.4\nproject: kontinuance-service',
+				plan: {
+					stages: 6,
+					tasks: 10,
+					maxParallel: 3,
+					toolchain: 'temurin-21 · gradle 8.8',
+					publish: 'nexus.internal',
+					deploy: 'argocd / kontinuance-stage'
+				}
+			}
+		})
+	);
+}
+
 /** Make every runs request fail, to exercise the error state. */
 export async function mockApiError(page: Page): Promise<void> {
 	await page.route(/\/api\/runs/, (route) =>
