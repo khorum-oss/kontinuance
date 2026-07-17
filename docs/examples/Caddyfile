@@ -1,0 +1,24 @@
+# Example Caddyfile for Kontinuance: serves the built web UI and proxies the API + live stream on the
+# SAME ORIGIN. Adapt the site address, the file root, and the upstream. Caddy auto-provisions TLS for a
+# public hostname.
+#
+# Build the UI first: `pnpm --dir web build` -> static assets in web/build/ (SPA, index.html fallback).
+# Run the server (defaults to 127.0.0.1:8077).
+
+kontinuance.example.com {
+	# --- API, live stream, and WebSocket: same origin -----------------------
+	# Caddy proxies WebSocket upgrades (/ws/runs) transparently; flush_interval -1
+	# disables buffering so the SSE run stream (/api/runs/stream) streams immediately.
+	@api path /api/* /ws/runs
+	reverse_proxy @api 127.0.0.1:8077 {
+		flush_interval -1
+	}
+
+	# --- Static single-page app --------------------------------------------
+	root * /srv/kontinuance/web/build   # contents of web/build/
+	try_files {path} /index.html         # client-side routing fallback
+	file_server
+}
+
+# NOTE: the Kontinuance API has no authentication (this release). Add an authentication layer
+# (e.g. forward_auth to an SSO provider, or basic_auth) before exposing this site publicly.
