@@ -13,8 +13,11 @@ import kotlin.test.assertTrue
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    // point coverage at a non-existent report so this suite exercises the fixture fallback deterministically
-    properties = ["kontinuance.coverage.report=/does-not-exist/kover-report.xml"],
+    // point coverage + config at non-existent files so this suite exercises the fixture fallback deterministically
+    properties = [
+        "kontinuance.coverage.report=/does-not-exist/kover-report.xml",
+        "kontinuance.config.descriptor=/does-not-exist/kontinuance.yml",
+    ],
 )
 class StubEndpointsIT(
     @param:Value("\${local.server.port}") private val port: Int,

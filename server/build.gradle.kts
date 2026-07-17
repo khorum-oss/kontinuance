@@ -21,6 +21,7 @@ plugins {
 group = "org.khorum.oss.kontinuance"
 
 dependencies {
+    implementation(project(":engine"))
     implementation(project(":persistence"))
     implementation(rootProject.libs.spring.boot.starter.webflux)
     implementation(rootProject.libs.spring.boot.starter.actuator)

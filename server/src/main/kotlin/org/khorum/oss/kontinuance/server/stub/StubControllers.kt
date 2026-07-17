@@ -28,8 +28,3 @@ class DeployStubController {
     fun deploy(): ResponseEntity<ByteArray> = json(StubFixtures.deploy())
 }
 
-@RestController
-class ConfigStubController {
-    @GetMapping("/api/config")
-    fun config(): ResponseEntity<ByteArray> = json(StubFixtures.config())
-}
