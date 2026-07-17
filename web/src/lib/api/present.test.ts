@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runMessage, runRef, toRunView } from './present';
+import { mergeNewestFirst, runMessage, runRef, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -58,5 +58,25 @@ describe('toRunView', () => {
 		const v = toRunView(base, Date.parse('2026-07-17T01:00:00Z'));
 		expect(v.duration).toBe('—');
 		expect(v.age).toBe('—');
+	});
+});
+
+describe('mergeNewestFirst', () => {
+	it('dedupes by id (later wins) and orders by latest activity', () => {
+		const merged = mergeNewestFirst([
+			{ ...base, id: '#A', endedAt: '2026-07-17T00:10:00Z' },
+			{ ...base, id: '#B', endedAt: '2026-07-17T00:30:00Z' },
+			{ ...base, id: '#A', status: 'Failed', endedAt: '2026-07-17T00:20:00Z' }
+		]);
+		expect(merged.map((r) => r.id)).toEqual(['#B', '#A']);
+		expect(merged.find((r) => r.id === '#A')?.status).toBe('Failed');
+	});
+
+	it('treats a running run (start only) as newer than an older finished run', () => {
+		const merged = mergeNewestFirst([
+			{ ...base, id: '#done', endedAt: '2026-07-17T00:00:00Z' },
+			{ ...base, id: '#live', status: 'Running', startedAt: '2026-07-17T00:05:00Z' }
+		]);
+		expect(merged[0].id).toBe('#live');
 	});
 });

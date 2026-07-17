@@ -1,19 +1,29 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
-	import { toRunView, type RunView } from '$lib/api/present';
+	import { runStream } from '$lib/api/live';
+	import { mergeNewestFirst, toRunView, type RunView } from '$lib/api/present';
+	import type { RunRecord } from '$lib/api/types';
 	import Runs from '$lib/screens/Runs.svelte';
+
+	// Records keyed by id, seeded by the initial fetch and kept live by the SSE stream.
+	const byId = new Map<string, RunRecord>();
 
 	let runs = $state<RunView[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let degraded = $state(false);
+
+	function render() {
+		runs = mergeNewestFirst(byId.values()).map((r) => toRunView(r));
+	}
 
 	async function load() {
 		loading = true;
 		error = null;
 		try {
-			const records = await api.listRuns(100);
-			runs = records.map((r) => toRunView(r));
+			for (const r of await api.listRuns(100)) byId.set(r.id, r);
+			render();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
@@ -24,12 +34,25 @@
 	$effect(() => {
 		load();
 	});
+
+	// Live updates: merge streamed records and reflect the connection's degraded state.
+	$effect(() => {
+		const unsubscribe = runStream().subscribe((s) => {
+			degraded = s.degraded;
+			if (s.runs.length) {
+				for (const r of s.runs) byId.set(r.id, r);
+				render();
+			}
+		});
+		return unsubscribe;
+	});
 </script>
 
 <Runs
 	{runs}
 	{loading}
 	{error}
+	{degraded}
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
 />

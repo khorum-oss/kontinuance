@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterApp, mockApi, mockApiError, sampleRuns } from './mock';
+import { enterApp, mockApi, mockApiError, mockStream, sampleRuns } from './mock';
 
 test.describe('entry shell', () => {
 	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {
@@ -53,6 +53,23 @@ test.describe('runs screen', () => {
 		await enterApp(page);
 
 		await expect(page.getByText('no runs recorded yet')).toBeVisible();
+	});
+
+	test('a run pushed over the live stream appears without a reload', async ({ page }) => {
+		const pushed = {
+			id: '#KX-2099',
+			pipeline: 'kontinuance-service',
+			status: 'Running',
+			repo: 'khorum-oss/kontinuance',
+			sha: 'deadbee11',
+			startedAt: '2026-07-17T02:00:00Z'
+		};
+		await mockApi(page, sampleRuns); // initial fetch: sampleRuns only
+		await mockStream(page, [...sampleRuns, pushed]); // stream also carries the new run
+		await page.goto('/');
+		await enterApp(page);
+
+		await expect(page.getByText('#KX-2099', { exact: true })).toBeVisible();
 	});
 });
 
