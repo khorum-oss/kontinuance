@@ -27,6 +27,24 @@ async function getJson<T>(path: string): Promise<T> {
 	return (await res.json()) as T;
 }
 
+// POST an action on a run (approve/reject); resolves on 2xx, throws [ApiError] with the server's
+// `error` message otherwise.
+async function postRun(id: string, action: 'approve' | 'reject'): Promise<void> {
+	let res: Response;
+	try {
+		res = await fetch(`/api/runs/${encodeURIComponent(id)}/${action}`, {
+			method: 'POST',
+			headers: { accept: 'application/json' }
+		});
+	} catch (e) {
+		throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+	}
+	if (!res.ok) {
+		const body = (await res.json().catch(() => ({}))) as { error?: string };
+		throw new ApiError(body.error ?? `request failed: ${res.status} ${res.statusText}`, res.status);
+	}
+}
+
 export const api = {
 	health: () => getJson<{ status: string }>('/api/health'),
 
@@ -53,6 +71,11 @@ export const api = {
 		}
 		return body.runId ?? '';
 	},
+
+	// Resolves a run paused at a manual-approval gate. Throws [ApiError] (404 with the server's message)
+	// when no run with that id is currently waiting.
+	approveRun: (id: string) => postRun(id, 'approve'),
+	rejectRun: (id: string) => postRun(id, 'reject'),
 
 	// forward-looking screens (stub endpoints; see contracts/stub-api.md)
 	getPipeline: (runId: string) => getJson<Pipeline>(`/api/runs/${encodeURIComponent(runId)}/pipeline`),

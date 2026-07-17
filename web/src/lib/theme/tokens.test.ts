@@ -10,7 +10,7 @@ describe('normalizeStatus', () => {
 		expect(normalizeStatus('Cancelled')).toBe('cancelled');
 		expect(normalizeStatus('Skipped')).toBe('skipped');
 		expect(normalizeStatus('Queued')).toBe('pending');
-		expect(normalizeStatus('WaitingOnApproval')).toBe('pending');
+		expect(normalizeStatus('WaitingOnApproval')).toBe('waiting');
 	});
 
 	it('defaults unknown / empty input to pending', () => {
@@ -26,12 +26,14 @@ describe('statusColor', () => {
 		expect(statusColor('failed')).toBe(color.fail);
 		expect(statusColor('timedout')).toBe(color.fail);
 		expect(statusColor('running')).toBe(color.teal);
+		expect(statusColor('waiting')).toBe(color.warn);
 	});
 });
 
 describe('statusPulses', () => {
-	it('pulses only while running', () => {
+	it('pulses while running or awaiting approval', () => {
 		expect(statusPulses('running')).toBe(true);
+		expect(statusPulses('waiting')).toBe(true);
 		expect(statusPulses('success')).toBe(false);
 		expect(statusPulses('pending')).toBe(false);
 	});

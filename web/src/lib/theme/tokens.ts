@@ -26,7 +26,15 @@ export const color = {
 } as const;
 
 /** Canonical run/task status vocabulary the UI renders. */
-export type Status = 'success' | 'failed' | 'running' | 'pending' | 'skipped' | 'timedout' | 'cancelled';
+export type Status =
+	| 'success'
+	| 'failed'
+	| 'running'
+	| 'pending'
+	| 'waiting'
+	| 'skipped'
+	| 'timedout'
+	| 'cancelled';
 
 /** Map an engine status string (e.g. "Success", "Failed(step, …)") to a canonical [Status]. */
 export function normalizeStatus(raw: string | null | undefined): Status {
@@ -34,7 +42,8 @@ export function normalizeStatus(raw: string | null | undefined): Status {
 	if (s.startsWith('success')) return 'success';
 	if (s.startsWith('fail')) return 'failed';
 	if (s.startsWith('run')) return 'running';
-	if (s.startsWith('pend') || s.startsWith('queue') || s.startsWith('wait')) return 'pending';
+	if (s.startsWith('wait')) return 'waiting';
+	if (s.startsWith('pend') || s.startsWith('queue')) return 'pending';
 	if (s.startsWith('skip')) return 'skipped';
 	if (s.startsWith('timed')) return 'timedout';
 	if (s.startsWith('cancel')) return 'cancelled';
@@ -50,6 +59,8 @@ export function statusColor(status: Status): string {
 			return color.fail;
 		case 'running':
 			return color.teal;
+		case 'waiting':
+			return color.warn;
 		case 'cancelled':
 			return color.muted4;
 		case 'skipped':
@@ -60,9 +71,9 @@ export function statusColor(status: Status): string {
 	}
 }
 
-/** Whether a status should visually pulse (in-flight). */
+/** Whether a status should visually pulse (in-flight or awaiting attention). */
 export function statusPulses(status: Status): boolean {
-	return status === 'running';
+	return status === 'running' || status === 'waiting';
 }
 
 /** Coverage color by threshold: healthy at/above target, warning in the band below, poor beneath. */

@@ -1,6 +1,7 @@
 package org.khorum.oss.kontinuance.engine.descriptor
 
 import org.junit.jupiter.api.Test
+import org.khorum.oss.kontinuance.engine.model.ApprovalStep
 import org.khorum.oss.kontinuance.engine.model.DockerStep
 import org.khorum.oss.kontinuance.engine.model.GradleStep
 import org.khorum.oss.kontinuance.engine.model.NpmStep
@@ -41,6 +42,12 @@ class TypedStepDescriptorTest {
         assertEquals(GradleStep(tasks = listOf("build"), args = listOf("-x", "test")), definitionOf(gradle))
         assertEquals(DockerStep.run(image = "node:20", command = listOf("node")), definitionOf(docker))
         assertEquals(NpmStep.install(clean = true), definitionOf(npm))
+    }
+
+    @Test
+    fun `the approval key maps to an ApprovalStep carrying its message`() {
+        val yaml = oneStep("name: \"promote\"", "approval: \"Promote to production?\"")
+        assertEquals(ApprovalStep("Promote to production?"), definitionOf(yaml))
     }
 
     @Test
