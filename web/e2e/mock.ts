@@ -80,6 +80,29 @@ export async function mockCoverage(page: Page): Promise<void> {
 	);
 }
 
+/** Serve the pipeline stub for the pipeline screen. */
+export async function mockPipeline(page: Page): Promise<void> {
+	await page.route(/\/api\/runs\/[^/?]+\/pipeline/, (route) =>
+		route.fulfill({
+			json: {
+				runId: '#KX-2046',
+				stages: [
+					{ id: 's1', name: 'CHECKOUT', tasks: [{ id: 'git', name: 'git checkout', tool: 'git', status: 'success', progress: 100, deps: [] }] },
+					{
+						id: 's3',
+						name: 'BUILD',
+						tasks: [
+							{ id: 'core', name: ':core assemble', tool: 'gradle', status: 'success', progress: 100, deps: [] },
+							{ id: 'legacy', name: 'legacy-adapter package', tool: 'maven', status: 'running', progress: 62, deps: ['core'] }
+						]
+					},
+					{ id: 's4', name: 'TEST', tasks: [{ id: 'unit', name: 'unit tests', tool: 'gradle', status: 'running', progress: 40, deps: ['core'] }] }
+				]
+			}
+		})
+	);
+}
+
 /** Serve the deploy stub for the deploy screen. */
 export async function mockDeploy(page: Page): Promise<void> {
 	await page.route(/\/api\/deploy/, (route) =>
