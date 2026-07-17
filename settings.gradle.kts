@@ -25,6 +25,7 @@ includeModules(
     "engine",
     "github",
     "persistence",
+    "server",
     "integration-tests"
 )
 
