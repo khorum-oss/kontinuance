@@ -10,22 +10,22 @@
 
 ## Phase 1: Setup — scaffold + theme (Increment 1)
 
-- [ ] T001 Scaffold a SvelteKit + TS + Vite app in `web/` (Svelte 5, pnpm) with a dev proxy to the server for `/api` + `/ws`.
-- [ ] T002 Add Storybook (`@storybook/sveltekit`) + Vitest; `pnpm storybook` and `pnpm test` run.
-- [ ] T003 [P] Theme: `src/app.css` (canvas/teal tokens, Space Grotesk + JetBrains Mono, keyframes) + `src/lib/theme/tokens.ts` (typed colors, tool colors, status→color map).
+- [x] T001 Scaffold a SvelteKit + TS + Vite app in `web/` (Svelte 5, pnpm) with a dev proxy to the server for `/api` + `/ws`.
+- [x] T002 Add Storybook (`@storybook/sveltekit`) + Vitest; `pnpm storybook` and `pnpm test` run.
+- [x] T003 [P] Theme: `src/app.css` (canvas/teal tokens, Space Grotesk + JetBrains Mono, keyframes) + `src/lib/theme/tokens.ts` (typed colors, tool colors, status→color map).
 
 ## Phase 2: Foundational — API client + fixtures
 
-- [ ] T004 `src/lib/api/types.ts` — typed `RunSummary`/`RunDetail` + stub types (Pipeline, Deploy, Coverage, Config) mirroring contracts/stub-api.md.
-- [ ] T005 `src/lib/api/client.ts` — fetch client: `health()`, `listRuns(limit)`, `getRun(id)`, `getPipeline(id)`, `getDeploy()`, `getCoverage()`, `getConfig()` with error typing.
-- [ ] T006 [P] `src/lib/fixtures/*` — typed example data for every entity (runs, pipeline stages/tasks, deploy, coverage, config) for stories + stubs.
+- [x] T004 `src/lib/api/types.ts` — typed `RunSummary`/`RunDetail` + stub types (Pipeline, Deploy, Coverage, Config) mirroring contracts/stub-api.md.
+- [x] T005 `src/lib/api/client.ts` — fetch client: `health()`, `listRuns(limit)`, `getRun(id)`, `getPipeline(id)`, `getDeploy()`, `getCoverage()`, `getConfig()` with error typing.
+- [x] T006 [P] `src/lib/fixtures/*` — typed example data for every entity (runs, pipeline stages/tasks, deploy, coverage, config) for stories + stubs.
 
 ## Phase 3: US1 — runs list + open a run (Priority: P1) 🎯 MVP
 
-- [ ] T007 [P] [US1] Shared components + stories: `StatusDot`, `ProgressBar`, `ToolBadge`, `RunRow`.
-- [ ] T008 [P] [US4] Shell components + stories: `Sidebar`, `Topbar`, `Login` (presentational entry).
-- [ ] T009 [US1] `screens/Runs.svelte` — newest-first runs table wired to `listRuns`, with loading/empty/error states + story.
-- [ ] T010 [US1] Routes: shell layout + `/` (Runs) + `/runs/[id]` (detail placeholder); sidebar nav highlights active screen.
+- [x] T007 [P] [US1] Shared components + stories: `StatusDot`, `ProgressBar`, `ToolBadge`, `RunRow`.
+- [x] T008 [P] [US4] Shell components + stories: `Sidebar`, `Topbar`, `Login` (presentational entry).
+- [x] T009 [US1] `screens/Runs.svelte` — newest-first runs table wired to `listRuns`, with loading/empty/error states + story.
+- [x] T010 [US1] Routes: shell layout + `/` (Runs) + `/runs/[id]` (detail placeholder); sidebar nav highlights active screen.
 
 ## Phase 4: US2 — live updates (Priority: P1)
 
