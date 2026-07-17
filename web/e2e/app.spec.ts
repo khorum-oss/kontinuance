@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { enterApp, mockApi, mockApiError, mockStream, sampleRuns } from './mock';
+import { enterApp, mockApi, mockApiError, mockCoverage, mockStream, sampleRuns } from './mock';
 
 test.describe('entry shell', () => {
 	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {
@@ -85,5 +85,23 @@ test.describe('navigation', () => {
 
 		await page.getByRole('link', { name: 'COVERAGE' }).click();
 		await expect(page).toHaveURL(/\/coverage$/);
+	});
+});
+
+test.describe('coverage screen', () => {
+	test('renders the Kover summary and module table, and drills into a module', async ({ page }) => {
+		await mockApi(page);
+		await mockCoverage(page);
+		await page.goto('/coverage');
+		await enterApp(page);
+
+		await expect(page.getByText('LINE COVERAGE')).toBeVisible();
+		await expect(page.getByText('84.2%')).toBeVisible();
+		await expect(page.getByRole('button', { name: /engine/ })).toBeVisible();
+
+		await page.getByRole('button', { name: /engine/ }).click();
+		await expect(page.getByText(/class-level breakdown for/)).toBeVisible();
+		await page.getByRole('button', { name: 'ALL MODULES' }).click();
+		await expect(page.getByRole('button', { name: /server/ })).toBeVisible();
 	});
 });

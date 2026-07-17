@@ -62,6 +62,24 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 	await mockStream(page, runs);
 }
 
+/** Serve the coverage stub (Kover-shaped) for the coverage screen. */
+export async function mockCoverage(page: Page): Promise<void> {
+	await page.route(/\/api\/coverage/, (route) =>
+		route.fulfill({
+			json: {
+				tool: 'kover',
+				line: { pct: '84.2%', covered: 4821, total: 5724 },
+				branch: { pct: '72.1%', covered: 611, total: 848 },
+				classes: 142,
+				modules: [
+					{ name: 'engine', kind: 'module', linePct: 91, branchPct: 84, missed: 214 },
+					{ name: 'server', kind: 'module', linePct: 86, branchPct: 74, missed: 63 }
+				]
+			}
+		})
+	);
+}
+
 /** Make every runs request fail, to exercise the error state. */
 export async function mockApiError(page: Page): Promise<void> {
 	await page.route(/\/api\/runs/, (route) =>
