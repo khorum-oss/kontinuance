@@ -1,0 +1,43 @@
+# Example Kontinuance pipeline descriptor.
+#
+# Point the server at this file with `kontinuance.config.descriptor` (default: kontinuance.yml in the
+# server's working directory). It demonstrates the recommended shape for a gated deployment:
+#
+#     build  ->  test  ->  approve (its own stage)  ->  deploy
+#
+# The manual-approval gate is alone in its stage. That matters: when an approved run resumes, the engine
+# re-enters the paused stage from the top, so keeping the gate by itself means resume repeats no prior
+# work. See docs/running.md for the authoring rules and the durability boundary.
+#
+# Secrets (e.g. DEPLOY_TOKEN below) are resolved from the server process's environment — set them as
+# environment variables; never commit their values.
+pipeline:
+  name: "kontinuance-service"
+  # Max steps running at once. Stages still run in declared order; this bounds parallelism within a stage.
+  concurrency: 2
+  stages:
+    - name: "build"
+      steps:
+        - name: "assemble"
+          gradle:
+            tasks: ["assemble"]
+
+    - name: "test"
+      steps:
+        - name: "unit"
+          gradle:
+            tasks: ["test"]
+            args: ["--no-daemon"]
+
+    # Gate alone in its own stage — a resumed run re-runs nothing before it.
+    - name: "approve"
+      steps:
+        - name: "promote-to-prod"
+          approval: "Promote this build to production?"
+
+    - name: "deploy"
+      steps:
+        - name: "rollout"
+          run: "./deploy.sh"
+          # Resolved from the environment (KONTINUANCE reads it via EnvSecretSource) and masked in logs.
+          secrets: ["DEPLOY_TOKEN"]

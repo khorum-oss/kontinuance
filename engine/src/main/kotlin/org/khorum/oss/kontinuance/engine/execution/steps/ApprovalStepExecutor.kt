@@ -14,14 +14,14 @@ import java.time.Instant
 import kotlin.coroutines.coroutineContext
 
 /**
- * Executes an [ApprovalStep] by suspending on the injected [ApprovalGate] until the run is approved or
- * rejected — it runs no process. An approval ends the step [PipelineStatus.Success] so the run
- * continues; a rejection ends it [PipelineStatus.Cancelled], which the engine propagates to a
- * [PipelineStatus.Cancelled] run (a deliberate stop, not a failure).
+ * Executes an [ApprovalStep] by asking the injected [ApprovalGate] for a decision — it runs no process.
+ * An approval ends the step [PipelineStatus.Success] so the run continues; a rejection ends it
+ * [PipelineStatus.Cancelled] (which the engine propagates to a Cancelled run — a deliberate stop, not a
+ * failure); a `null` (no decision yet) ends it [PipelineStatus.WaitingOnApproval], which pauses the run.
  *
  * The run id used to address the gate is read from the [ApprovalToken] on the coroutine context (set
  * by the host around `engine.run(...)`); it is absent for non-interactive hosts, whose default
- * [AutoApprovingGate] ignores it.
+ * [AutoApprovingGate] ignores it and always approves.
  */
 class ApprovalStepExecutor(private val gate: ApprovalGate = AutoApprovingGate) : StepExecutor {
 
@@ -34,9 +34,10 @@ class ApprovalStepExecutor(private val gate: ApprovalGate = AutoApprovingGate) :
         context.logSink.emit(definition.message)
 
         val runId = coroutineContext[ApprovalToken]?.runId
-        val status = when (gate.await(runId, step.name)) {
+        val status = when (gate.decide(runId, step.name)) {
             ApprovalDecision.APPROVED -> PipelineStatus.Success
             ApprovalDecision.REJECTED -> PipelineStatus.Cancelled
+            null -> PipelineStatus.WaitingOnApproval
         }
         return StepRun(step.name, status, exitCode = null, startedAt = startedAt, endedAt = Instant.now())
     }

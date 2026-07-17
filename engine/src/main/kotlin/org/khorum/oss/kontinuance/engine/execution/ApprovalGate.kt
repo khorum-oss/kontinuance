@@ -7,23 +7,27 @@ import kotlin.coroutines.CoroutineContext
 enum class ApprovalDecision { APPROVED, REJECTED }
 
 /**
- * Resolves a manual-approval gate (an [org.khorum.oss.kontinuance.engine.model.ApprovalStep]). The
- * executor suspends on [await] until an approver decides; the engine keeps the run's coroutine alive
- * while it waits, so no run state has to be serialized for the common in-process case.
+ * Resolves a manual-approval gate (an [org.khorum.oss.kontinuance.engine.model.ApprovalStep]).
+ *
+ * [decide] is **non-blocking**: it returns the decision for this gate *now*, or `null` to signal that
+ * no decision has been made yet — in which case the step ends `WaitingOnApproval` and the run **pauses**
+ * (returns with completed stages preserved) rather than holding a coroutine open. A host resolves the
+ * pause durably by persisting the paused run and later re-running it from its completed stages with the
+ * decision available (see the durable-approval host gate).
  *
  * [runId] is the caller's run identifier (carried on the coroutine context via [ApprovalToken]) so an
- * external host can address the waiting gate; it is `null` for non-interactive callers.
+ * external host can address the gate; it is `null` for non-interactive callers, which auto-approve.
  */
 fun interface ApprovalGate {
-    suspend fun await(runId: String?, stepName: String): ApprovalDecision
+    suspend fun decide(runId: String?, stepName: String): ApprovalDecision?
 }
 
 /**
  * The default gate for non-interactive hosts (CLI, tests): approves immediately so a gated pipeline
- * still runs to completion without an external approver.
+ * still runs to completion without an external approver — it never pauses.
  */
 object AutoApprovingGate : ApprovalGate {
-    override suspend fun await(runId: String?, stepName: String): ApprovalDecision = ApprovalDecision.APPROVED
+    override suspend fun decide(runId: String?, stepName: String): ApprovalDecision = ApprovalDecision.APPROVED
 }
 
 /**

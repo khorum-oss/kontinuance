@@ -67,21 +67,25 @@ class DefaultPipelineEngine(
     // SwallowedException: cancellation is the signalling mechanism for cancel(); it is intentionally
     // converted into a terminal Cancelled Run rather than propagated to the caller (FR-014).
     @Suppress("SwallowedException")
-    override suspend fun run(pipeline: Pipeline, secrets: SecretSource): Run {
+    override suspend fun run(pipeline: Pipeline, secrets: SecretSource, completedStages: List<StageRun>): Run {
         val runId = runIdFactory()
         val flow = newRunFlow()
         runFlows[runId] = flow
 
         validate(pipeline, secrets)
 
-        val gate = ConcurrencyGate(pipeline.concurrency)
-        val stepRunner = StepRunner(registry, secrets, logSink)
+        val exec = Execution(
+            gate = ConcurrencyGate(pipeline.concurrency),
+            stepRunner = StepRunner(registry, secrets, logSink),
+            flow = flow,
+        )
         val collected = CopyOnWriteArrayList<StageRun>()
+        val done = completedStages.associateBy { it.name }
         val pipelineTarget = Target.PipelineTarget(pipeline.name)
 
         emit(flow, pipelineTarget, PipelineStatus.Running)
         return supervisorScope {
-            val execution = async { executeStages(pipeline, gate, stepRunner, flow, collected) }
+            val execution = async { executeStages(pipeline, exec, collected, done) }
             activeRuns[runId] = execution
             try {
                 val overall = execution.await()
@@ -108,14 +112,24 @@ class DefaultPipelineEngine(
 
     private suspend fun executeStages(
         pipeline: Pipeline,
-        gate: ConcurrencyGate,
-        stepRunner: StepRunner,
-        flow: MutableSharedFlow<StatusEvent>,
+        exec: Execution,
         collected: MutableList<StageRun>,
+        completedByName: Map<String, StageRun>,
     ): PipelineStatus {
         for (stage in pipeline.stages) {
-            val stageRun = executeStage(pipeline.name, stage, gate, stepRunner, flow)
+            // Resume: reuse an already-completed stage instead of re-executing it (FR: durable approval).
+            val alreadyDone = completedByName[stage.name]
+            if (alreadyDone != null) {
+                collected.add(alreadyDone)
+                continue
+            }
+            val stageRun = executeStage(pipeline.name, stage, exec)
             collected.add(stageRun)
+            // A manual-approval gate with no decision yet pauses the run: stop here, preserving the
+            // stages completed so far, and report WaitingOnApproval (a non-terminal, resumable state).
+            if (stageRun.status == PipelineStatus.WaitingOnApproval) {
+                return PipelineStatus.WaitingOnApproval
+            }
             if (stageRun.status.isFailure) {
                 // A rejected approval gate ends the step Cancelled — surface that as a Cancelled run
                 // (a deliberate stop), not a Failed one, so it is not styled/treated as a breakage.
@@ -133,42 +147,35 @@ class DefaultPipelineEngine(
     private suspend fun executeStage(
         pipelineName: String,
         stage: Stage,
-        gate: ConcurrencyGate,
-        stepRunner: StepRunner,
-        flow: MutableSharedFlow<StatusEvent>,
+        exec: Execution,
     ): StageRun {
         val stageTarget = Target.StageTarget(pipelineName, stage.name)
-        emit(flow, stageTarget, PipelineStatus.Running)
+        emit(exec.flow, stageTarget, PipelineStatus.Running)
         val stepRuns = mutableListOf<StepRun>()
         var stageStatus: PipelineStatus = PipelineStatus.Success
         for (step in stage.steps) {
             val target = Target.StepTarget(pipelineName, stage.name, step.name)
-            val stepRun = runStep(step, target, gate, stepRunner, flow)
+            val stepRun = runStep(step, target, exec)
             stepRuns.add(stepRun)
-            if (stepRun.status.isFailure) {
+            // Stop the stage on a failure/cancellation or on a pause (an unresolved approval gate).
+            if (stepRun.status.isFailure || stepRun.status == PipelineStatus.WaitingOnApproval) {
                 stageStatus = stepRun.status
                 break
             }
         }
-        emit(flow, stageTarget, stageStatus)
+        emit(exec.flow, stageTarget, stageStatus)
         return StageRun(stage.name, stageStatus, stepRuns)
     }
 
     /** Runs a single step (or marks it Skipped), emitting its transitions. */
-    private suspend fun runStep(
-        step: Step,
-        target: Target,
-        gate: ConcurrencyGate,
-        stepRunner: StepRunner,
-        flow: MutableSharedFlow<StatusEvent>,
-    ): StepRun {
+    private suspend fun runStep(step: Step, target: Target, exec: Execution): StepRun {
         if (!step.condition) {
-            emit(flow, target, PipelineStatus.Skipped)
+            emit(exec.flow, target, PipelineStatus.Skipped)
             return StepRun(step.name, PipelineStatus.Skipped)
         }
-        emit(flow, target, PipelineStatus.Running)
-        val stepRun = gate.withPermit { stepRunner.run(step) }
-        emit(flow, target, stepRun.status)
+        emit(exec.flow, target, PipelineStatus.Running)
+        val stepRun = exec.gate.withPermit { exec.stepRunner.run(step) }
+        emit(exec.flow, target, stepRun.status)
         return stepRun
     }
 
@@ -187,6 +194,13 @@ class DefaultPipelineEngine(
             extraBufferCapacity = BUFFER,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
+
+    /** The per-run collaborators threaded through the stage/step loop (keeps the loop signatures small). */
+    private class Execution(
+        val gate: ConcurrencyGate,
+        val stepRunner: StepRunner,
+        val flow: MutableSharedFlow<StatusEvent>,
+    )
 
     private companion object {
         const val REPLAY = 128

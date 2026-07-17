@@ -10,6 +10,7 @@ import org.khorum.oss.kontinuance.engine.execution.steps.NpmStepExecutor
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.model.RunId
+import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 
@@ -22,8 +23,20 @@ import org.khorum.oss.kontinuance.engine.secret.SecretSource
  */
 interface PipelineEngine {
 
-    /** Executes [pipeline] in-process and returns the completed [Run]. */
-    suspend fun run(pipeline: Pipeline, secrets: SecretSource = EnvSecretSource()): Run
+    /**
+     * Executes [pipeline] in-process and returns the [Run]. Ordinarily the returned run is terminal;
+     * if it reaches a manual-approval gate with no decision yet it returns paused
+     * ([org.khorum.oss.kontinuance.engine.model.PipelineStatus.WaitingOnApproval]) with the stages
+     * completed so far.
+     *
+     * [completedStages] resumes a previously paused run: stages already completed (matched by name) are
+     * skipped and reused, so execution continues from the gate. Pass the empty list for a fresh run.
+     */
+    suspend fun run(
+        pipeline: Pipeline,
+        secrets: SecretSource = EnvSecretSource(),
+        completedStages: List<StageRun> = emptyList(),
+    ): Run
 
     /** Observes lifecycle transitions for the run identified by [runId] as they happen. */
     fun statuses(runId: RunId): Flow<StatusEvent>
