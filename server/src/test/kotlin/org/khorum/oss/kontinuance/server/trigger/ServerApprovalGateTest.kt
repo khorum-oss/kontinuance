@@ -1,60 +1,33 @@
 package org.khorum.oss.kontinuance.server.trigger
 
-import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.engine.execution.ApprovalDecision
-import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
-import org.khorum.oss.kontinuance.persistence.RunRecord
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 class ServerApprovalGateTest {
 
-    private fun storeWith(id: String) = InMemoryRunStore().apply {
-        record(RunRecord(id = id, pipeline = "p", status = "Running"))
+    @Test
+    fun `decide pauses (null) until a decision is granted, then consumes it once`() = runBlocking {
+        val gate = ServerApprovalGate()
+
+        assertNull(gate.decide("run-1", "gate"), "no grant yet → pause")
+
+        gate.grant("run-1", ApprovalDecision.APPROVED)
+        assertEquals(ApprovalDecision.APPROVED, gate.decide("run-1", "gate"), "consumes the grant")
+        assertNull(gate.decide("run-1", "gate"), "one-shot: the grant is gone")
     }
 
     @Test
-    fun `await marks WaitingOnApproval and approve resumes it, marking Running`() = runBlocking {
-        val store = storeWith("run-1")
-        val gate = ServerApprovalGate(store)
-
-        val waiting = async { gate.await("run-1", "approve") }
-        while (store.get("run-1")?.status != "WaitingOnApproval") yield()
-
-        assertTrue(gate.approve("run-1"), "a pending gate should be approvable")
-        assertEquals(ApprovalDecision.APPROVED, waiting.await())
-        assertEquals("Running", store.get("run-1")?.status)
+    fun `a granted rejection is returned`() = runBlocking {
+        val gate = ServerApprovalGate()
+        gate.grant("run-2", ApprovalDecision.REJECTED)
+        assertEquals(ApprovalDecision.REJECTED, gate.decide("run-2", "gate"))
     }
 
     @Test
-    fun `reject resolves the gate REJECTED`() = runBlocking {
-        val store = storeWith("run-2")
-        val gate = ServerApprovalGate(store)
-
-        val waiting = async { gate.await("run-2", "approve") }
-        while (store.get("run-2")?.status != "WaitingOnApproval") yield()
-
-        assertTrue(gate.reject("run-2"))
-        assertEquals(ApprovalDecision.REJECTED, waiting.await())
-    }
-
-    @Test
-    fun `approve or reject with no run waiting returns false`() {
-        val gate = ServerApprovalGate(storeWith("run-3"))
-        assertFalse(gate.approve("run-3"), "nothing is waiting yet")
-        assertFalse(gate.reject("absent"))
-    }
-
-    @Test
-    fun `a null run id auto-approves without touching the store`() = runBlocking {
-        val store = storeWith("run-4")
-        val gate = ServerApprovalGate(store)
-
-        assertEquals(ApprovalDecision.APPROVED, gate.await(null, "approve"))
-        assertEquals("Running", store.get("run-4")?.status, "an unaddressable gate should not alter records")
+    fun `a null run id auto-approves`() = runBlocking {
+        assertEquals(ApprovalDecision.APPROVED, ServerApprovalGate().decide(null, "gate"))
     }
 }

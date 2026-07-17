@@ -1,56 +1,32 @@
 package org.khorum.oss.kontinuance.server.trigger
 
-import kotlinx.coroutines.CompletableDeferred
 import org.khorum.oss.kontinuance.engine.execution.ApprovalDecision
 import org.khorum.oss.kontinuance.engine.execution.ApprovalGate
-import org.khorum.oss.kontinuance.persistence.RunStore
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The server's [ApprovalGate]: when a triggered run reaches a manual-approval step it suspends here,
- * and its record is marked `WaitingOnApproval` (so the UI shows the gate and the approve/reject
- * actions). [ApprovalController] resolves the waiting gate by run id via [approve] / [reject].
+ * The server's [ApprovalGate]. On the initial run a gate has no decision, so [decide] returns `null`
+ * and the run pauses (`WaitingOnApproval`) — the pause is persisted, not held in memory. When an
+ * operator approves/rejects, [RunApprovals] records a one-shot decision here via [grant] and re-runs the
+ * pipeline from its completed stages; on that resume [decide] consumes the grant so the gate proceeds.
  *
- * Because stages run in order, a run waits at one gate at a time, so the run id alone keys the pending
- * decision. This is an in-process gate: it only resolves runs whose coroutine is still alive on this
- * instance (the same constraint as the manual trigger). A `null` run id (no [ApprovalToken] set)
- * auto-approves rather than hanging.
+ * Because the durable state lives in the run store (not this map), approval works even after a restart:
+ * a fresh gate instance with an empty map resolves a paused run just the same. A `null` run id (no
+ * [org.khorum.oss.kontinuance.engine.execution.ApprovalToken]) auto-approves rather than pausing.
  */
 @Component
-class ServerApprovalGate(private val store: RunStore) : ApprovalGate {
+class ServerApprovalGate : ApprovalGate {
 
-    private val pending = ConcurrentHashMap<String, CompletableDeferred<ApprovalDecision>>()
+    private val granted = ConcurrentHashMap<String, ApprovalDecision>()
 
-    override suspend fun await(runId: String?, stepName: String): ApprovalDecision {
+    override suspend fun decide(runId: String?, stepName: String): ApprovalDecision? {
         if (runId == null) return ApprovalDecision.APPROVED
-        val decision = CompletableDeferred<ApprovalDecision>()
-        pending[runId] = decision
-        markStatus(runId, WAITING)
-        try {
-            val outcome = decision.await()
-            if (outcome == ApprovalDecision.APPROVED) markStatus(runId, RUNNING)
-            return outcome
-        } finally {
-            pending.remove(runId, decision)
-        }
+        return granted.remove(runId) // one-shot grant, or null to pause when none is set
     }
 
-    /** Approves the run waiting at [runId]'s gate; `true` if one was pending. */
-    fun approve(runId: String): Boolean = decide(runId, ApprovalDecision.APPROVED)
-
-    /** Rejects the run waiting at [runId]'s gate; `true` if one was pending. */
-    fun reject(runId: String): Boolean = decide(runId, ApprovalDecision.REJECTED)
-
-    private fun decide(runId: String, outcome: ApprovalDecision): Boolean =
-        pending[runId]?.complete(outcome) ?: false
-
-    private fun markStatus(runId: String, status: String) {
-        store.get(runId)?.let { store.record(it.copy(status = status)) }
-    }
-
-    private companion object {
-        const val WAITING = "WaitingOnApproval"
-        const val RUNNING = "Running"
+    /** Records a one-shot [decision] to be consumed by [runId]'s next gate on resume. */
+    fun grant(runId: String, decision: ApprovalDecision) {
+        granted[runId] = decision
     }
 }
