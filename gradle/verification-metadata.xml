@@ -53,6 +53,10 @@
          <trust group="^com[.]vaadin[.]external($|([.].*))" regex="true"/>
          <trust group="^org[.]hdrhistogram($|([.].*))" regex="true"/>
          <trust group="^org[.]latencyutils($|([.].*))" regex="true"/>
+         <!-- groovy-bom metadata only (no jar): logback-classic declares an optional Groovy-config
+              version constraint, so Gradle 9.5.1 fetches the BOM's .pom/.module to evaluate it. No
+              Groovy is on any classpath; this trusts the metadata so verification stays enabled. -->
+         <trust group="^org[.]apache[.]groovy($|([.].*))" regex="true"/>
       </trusted-artifacts>
       <ignored-keys>
          <ignored-key id="2161D72E7DCD4258" reason="Key couldn't be downloaded from any key server"/>
