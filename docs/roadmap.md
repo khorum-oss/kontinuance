@@ -10,7 +10,7 @@ planes (one process now, separable later): **orchestrator** (schedule/track runs
 (execute steps), **event source** (triggers). Pipelines are authored as a **hybrid YAML + Kotlin
 DSL** generated on Konstellation KSP.
 
-## Current state (2026-07-15)
+## Current state (2026-07-17)
 
 | Feature | State |
 |---|---|
@@ -22,6 +22,7 @@ DSL** generated on Konstellation KSP.
 | **006 run-persistence** | **Built** — new `persistence` module: durable `RunStore` (file-backed JSON, `recent(limit)` newest-first + `get(id)`, corrupt-record isolation) behind a swappable seam; `RunRecord` captures status + CI context (repo/sha/trigger), no secrets/logs. The `github` CI service records every run; `kontinuance-ci` state consolidated under `~/.kontinuance/`. Engine-only, Spring-free, no new deps. |
 | **007 server-api** | **Read API built** (increment 1, Spring-free) — new `server` module: `GET /api/health`, `/api/runs?limit=N` (newest-first, default 50 / cap 500), `/api/runs/{id}` (404 absent). Transport-agnostic `RunApi` handlers + `HttpApiServer` on the JDK HttpServer + installable `kontinuance-api` launcher (host/port/store configurable) serving the 006 store. No new deps; verified via real `HttpClient` round-trip + live `curl`. **Superseded by 008** (real Spring Boot); the JDK `HttpApiServer` transport was retired there. Still deferred: SSE/WebSocket streaming, manual-trigger POST, auth. |
 | **008 spring-boot-server** | **Built** — migrated `:server` off the JDK HttpServer to **Spring Boot 4.1.0** (WebFlux + actuator) with Kotlin coroutines: suspend `@RestController` over a suspend `RunReadFacade` (`withContext(Dispatchers.IO)` offloading the blocking file store), reusing the 007 `RunApi`/`ApiResponse`/`JsonView` unchanged. Same `/api` contract byte-for-byte + `/actuator/health`. Versions via the Boot BOM (starters pinned, no Boot Gradle plugin) so **dependency verification stays enabled** — extended with group trusts for the Spring/test ecosystem, never disabled. `@SpringBootTest(RANDOM_PORT)` + `WebTestClient` real HTTP round-trip (15 tests green on Gradle 8.14.3; CI 9.5.1 authoritative for the new graph). |
+| **009 web-ui** | **Built** — a SvelteKit + Storybook "mission control" dashboard (`web/`) over the 008 read API + live stream. Seven screens behind a sidebar/topbar shell: **Runs** (newest-first, wired to `/api/runs`), **live** updates over SSE (`/api/runs/stream`), **Run detail** (log view + Kover coverage sidebar), plus **Pipeline / Deploy / Coverage / Config** wired to four new **additive stub endpoints** on `:server` (`/api/runs/{id}/pipeline`, `/api/deploy`, `/api/coverage`, `/api/config`) — no new JVM dep, verification untouched. Component-library-first (Storybook stories per element/screen on typed fixtures). Tests: Vitest unit + Playwright E2E, wired into a `web-tests` CI job. Dark teal theme; Space Grotesk + JetBrains Mono. Deferred: real pipeline/deploy/coverage sources (stubs today), live step-log streaming (engine records no logs yet), auth + write actions (trigger/approve). |
 | `engine→dsl` refactor | **Deferred, not a blocker.** 003 will be implemented **engine-only** (depending on `engine` types directly), so this refactor is decoupled from the near-term path and can land later on its own merit. |
 
 ## Decisions locked today (2026-07-12)
@@ -79,15 +80,14 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    approval actions. **Design the remaining API contract *from* the finished UI** (the maintainer's
    screenshots). *Next here:* streamed step **logs** (vs. run-status records) and a push/DB-notify source
    behind the same `RunStream` seam to replace polling. **Design the API contract *from* the finished UI.**
-5. **Approval / promotion step** *(009)* — makes the reserved `WaitingOnApproval` state actionable
+5. **Web UI** *(009 — ✅ built)* — SvelteKit + Storybook "mission control" dashboard (`web/`) against the
+   (4) API. The **Observe UI** is done (read-only): sign-in shell, runs list, live status over SSE, run
+   detail, and pipeline/deploy/coverage/config screens (the last four on additive server stubs). The
+   **Control UI** (trigger runs, click-to-approve promotions) is the remaining slice — it needs write
+   endpoints + approval (below).
+6. **Approval / promotion step** *(010)* — makes the reserved `WaitingOnApproval` state actionable
    (environment promotion + manual approval), replacing today's manual prod pipeline. The UI's
    control surface drives it.
-6. **Web UI** *(010+ — design already in hand; screenshots to spec against)* — SvelteKit frontend
-   against the (4) API. Naturally splits by dependency:
-   - **Observe UI** (read-only): list pipelines/runs, watch live status + streamed logs. Needs (4) +
-     light (3) only — deliverable soon after the API layer.
-   - **Control UI**: trigger runs, click-to-approve promotions. Additionally needs (5).
-   The existing UI design guides the API shape (4) and where the observe/control line falls.
 7. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
    `UAT`→**euri** (Playwright), each a `StepExecutor` plugin.
 8. **Runner isolation** (Docker/k8s) — overview v1 item; when parallel/multi-tenant runs matter.
@@ -100,10 +100,12 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 
 ## Immediate next step
 
-**Publishing (005), external CI (003, runnable), persistence (006), the read API (007), and the Spring
-Boot migration (008)** are all built — the engine now runs, delivers, gates GitHub PRs, records history,
-serves the run history from a real Spring Boot 4.1 (WebFlux + coroutine) application, and now **streams
-run updates live over SSE + WebSocket**. What's left in the **UI cluster** is the **Web UI (010)** against
-this API, plus streamed step **logs** and a push source to retire polling behind the `RunStream` seam.
-Highest-leverage move: pin the remaining API contract to the finished UI design (the maintainer's
-screenshots), so we build exactly the endpoints/streams the screens consume.
+**Publishing (005), external CI (003), persistence (006), the read API (007), the Spring Boot migration
+(008), and the Web UI (009)** are all built — the engine runs, delivers, gates GitHub PRs, records
+history, serves it from a real Spring Boot 4.1 (WebFlux + coroutine) app with live SSE updates, and now
+has a **SvelteKit observe dashboard** over all of it. The **Control UI** is what remains: make the
+forward-looking screens real by (a) **write endpoints** — manual trigger + approve/promote — behind the
+`WaitingOnApproval` FSM (feature 010), and (b) **real data sources** for the pipeline/deploy/coverage
+stubs plus **streamed step logs** (the engine records run metadata but no step logs yet) and a push/
+DB-notify source to retire polling behind the `RunStream` seam. Highest-leverage move: wire the approval
+step so the dashboard's control surface becomes actionable.
