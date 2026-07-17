@@ -2,7 +2,9 @@ package org.khorum.oss.kontinuance.server.trigger
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
+import org.khorum.oss.kontinuance.engine.execution.ApprovalToken
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
@@ -42,7 +44,10 @@ class RunTrigger(
 
         scope.launch {
             val terminal = runCatching {
-                RunRecord.from(engine.run(pipeline), Instant.now(), trigger = "manual").copy(id = id)
+                // Carry this run's id into the engine so a manual-approval gate can be addressed by it.
+                withContext(ApprovalToken(id)) {
+                    RunRecord.from(engine.run(pipeline), Instant.now(), trigger = "manual").copy(id = id)
+                }
             }.getOrElse {
                 RunRecord(
                     id = id,
