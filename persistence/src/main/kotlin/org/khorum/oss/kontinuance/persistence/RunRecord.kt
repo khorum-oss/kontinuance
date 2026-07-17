@@ -26,9 +26,10 @@ data class RunRecord(
     val repo: String? = null,
     val sha: String? = null,
     val trigger: String? = null,
+    val stages: List<StageRecord> = emptyList(),
 ) {
 
-    /** Flat JSON for on-disk storage. */
+    /** Flat JSON for on-disk storage (plus a nested `stages` array when present). */
     fun toJson(): String = buildJsonObject {
         put("id", id)
         put("pipeline", pipeline)
@@ -40,6 +41,7 @@ data class RunRecord(
         repo?.let { put("repo", it) }
         sha?.let { put("sha", it) }
         trigger?.let { put("trigger", it) }
+        putStages(stages)
     }.toString()
 
     companion object {
@@ -56,6 +58,9 @@ data class RunRecord(
         ): RunRecord {
             val steps = run.stageRuns.flatMap { it.stepRuns }
             val failed = run.status as? PipelineStatus.Failed
+            val toolByStep = run.pipeline.stages
+                .flatMap { it.steps }
+                .associate { it.name to (it.definition::class.simpleName?.removeSuffix("Step")?.lowercase()) }
             return RunRecord(
                 id = run.id.value,
                 pipeline = run.pipeline.name,
@@ -67,6 +72,21 @@ data class RunRecord(
                 repo = repo,
                 sha = sha,
                 trigger = trigger,
+                stages = run.stageRuns.map { stage ->
+                    StageRecord(
+                        name = stage.name,
+                        status = stage.status::class.simpleName ?: "Unknown",
+                        steps = stage.stepRuns.map { step ->
+                            StepRecord(
+                                name = step.name,
+                                status = step.status::class.simpleName ?: "Unknown",
+                                tool = toolByStep[step.name],
+                                startedAt = step.startedAt,
+                                endedAt = step.endedAt,
+                            )
+                        },
+                    )
+                },
             )
         }
 
@@ -85,6 +105,7 @@ data class RunRecord(
                 repo = str("repo"),
                 sha = str("sha"),
                 trigger = str("trigger"),
+                stages = parseStages(obj),
             )
         }
     }
