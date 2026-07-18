@@ -82,25 +82,52 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 
 ---
 
+## Where the code comes from (important)
+
+**Kontinuance does not check out your source for you (yet).** Understand the workspace model before you
+write a real pipeline:
+
+- Each step runs in **its own fresh temporary directory, which is deleted when the step finishes**. Steps
+  are fully isolated: there is **no shared workspace** between them, and a step **cannot** reach files on
+  the host (the `workingDir:` hint is resolved *inside* that temp directory).
+- There is **no built-in `git checkout`** and **no repo/SHA driving a checkout**. The `repo`/`sha` you may
+  see on a run are metadata only.
+
+So a bare `gradle: { tasks: ["assemble"] }` step would start in an **empty** directory and fail — there's
+no project there. Two consequences:
+
+1. **To build real code today, a single step must fetch *and* build it**, because the checkout can't be
+   shared with later steps:
+
+   ```yaml
+   - name: "build"
+     run: "git clone --depth 1 https://github.com/you/your-repo src && cd src && ./gradlew assemble"
+     secrets: ["GIT_TOKEN"]   # for a private repo, referenced from the environment
+   ```
+
+2. **You cannot clone in one step and build in the next** — the second step gets a new empty directory.
+
+This is why the shipped demo uses `echo` steps: it exercises the engine, the approval gate, and the UI
+end to end **without** needing external code. A first-class **source checkout + a shared per-run
+workspace** is the key missing piece (it's what "configure a repo for first setup" will drive) — see
+[limitations](#current-limitations--planned-work).
+
 ## Authoring a pipeline
 
 The server runs the pipeline from its configured descriptor (`kontinuance.config.descriptor`, default
-`kontinuance.yml`). A minimal gated pipeline:
+`kontinuance.yml`). A gated pipeline that clones its own source (per the note above) and gates before
+deploy:
 
 ```yaml
 pipeline:
   name: "my-service"
   stages:
-    - name: "build"
+    - name: "build-and-test"
       steps:
-        - name: "assemble"
-          gradle:
-            tasks: ["assemble"]
-    - name: "test"
-      steps:
-        - name: "unit"
-          gradle:
-            tasks: ["test"]
+        # One self-contained step: fetch the source, then build + test it in the same working directory.
+        - name: "clone-build-test"
+          run: "git clone --depth 1 https://github.com/you/your-repo src && cd src && ./gradlew build"
+          secrets: ["GIT_TOKEN"]
     # Put the approval gate in its OWN stage — a resumed run then repeats no prior work.
     - name: "approve"
       steps:
@@ -119,11 +146,22 @@ are resolved from the server's environment variables and masked in logs. Full au
 config surface are in [running.md](./running.md); runnable examples are in
 [docs/examples/](./examples/).
 
+> The typed `gradle:` / `npm:` / `docker:` steps assume the project is already present in the step's
+> working directory — useful once a shared-workspace checkout exists, or within a single step that has
+> already cloned into `workingDir`.
+
 ---
 
 ## Current limitations & planned work
 
 Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, roughly by area:
+
+**Source & workspace** (the most foundational gap)
+- **No built-in source checkout, and no shared workspace across steps.** Every step runs in its own
+  fresh, ephemeral, isolated directory (see [Where the code comes from](#where-the-code-comes-from-important)).
+  Today, building real code means a single step clones and builds it; multi-step pipelines can't share a
+  checkout. *Planned: a first-class checkout that fetches a configured repo/ref into a per-run workspace
+  the steps share — tied to "configure a repo for first setup".*
 
 **Auth & session**
 - **Authentication is not enforced.** The sign-in screen is a presentational gate and the API endpoints
