@@ -82,52 +82,54 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 
 ---
 
-## Where the code comes from (important)
+## Where the code comes from
 
-**Kontinuance does not check out your source for you (yet).** Understand the workspace model before you
-write a real pipeline:
+Understand the workspace model before you write a real pipeline:
 
-- Each step runs in **its own fresh temporary directory, which is deleted when the step finishes**. Steps
-  are fully isolated: there is **no shared workspace** between them, and a step **cannot** reach files on
-  the host (the `workingDir:` hint is resolved *inside* that temp directory).
-- There is **no built-in `git checkout`** and **no repo/SHA driving a checkout**. The `repo`/`sha` you may
-  see on a run are metadata only.
+- **All steps of a run share one workspace directory.** It's created when the run starts and removed when
+  it ends. A file a step writes at a relative path is visible to later steps — so you can **check out once
+  and build across steps**.
+- The workspace is isolated from the host (a step's `workingDir:` sub-path resolves *inside* it and can't
+  escape), and secret masking + environment scoping stay per step.
+- Use the **`git` checkout step** to fetch your source into the workspace:
 
-So a bare `gradle: { tasks: ["assemble"] }` step would start in an **empty** directory and fail — there's
-no project there. Two consequences:
+  ```yaml
+  - name: "checkout"
+    git:
+      url: "https://github.com/you/your-repo"
+      ref: "main"              # optional branch/tag
+      # dir: "."               # optional target sub-dir (default: the workspace root)
+    secrets: ["GIT_TOKEN"]     # for a private repo, referenced from the environment
+  ```
 
-1. **To build real code today, a single step must fetch *and* build it**, because the checkout can't be
-   shared with later steps:
+  Put the checkout **first** (the workspace starts empty, so cloning into `.` works), then later steps
+  build the checked-out code.
 
-   ```yaml
-   - name: "build"
-     run: "git clone --depth 1 https://github.com/you/your-repo src && cd src && ./gradlew assemble"
-     secrets: ["GIT_TOKEN"]   # for a private repo, referenced from the environment
-   ```
-
-2. **You cannot clone in one step and build in the next** — the second step gets a new empty directory.
-
-This is why the shipped demo uses `echo` steps: it exercises the engine, the approval gate, and the UI
-end to end **without** needing external code. A first-class **source checkout + a shared per-run
-workspace** is the key missing piece (it's what "configure a repo for first setup" will drive) — see
-[limitations](#current-limitations--planned-work).
+The shipped demo still uses `echo` steps so it runs with no external repo, but a real pipeline checks out
+its source. (Checkout supports branch/tag refs today; arbitrary commit SHAs are a follow-up.)
 
 ## Authoring a pipeline
 
 The server runs the pipeline from its configured descriptor (`kontinuance.config.descriptor`, default
-`kontinuance.yml`). A gated pipeline that clones its own source (per the note above) and gates before
-deploy:
+`kontinuance.yml`). A gated pipeline that checks out its source, builds it, and gates before deploy:
 
 ```yaml
 pipeline:
   name: "my-service"
   stages:
+    - name: "checkout"
+      steps:
+        - name: "clone"
+          git:
+            url: "https://github.com/you/your-repo"
+            ref: "main"
+          secrets: ["GIT_TOKEN"]     # for a private repo
     - name: "build-and-test"
       steps:
-        # One self-contained step: fetch the source, then build + test it in the same working directory.
-        - name: "clone-build-test"
-          run: "git clone --depth 1 https://github.com/you/your-repo src && cd src && ./gradlew build"
-          secrets: ["GIT_TOKEN"]
+        # Runs in the shared workspace where the checkout landed.
+        - name: "build"
+          gradle:
+            tasks: ["build"]
     # Put the approval gate in its OWN stage — a resumed run then repeats no prior work.
     - name: "approve"
       steps:
@@ -141,7 +143,8 @@ pipeline:
 ```
 
 Parser rules (strict — unknown keys are rejected): top-level `pipeline:`; each step declares **exactly
-one** of `run` / `gradle` / `docker` / `npm` / `approval`; the condition key is `when:`. Pipeline secrets
+one** of `run` / `gradle` / `docker` / `npm` / `approval` / `git`; the condition key is `when:`. Pipeline
+secrets
 are resolved from the server's environment variables and masked in logs. Full authoring rules and the
 config surface are in [running.md](./running.md); runnable examples are in
 [docs/examples/](./examples/).
@@ -156,12 +159,13 @@ config surface are in [running.md](./running.md); runnable examples are in
 
 Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, roughly by area:
 
-**Source & workspace** (the most foundational gap)
-- **No built-in source checkout, and no shared workspace across steps.** Every step runs in its own
-  fresh, ephemeral, isolated directory (see [Where the code comes from](#where-the-code-comes-from-important)).
-  Today, building real code means a single step clones and builds it; multi-step pipelines can't share a
-  checkout. *Planned: a first-class checkout that fetches a configured repo/ref into a per-run workspace
-  the steps share — tied to "configure a repo for first setup".*
+**Source & workspace**
+- Checkout supports **branch/tag refs** (shallow clone); an arbitrary commit **SHA** is a follow-up.
+- The workspace lives for one run; a run **resumed after an approval gate** starts with a fresh (empty)
+  workspace, so a checkout done *before* the gate isn't restored — keep post-gate steps self-sufficient.
+  Persisting a workspace across a gate is a follow-up.
+- Configuring a repo per project in the UI ("configure a repo for first setup") is still to come; today
+  the checkout lives in the descriptor's `git:` step.
 
 **Auth & session**
 - **Authentication is not enforced.** The sign-in screen is a presentational gate and the API endpoints
