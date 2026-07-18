@@ -102,7 +102,8 @@ so keep to these rules:
 - `pipeline` accepts `name` (required), `concurrency`, and `stages`.
 - Each `stage` has a `name` and `steps`.
 - Each `step` has a `name`, optionally `timeout` / `when` / `secrets` / `workingDir`, and **exactly one**
-  step type: `run`, `gradle`, `docker`, `npm`, or `approval`.
+  step type: `run`, `gradle`, `docker`, `npm`, `approval`, or `git` (a source checkout into the run's
+  shared workspace).
 - The condition key is **`when:`** (not `condition:`).
 
 ### Manual-approval gates
