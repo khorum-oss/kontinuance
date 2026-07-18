@@ -1,0 +1,14 @@
+# Trim the image build context (both Dockerfiles build from the repo root).
+.git
+.gradle
+**/build
+**/node_modules
+web/.svelte-kit
+web/.vite
+**/*.iml
+.idea
+.vscode
+.DS_Store
+# Scratch / local-only
+scratchpad
+*.log
