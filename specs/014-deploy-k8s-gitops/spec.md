@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "P2 of aligning Kontinuance's deployment with relikquary: Kubernetes manifests (Kustomize base + stage/prod overlays), ArgoCD Applications (stage auto-sync, prod gated), stage→prod promotion scripts, and a CI job that builds the P1 images. Deployment artifacts + CI only — no engine/server/web application code changes."
+**Input**: User description: "P2 of aligning Kontinuance's deployment with relikquary: Kubernetes manifests (Kustomize base + stage/prod overlays), ArgoCD Applications (stage auto-sync, prod gated), and stage→prod promotion scripts. Deployment artifacts only — no engine/server/web application code changes. Deployment is driven from the operator's machine (no CI image-build job)."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -73,20 +73,6 @@ correct overlay fields.
 
 ---
 
-### User Story 4 - CI builds the images (Priority: P3)
-
-A CI job builds both container images from source when deployment artifacts change, so the Dockerfiles
-have automated build coverage (the P1 sandbox could not complete image builds).
-
-**Why this priority**: Closes the P1 verification gap; independent of the cluster work.
-
-**Independent Test**: The workflow triggers on `deploy/**` (and manual dispatch) and builds both images.
-
-**Acceptance Scenarios**:
-
-1. **Given** a change under `deploy/`, **When** CI runs, **Then** it builds the server and web images from
-   source (no push) and fails if either Dockerfile breaks.
-
 ### Edge Cases
 
 - What happens if the run-store PVC is `ReadWriteOnce` and replicas > 1? Not supported — prod stays a
@@ -94,8 +80,6 @@ have automated build coverage (the P1 sandbox could not complete image builds).
 - What happens when secrets are absent? The Secret carries placeholders; real values come from the
   operator (or a secret operator, a later slice) — documented, not committed.
 - What happens on `kustomize build` of each overlay? It succeeds and yields namespaced, tagged manifests.
-- What happens if the CI image build cannot reach the network? It fails visibly in CI (unlike a silent
-  gap); the workflow is scoped to deployment changes to avoid noise.
 
 ## Requirements *(mandatory)*
 
@@ -116,8 +100,6 @@ have automated build coverage (the P1 sandbox could not complete image builds).
 - **FR-006**: A **release** script MUST build + push both images and pin the stage overlay's image tag; a
   **promote** script MUST set the prod overlay's image tag to the stage-tested tag. Both MUST be valid,
   safe shell with a usage/help path.
-- **FR-007**: A **CI workflow** MUST build both images from source on changes to `deploy/**` (and on
-  manual dispatch), keeping dependency verification enabled and pushing nothing.
 - **FR-008**: No real secret values MUST be committed (placeholders only); no artifact MUST reference an
   external design source.
 - **FR-009**: This feature MUST NOT change any engine, server, or web application code. Enabling the
@@ -145,7 +127,6 @@ have automated build coverage (the P1 sandbox could not complete image builds).
 - **SC-002**: The ArgoCD manifests express stage=auto-sync and prod=manual-sync, each pointing at the
   right overlay and namespace.
 - **SC-003**: The promotion scripts are valid shell and edit only the intended overlay fields.
-- **SC-004**: The CI workflow builds both images from source on deployment changes.
 - **SC-005**: No engine/server/web application code changed; no secret values or external design links
   committed.
 
@@ -160,6 +141,11 @@ have automated build coverage (the P1 sandbox could not complete image builds).
 - Secrets are placeholders here; a secret-operator integration (e.g. an external-secrets/1Password
   operator) is a later slice.
 - `kustomize`/`kubectl` and a container engine are available where these are applied/built; in the
-  authoring sandbox, manifests are validated by YAML parsing and scripts by `bash -n`, with the cluster
-  apply and CI build authoritative.
-- Verification of the images themselves is the P1 Dockerfiles (feature 013), now given CI coverage here.
+  authoring sandbox, manifests are validated by `kustomize build` + YAML parsing and scripts by `bash -n`,
+  with the cluster apply authoritative.
+- Deployment is driven from the operator's machine (build/push/apply and `argocd sync`); there is no CI
+  image-build job in this feature. The images are the P1 Dockerfiles (feature 013).
+- This feature removes the `merge-main.yml` "Bump & Publish" workflow, so merges to `main` no longer
+  auto-bump the version, publish the `dsl` module, or cut a release. Publishing/releasing becomes a
+  deliberate machine-run step (the gradle publish task remains runnable locally). The PR-test workflow
+  (`pr-main.yml`) is unchanged.

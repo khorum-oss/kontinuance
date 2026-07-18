@@ -14,7 +14,6 @@ No runtime data model. Entities = the deployment artifacts.
 | Prod Application | `deploy/argocd/application-prod.yaml` | FR-005 |
 | Release script | `deploy/pipeline/release.sh` | FR-006 |
 | Promote script | `deploy/pipeline/promote.sh` | FR-006 |
-| CI image build | `.github/workflows/deploy-images.yml` | FR-007 |
 | K8s README | `deploy/k8s/README.md` | FR-010 |
 | ArgoCD README | `deploy/argocd/README.md` | FR-010 |
 
@@ -22,8 +21,8 @@ No runtime data model. Entities = the deployment artifacts.
 
 - Ingress → web Service → (nginx proxy) → server Service → PVC (run store) + descriptor ConfigMap + Secret.
 - Overlays patch the base (namespace/tag/host/replicas). ArgoCD Applications point at overlay paths.
-- release/promote scripts edit the overlays' image tag; ArgoCD syncs the resulting git state.
-- CI builds the feature-013 images.
+- release/promote scripts (run from the operator's machine) edit the overlays' image tag; ArgoCD syncs
+  the resulting git state.
 
 ## Deferred (named, not built here)
 

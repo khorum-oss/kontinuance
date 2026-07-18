@@ -3,7 +3,7 @@
 **Feature**: 014-deploy-k8s-gitops | **Branch**: `claude/deploy-k8s`
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md)
 
-Deployment/GitOps + CI — **no engine/server/web application code changes**. Traces to
+Deployment/GitOps — **no engine/server/web application code changes**. Traces to
 [contracts/deploy-topology.md](./contracts/deploy-topology.md). Builds on feature 013's images (on `main`).
 
 **MVP** = User Story 1 (deploy to a cluster with Kustomize).
@@ -58,17 +58,12 @@ Deployment/GitOps + CI — **no engine/server/web application code changes**. Tr
 
 ---
 
-## Phase 6: User Story 4 — CI image build (Priority: P3)
-
-- [x] T020 [P] [US4] `.github/workflows/deploy-images.yml` — on `deploy/**` push/PR + `workflow_dispatch`: build the server and web images from source (no push), verification enabled (FR-007)
-
----
-
-## Phase 7: Polish & Cross-Cutting
+## Phase 6: Polish & Cross-Cutting
 
 - [x] T021 `deploy/k8s/README.md` — apply overlays, register ArgoCD, the release/promote flow; state that a secret-operator integration and multi-replica scaling are later slices (FR-010)
-- [x] T022 Verify: YAML-parse every `deploy/k8s/**`, `deploy/argocd/**`, and the CI workflow (multi-doc); `bash -n` the two scripts; confirm stage has `automated` sync and prod does not, and prod keeps `replicas: 1` (SC-001, SC-002, SC-003)
-- [x] T023 [P] Confirm no secret values and no external design links anywhere in `deploy/**` / the workflow, and that `git status` shows no `engine/`/`server/`/`web/` application code changed (FR-008, FR-009, SC-005)
+- [x] T022 Verify: `kustomize build` both overlays; YAML-parse every `deploy/k8s/**` and `deploy/argocd/**` (multi-doc); `bash -n` the two scripts; confirm stage has `automated` sync and prod does not, and prod keeps `replicas: 1` (SC-001, SC-002, SC-003)
+- [x] T023 [P] Confirm no secret values and no external design links anywhere in `deploy/**`, and that `git status` shows no `engine/`/`server/`/`web/` application code changed (FR-008, FR-009, SC-005)
+- [x] T024 Remove the `.github/workflows/merge-main.yml` "Bump & Publish" workflow (deploy/publish from the machine); keep `pr-main.yml` PR tests and the machine-runnable gradle publish task
 
 ---
 
@@ -77,16 +72,16 @@ Deployment/GitOps + CI — **no engine/server/web application code changes**. Tr
 - Setup (T001) → all. Foundational (T002) → manifests.
 - US1 base manifests (T003–T010) are `[P]`; the base `kustomization.yaml` (T011) references them all; the
   overlays (T012, T013) reference the base.
-- US2 (T014–T017), US3 (T018–T019), US4 (T020) are independent of each other (all `[P]`), after US1.
+- US2 (T014–T017) and US3 (T018–T019) are independent of each other (all `[P]`), after US1.
 - Polish (T021–T023) → last.
 
 ## Parallel Opportunities
 
 - Each base manifest (T003–T010), both overlays (T012/T013), all ArgoCD files (T014–T017), both scripts
-  (T018/T019), the CI workflow (T020), and the review (T023) are `[P]`. The base `kustomization.yaml`
-  (T011) is the join point after the base manifests exist.
+  (T018/T019), and the review (T023) are `[P]`. The base `kustomization.yaml` (T011) is the join point
+  after the base manifests exist.
 
 ## Implementation Strategy
 
-- **MVP**: Phase 1–3 (US1) → deployable overlays. **Increment**: US2 (GitOps), US3 (promotion), US4 (CI),
-  Polish. **Verification**: YAML parse + `bash -n` here; `kustomize build` + the CI image build authoritative.
+- **MVP**: Phase 1–3 (US1) → deployable overlays. **Increment**: US2 (GitOps), US3 (promotion), Polish.
+  **Verification**: `kustomize build` both overlays + YAML parse + `bash -n` here; a cluster apply authoritative.

@@ -2,8 +2,8 @@
 
 ## In this repo (authoring checks — always available)
 
-- **Every manifest is valid YAML**: parse all `deploy/k8s/**`, `deploy/argocd/**`, and the CI workflow
-  with a YAML loader (multi-doc). Expected: no parse errors.
+- **Every manifest is valid YAML**: parse all `deploy/k8s/**` and `deploy/argocd/**` with a YAML loader
+  (multi-doc). Expected: no parse errors.
 - **Scripts are valid shell**: `bash -n deploy/pipeline/release.sh deploy/pipeline/promote.sh`. Expected:
   no syntax errors; each has a usage/help path and `set -euo pipefail`.
 - **Sync policy**: `application-stage.yaml` contains `syncPolicy.automated`; `application-prod.yaml` does
@@ -25,12 +25,7 @@ descriptor ConfigMap, and an Ingress to the web.
 Apply an overlay (`kubectl apply -k deploy/k8s/overlays/stage`) or register the ArgoCD Applications
 (`kubectl apply -f deploy/argocd/`). Stage auto-syncs; prod waits for `argocd app sync kontinuance-prod`.
 The UI is reachable at the Ingress host; run history survives a pod restart (PVC); liveness/readiness
-probes report healthy.
-
-## CI (authoritative for image builds)
-
-`.github/workflows/deploy-images.yml` builds both images from source on `deploy/**` changes — the image
-build coverage the P1 sandbox could not provide.
+probes report healthy. Build/push images from the machine with `deploy/pipeline/release.sh`.
 
 ## Constraints (SC-005)
 

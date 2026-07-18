@@ -39,7 +39,5 @@ real config.
 | `release.sh` | build + push `kontinuance-server`/`-web` to `$REGISTRY`; set stage overlay image `newTag` to the built tag; (operator commits) |
 | `promote.sh` | set prod overlay image `newTag` = stage overlay's current tag; (operator commits + `argocd app sync kontinuance-prod`) |
 
-## CI
-
-`.github/workflows/deploy-images.yml` — on `deploy/**` push/PR + `workflow_dispatch`: `docker build` both
-images from source (no push); verification enabled in the server build.
+Both scripts are run from the operator's machine; there is no CI image-build or auto-publish job (the
+`merge-main.yml` publish workflow is removed by this feature).

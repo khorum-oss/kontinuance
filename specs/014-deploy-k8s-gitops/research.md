@@ -47,9 +47,11 @@
 - **Rationale**: the production gate is a human `argocd app sync` — mirrors relikquary and complements the
   in-app approval gate (the two are independent gates at different layers).
 
-## Decision: CI builds images on deploy changes (closes the P1 gap)
+## Decision: deployment is driven from the operator's machine (no CI publish/build)
 
-- **Decision**: `.github/workflows/deploy-images.yml` builds the server + web images from source on
-  `deploy/**` changes and manual dispatch; no push. Verification stays enabled in the server build.
-- **Rationale**: GitHub-hosted runners have Docker + unrestricted network (no intercepting proxy), so the
-  image builds that could not complete in the P1 sandbox get real coverage here.
+- **Decision**: images are built and pushed by `release.sh` from the operator's machine; there is no CI
+  image-build job. (This feature also removes the `merge-main.yml` "Bump & Publish" workflow so main
+  merges no longer auto-publish — publishing is a deliberate machine-run step, matching the
+  relikquary-style machine-driven deploy.)
+- **Rationale**: the operator deploys from their machine; CI image builds and auto-publish are not wanted.
+  The gradle publish task remains runnable from the machine for any manual release.

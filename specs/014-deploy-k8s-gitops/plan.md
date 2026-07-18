@@ -7,9 +7,10 @@
 ## Summary
 
 Extend `deploy/` with the P2 layer that relikquary ships: a Kustomize base + stage/prod overlays, ArgoCD
-Applications (stage auto-sync, prod gated) + an AppProject, `release.sh`/`promote.sh`, and a CI workflow
-that builds the P1 images. Builds on the P1 images (feature 013, on `main`). No application code changes;
-the liveness/readiness probe endpoints are enabled via a ConfigMap-supplied property, not a source edit.
+Applications (stage auto-sync, prod gated) + an AppProject, and `release.sh`/`promote.sh`. Builds on the
+P1 images (feature 013, on `main`). Deployment is driven from the operator's machine (no CI image-build
+job). No application code changes; the liveness/readiness probe endpoints are enabled via a
+ConfigMap-supplied property, not a source edit.
 
 ## Technical Context
 
@@ -22,7 +23,7 @@ controller. No new application dependency.
 **Storage**: A `ReadWriteOnce` PVC for the file-backed run store (single-writer → single replica).
 
 **Testing**: `kustomize build overlays/{stage,prod}` (authoritative on a machine with kubectl);
-`bash -n` on the scripts; YAML parse of every manifest. CI builds the images from source.
+`bash -n` on the scripts; YAML parse of every manifest.
 
 **Target Platform**: A Kubernetes cluster with Ingress + ArgoCD.
 
@@ -32,18 +33,17 @@ controller. No new application dependency.
 replica; no secrets committed (placeholders); no external design link; verification stays enabled in the
 CI image build.
 
-**Scale/Scope**: ~18–22 files under `deploy/k8s`, `deploy/argocd`, `deploy/pipeline`, one CI workflow.
+**Scale/Scope**: ~18 files under `deploy/k8s`, `deploy/argocd`, `deploy/pipeline`; plus removal of the
+`merge-main.yml` publish workflow.
 
 ## Constitution Check
 
 - **I. Stable Public Contract**: PASS — deploys the existing server/UI unchanged; no contract change.
 - **II. Test-First / Integration-Verified**: PASS (adapted) — no app behavior change; verification is
-  `kustomize build` + `bash -n` + YAML parse + a CI image build (`quickstart.md`).
-- **III. Quality Gates**: PASS — no Kotlin/TS changed; detekt/Kover/Sonar unaffected. The CI image build
-  runs the real Gradle build with verification enabled.
+  `kustomize build` + `bash -n` + YAML parse (`quickstart.md`).
+- **III. Quality Gates**: PASS — no Kotlin/TS changed; detekt/Kover/Sonar unaffected.
 - **IV. Code Generation**: N/A.
-- **V. Supply-Chain**: PASS — no new dependency; verification enabled in the image build; no secrets
-  committed; nothing published by CI (build only).
+- **V. Supply-Chain**: PASS — no new dependency; no secrets committed; nothing published.
 
 No violations → Complexity Tracking empty.
 
@@ -85,7 +85,6 @@ deploy/
 │   ├── release.sh                    # build + push both images; pin stage tag
 │   └── promote.sh                    # set prod tag = stage-tested tag
 └── k8s/README.md                     # apply overlays + ArgoCD + promote flow
-.github/workflows/deploy-images.yml   # CI: build both images on deploy/** changes
 ```
 
 No changes under `engine/`, `server/`, `web/`, or `gradle/`.
