@@ -8,6 +8,7 @@ import org.khorum.oss.kontinuance.engine.model.Stage
 import org.khorum.oss.kontinuance.engine.model.Step
 import org.khorum.oss.kontinuance.engine.model.StepDefinition
 import org.khorum.oss.kontinuance.engine.model.DockerStep
+import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.GradleStep
 import org.khorum.oss.kontinuance.engine.model.NpmStep
 import org.snakeyaml.engine.v2.api.Load
@@ -24,6 +25,7 @@ import kotlin.io.path.readText
  * [DescriptorException] identifying the location, and no step executes (FR-003). The produced
  * model is identical to the equivalent Kotlin-DSL definition (FR-002, SC-002).
  */
+@Suppress("TooManyFunctions") // a cohesive strict parser — one small parse function per descriptor shape
 object PipelineDescriptor {
 
     private val load = Load(
@@ -32,7 +34,7 @@ object PipelineDescriptor {
 
     private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
     private val STAGE_KEYS = setOf("name", "steps")
-    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval")
+    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
     private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir") + DEFINITION_KEYS
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
     private val DOCKER_KEYS = setOf("run", "build")
@@ -40,6 +42,7 @@ object PipelineDescriptor {
     private val DOCKER_BUILD_KEYS = setOf("context", "dockerfile", "tags", "buildArgs")
     private val NPM_KEYS = setOf("script", "install")
     private val NPM_INSTALL_KEYS = setOf("clean")
+    private val GIT_KEYS = setOf("url", "ref", "dir", "depth")
 
     /** Reads the descriptor at [path] and parses it into a [Pipeline]. */
     fun load(path: Path): Pipeline = parse(path.readText())
@@ -108,6 +111,7 @@ object PipelineDescriptor {
             "gradle" -> parseGradle(asMap(map["gradle"], "$path.gradle"), "$path.gradle")
             "docker" -> parseDocker(asMap(map["docker"], "$path.docker"), "$path.docker")
             "approval" -> ApprovalStep(asString(requireKey(map, "approval", path), "$path.approval"))
+            "git" -> parseGit(asMap(map["git"], "$path.git"), "$path.git")
             else -> parseNpm(asMap(map["npm"], "$path.npm"), "$path.npm")
         }
     }
@@ -118,6 +122,15 @@ object PipelineDescriptor {
         val args = asStringList(map["args"], "$path.args")
         val useWrapper = map["useWrapper"]?.let { asBoolean(it, "$path.useWrapper") } ?: true
         return construct(path) { GradleStep(tasks, args, useWrapper) }
+    }
+
+    private fun parseGit(map: Map<String, Any?>, path: String): StepDefinition {
+        checkKeys(map, GIT_KEYS, path)
+        val url = asString(requireKey(map, "url", path), "$path.url")
+        val ref = map["ref"]?.let { asString(it, "$path.ref") }
+        val dir = map["dir"]?.let { asString(it, "$path.dir") } ?: "."
+        val depth = map["depth"]?.let { asInt(it, "$path.depth") } ?: 1
+        return construct(path) { GitStep(url = url, ref = ref, dir = dir, depth = depth) }
     }
 
     private fun parseDocker(map: Map<String, Any?>, path: String): StepDefinition {

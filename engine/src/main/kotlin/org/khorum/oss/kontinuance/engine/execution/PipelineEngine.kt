@@ -5,6 +5,7 @@ import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
 import org.khorum.oss.kontinuance.engine.execution.steps.ApprovalStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.DockerStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.steps.GitStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.GradleStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.NpmStepExecutor
 import org.khorum.oss.kontinuance.engine.model.Pipeline
@@ -63,6 +64,7 @@ interface PipelineEngine {
                         GradleStepExecutor(),
                         DockerStepExecutor(),
                         NpmStepExecutor(),
+                        GitStepExecutor(),
                         ApprovalStepExecutor(approvalGate),
                     ),
                 ),

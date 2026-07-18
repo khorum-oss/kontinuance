@@ -18,9 +18,9 @@ import kotlin.test.assertTrue
 class StepIsolationTest {
 
     @Test
-    fun `steps do not interfere via the same relative filename`() = runBlocking {
-        // 'writer' creates shared.txt; 'checker' passes only if it does NOT see that file,
-        // which holds only when each step ran in its own isolated working directory.
+    fun `steps share the run workspace via the same relative path`() = runBlocking {
+        // 'writer' creates shared.txt; 'checker' passes only if it DOES see that file — which holds
+        // because all steps of a run share one workspace directory (a checkout persists across steps).
         val pipeline = Pipeline(
             name = "p",
             stages = listOf(
@@ -28,7 +28,7 @@ class StepIsolationTest {
                     "s",
                     listOf(
                         Step("writer", RunStep("echo hello > shared.txt")),
-                        Step("checker", RunStep("test ! -f shared.txt")),
+                        Step("checker", RunStep("test -f shared.txt")),
                     ),
                 ),
             ),
@@ -65,19 +65,19 @@ class StepIsolationTest {
     }
 
     @Test
-    fun `working directories are removed after a terminal status`() = runBlocking {
+    fun `the run workspace is removed after a terminal status`() = runBlocking {
         val tmp = Path.of(System.getProperty("java.io.tmpdir"))
-        fun stepDirs(): Set<String> =
+        fun workspaces(): Set<String> =
             Files.list(tmp).use { stream ->
-                stream.map { it.name }.filter { it.startsWith("knt-step-") }.toList().toSet()
+                stream.map { it.name }.filter { it.startsWith("knt-run-") }.toList().toSet()
             }
 
-        val before = stepDirs()
+        val before = workspaces()
         val pipeline = Pipeline("p", listOf(Stage("s", listOf(Step("x", RunStep("true"))))))
 
         PipelineEngine.default(CapturingLogSink()).run(pipeline)
 
-        val leftover = stepDirs() - before
-        assertTrue(leftover.isEmpty(), "leftover step working directories: $leftover")
+        val leftover = workspaces() - before
+        assertTrue(leftover.isEmpty(), "leftover run workspaces: $leftover")
     }
 }

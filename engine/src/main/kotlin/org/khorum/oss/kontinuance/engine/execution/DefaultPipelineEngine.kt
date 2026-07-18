@@ -21,6 +21,7 @@ import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.model.Step
 import org.khorum.oss.kontinuance.engine.model.StepRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -74,9 +75,13 @@ class DefaultPipelineEngine(
 
         validate(pipeline, secrets)
 
+        // One workspace per run: all steps share it (a checkout persists across steps), and it is removed
+        // when the run ends (success, failure, cancellation, or a pause at an approval gate). A resumed
+        // run is a fresh invocation with a fresh workspace — see the durable-approval note in the spec.
+        val workspace = Files.createTempDirectory(WORKSPACE_PREFIX)
         val exec = Execution(
             gate = ConcurrencyGate(pipeline.concurrency),
-            stepRunner = StepRunner(registry, secrets, logSink),
+            stepRunner = StepRunner(registry, secrets, logSink, workspace),
             flow = flow,
         )
         val collected = CopyOnWriteArrayList<StageRun>()
@@ -96,6 +101,7 @@ class DefaultPipelineEngine(
                 Run(runId, pipeline, PipelineStatus.Cancelled, collected.toList())
             } finally {
                 activeRuns.remove(runId)
+                workspace.toFile().deleteRecursively()
             }
         }
     }
@@ -205,5 +211,6 @@ class DefaultPipelineEngine(
     private companion object {
         const val REPLAY = 128
         const val BUFFER = 256
+        const val WORKSPACE_PREFIX = "knt-run-"
     }
 }

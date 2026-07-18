@@ -3,6 +3,7 @@ package org.khorum.oss.kontinuance.engine.descriptor
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.engine.model.ApprovalStep
 import org.khorum.oss.kontinuance.engine.model.DockerStep
+import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.GradleStep
 import org.khorum.oss.kontinuance.engine.model.NpmStep
 import kotlin.test.assertEquals
@@ -48,6 +49,24 @@ class TypedStepDescriptorTest {
     fun `the approval key maps to an ApprovalStep carrying its message`() {
         val yaml = oneStep("name: \"promote\"", "approval: \"Promote to production?\"")
         assertEquals(ApprovalStep("Promote to production?"), definitionOf(yaml))
+    }
+
+    @Test
+    fun `the git key maps to a GitStep`() {
+        val yaml = oneStep(
+            "name: \"checkout\"",
+            "git: { url: \"https://example.com/repo.git\", ref: \"main\", dir: \"src\", depth: 1 }",
+        )
+        assertEquals(
+            GitStep(url = "https://example.com/repo.git", ref = "main", dir = "src", depth = 1),
+            definitionOf(yaml),
+        )
+    }
+
+    @Test
+    fun `the git key defaults dir to dot and depth to one`() {
+        val yaml = oneStep("name: \"checkout\"", "git: { url: \"https://example.com/repo.git\" }")
+        assertEquals(GitStep(url = "https://example.com/repo.git"), definitionOf(yaml))
     }
 
     @Test
