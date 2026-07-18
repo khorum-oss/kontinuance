@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  # Server binds all interfaces inside the pod; the Service/Ingress control exposure.
+  SERVER_ADDRESS: "0.0.0.0"
+  SERVER_PORT: "8077"
+  # Run store on the mounted PVC; descriptor from the mounted ConfigMap.
+  KONTINUANCE_STORE: "/data/runs"
+  KONTINUANCE_CONFIG_DESCRIPTOR: "/etc/kontinuance/kontinuance.yml"
+  # Live-stream tuning.
+  KONTINUANCE_STREAM_POLL_INTERVAL_MS: "1000"
+  KONTINUANCE_STREAM_SNAPSHOT_LIMIT: "50"
+  # Light up /actuator/health/{liveness,readiness} for the probes (relaxed binding; no source change).
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"

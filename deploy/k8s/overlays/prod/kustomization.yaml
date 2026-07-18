@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kontinuance-prod
+
+resources:
+  - ../../base
+
+# Prod stays at a single server replica: the file-backed run store is single-writer. promote.sh sets the
+# tag here to the stage-tested one; prod is applied by a manual ArgoCD sync (the production gate).
+images:
+  - name: kontinuance-server
+    newName: ghcr.io/khorum-oss/kontinuance-server
+    newTag: stable
+  - name: kontinuance-web
+    newName: ghcr.io/khorum-oss/kontinuance-web
+    newTag: stable
+
+patches:
+  - target:
+      kind: Ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: kontinuance.example.com

@@ -1,0 +1,30 @@
+# Default pipeline descriptor for the compose stack (mounted read-only at
+# /etc/kontinuance/kontinuance.yml). Its steps use plain shell commands that succeed inside the slim
+# server runtime image, so triggering a run actually reaches the approval gate and can be approved from
+# the UI — demonstrating the full flow end to end. Swap this for your real pipeline (mount your own file
+# or edit deploy/docker-compose.yml); see docs/running.md for the authoring rules.
+pipeline:
+  name: "kontinuance-demo"
+  stages:
+    - name: "build"
+      steps:
+        - name: "compile"
+          run: "echo building the artifact"
+
+    - name: "test"
+      steps:
+        - name: "unit"
+          run: "echo running tests"
+
+    # Manual gate, alone in its stage (so a resumed run repeats no prior work).
+    - name: "approve"
+      steps:
+        - name: "promote-to-prod"
+          approval: "Promote this build to production?"
+
+    - name: "deploy"
+      steps:
+        - name: "rollout"
+          run: "echo deploying to production"
+          # Resolved from the server container's environment (set DEPLOY_TOKEN in deploy/.env).
+          secrets: ["DEPLOY_TOKEN"]
