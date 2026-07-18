@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kontinuance-prod
+  namespace: argocd
+spec:
+  project: kontinuance
+  source:
+    repoURL: https://github.com/khorum-oss/kontinuance.git
+    targetRevision: main
+    path: deploy/k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kontinuance-prod
+  # No `automated` policy: prod is a manual gate. Promote a tested tag (deploy/pipeline/promote.sh),
+  # commit, then apply it deliberately with `argocd app sync kontinuance-prod`.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

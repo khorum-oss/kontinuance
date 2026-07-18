@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# All base object names get this prefix, so the server Service becomes "kontinuance-server"
+# (which the web Deployment's KONTINUANCE_BACKEND points at).
+namePrefix: kontinuance-
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: kontinuance
+    includeSelectors: false
+
+resources:
+  - configmap.yaml
+  - secret.yaml
+  - pvc.yaml
+  - server-deployment.yaml
+  - server-service.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - ingress.yaml
+
+# The pipeline descriptor, served to the server as a mounted ConfigMap (mirrors deploy/kontinuance.yml).
+configMapGenerator:
+  - name: descriptor
+    files:
+      - kontinuance.yml
+
+# Base container image names; overlays set the registry (newName) and tag (newTag).

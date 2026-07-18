@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress
+  labels:
+    app.kubernetes.io/name: kontinuance
+spec:
+  rules:
+    # Overlays replace the host. One origin: everything goes to the web Service, which fronts the API,
+    # the SSE stream, and the WebSocket.
+    - host: kontinuance.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

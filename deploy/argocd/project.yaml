@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kontinuance
+  namespace: argocd
+spec:
+  description: Kontinuance CI/CD engine
+  sourceRepos:
+    - https://github.com/khorum-oss/kontinuance.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: kontinuance-stage
+    - server: https://kubernetes.default.svc
+      namespace: kontinuance-prod
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
