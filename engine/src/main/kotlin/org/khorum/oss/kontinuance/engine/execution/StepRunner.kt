@@ -17,12 +17,14 @@ import java.nio.file.Path
  *
  * For each step it:
  * - resolves the step's secrets (a missing secret fails fast with [UnresolvedSecretException]);
- * - builds a fresh temp working directory, resolving any `workingDir` hint **inside** it (FR-007);
+ * - runs in the run's shared [workspace] directory, resolving any `workingDir` hint **inside** it so it
+ *   cannot escape to the host; all steps of a run share this directory (a checkout persists across steps);
  * - constructs a scoped environment from a small passthrough allow-list plus the resolved secrets,
  *   so arbitrary parent-process variables do not leak (FR-008);
  * - wraps the log sink in a [MaskingLogSink] so secrets are redacted in streamed output (SC-003);
- * - selects the executor from the [StepExecutorRegistry] and runs it;
- * - removes the working directory on any terminal status — including cancellation (FR-008, SC-004).
+ * - selects the executor from the [StepExecutorRegistry] and runs it.
+ *
+ * The workspace itself is created and removed by the engine once per run, not per step.
  *
  * @param registry the executor registry.
  * @param secrets the secret backing used to resolve referenced secrets.
@@ -33,10 +35,15 @@ class StepRunner(
     private val registry: StepExecutorRegistry,
     private val secrets: SecretSource,
     private val logSink: LogSink = StdoutLogSink(),
+    private val workspace: Path,
     private val baseEnvironment: Map<String, String> = defaultBaseEnvironment(),
 ) {
 
-    /** Resolves, isolates, runs, and cleans up a single [step]; never returns a non-terminal status. */
+    /**
+     * Resolves, scopes, and runs a single [step] in the run's shared [workspace]; never returns a
+     * non-terminal status. All steps of a run share this one directory (so a checkout persists across
+     * steps); the engine creates it per run and removes it when the run ends.
+     */
     suspend fun run(step: Step): StepRun {
         if (!step.condition) {
             return StepRun(step.name, PipelineStatus.Skipped)
@@ -44,14 +51,9 @@ class StepRunner(
         val resolved = resolveSecrets(step)
         val masker = SecretMasker(resolved.values)
         val maskingSink = MaskingLogSink(masker, logSink)
-        val root = Files.createTempDirectory(WORKDIR_PREFIX)
-        return try {
-            val workingDir = resolveWorkingDir(root, step.workingDirHint)
-            val context = StepContext(step, workingDir, baseEnvironment + resolved, maskingSink)
-            registry.executorFor(step.definition).execute(context)
-        } finally {
-            root.toFile().deleteRecursively()
-        }
+        val workingDir = resolveWorkingDir(workspace, step.workingDirHint)
+        val context = StepContext(step, workingDir, baseEnvironment + resolved, maskingSink)
+        return registry.executorFor(step.definition).execute(context)
     }
 
     private fun resolveSecrets(step: Step): Map<String, String> =
@@ -63,15 +65,13 @@ class StepRunner(
         if (hint == null) return root
         val resolved = root.resolve(hint).normalize()
         require(resolved.startsWith(root)) {
-            "workingDir '$hint' escapes the isolated directory"
+            "workingDir '$hint' escapes the workspace"
         }
         Files.createDirectories(resolved)
         return resolved
     }
 
     companion object {
-        private const val WORKDIR_PREFIX = "knt-step-"
-
         /** Environment variables passed through to every step so commands resolve, without leaking the rest. */
         private val PASSTHROUGH = listOf("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR")
 
