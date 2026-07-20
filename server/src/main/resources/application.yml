@@ -10,6 +10,12 @@ server:
 
 # Store location the CI service writes run history to. Override with KONTINUANCE_STORE.
 kontinuance:
+  # Authentication (016): set BOTH to enforce a login gate on the API; leave empty (default) to run open
+  # (loopback/dev) — the server logs a warning at startup when unauthenticated. Supply via
+  # KONTINUANCE_AUTH_USERNAME / KONTINUANCE_AUTH_PASSWORD (never commit secret values).
+  auth:
+    username: ${KONTINUANCE_AUTH_USERNAME:}
+    password: ${KONTINUANCE_AUTH_PASSWORD:}
   store: ${user.home}/.kontinuance/runs
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.

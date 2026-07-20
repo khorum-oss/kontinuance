@@ -68,8 +68,11 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 
 ## Using the UI
 
-1. **Sign in.** Enter any username and password and click **SIGN IN** — authentication is not yet enforced
-   (see [limitations](#current-limitations--planned-work)).
+1. **Sign in.** Enter any username and password and click **SIGN IN**. The **server** now supports real,
+   opt-in authentication (`KONTINUANCE_AUTH_USERNAME` / `KONTINUANCE_AUTH_PASSWORD` — see
+   [running.md](./running.md#authentication)), but the **login screen is not yet wired to it**, so what you
+   type here is not checked (see [limitations](#current-limitations--planned-work)). Leave server auth off
+   for local UI runs.
 2. **Select a repo setup** and click **ENTER MISSION CONTROL**.
 3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
@@ -168,11 +171,15 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
   the checkout lives in the descriptor's `git:` step.
 
 **Auth & session**
-- **Authentication is not enforced.** The sign-in screen is a presentational gate and the API endpoints
-  (including trigger/approve/reject) are unauthenticated — run it on loopback or behind an authenticating
-  proxy (see [running.md](./running.md#security-no-authentication-yet)). *Planned: real authentication.*
+- **Server authentication is real and opt-in** — set `KONTINUANCE_AUTH_USERNAME` /
+  `KONTINUANCE_AUTH_PASSWORD` to enforce a login gate (session cookie via `/api/auth/login`), or leave them
+  unset to run open on loopback (the server warns at startup). See
+  [running.md](./running.md#authentication).
+- **The web login screen is not yet wired to it.** The SPA's **SIGN IN** does not call `/api/auth/login`, so
+  enabling server auth today is best exercised via the API/`curl` or a proxy. *Planned: wire the browser
+  sign-in flow.*
 - **The operator name in the sidebar is a placeholder**, not the signed-in user. *Planned: reflect the
-  logged-in person.*
+  logged-in person (from `/api/auth/me`).*
 - **EXIT returns to the sign-in screen.** *Planned: return to the project/repo view instead.*
 
 **UI**
