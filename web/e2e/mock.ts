@@ -73,6 +73,9 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 			? route.fulfill({ json: run })
 			: route.fulfill({ status: 404, json: { error: 'not found' } });
 	});
+	await page.route(/\/api\/runs\/[^/?]+\/logs$/, (route) =>
+		route.fulfill({ json: { runId: 'x', lines: ['[build] compiling', '[test] 12 passed'] } })
+	);
 	await mockStream(page, runs);
 	// Registered after detailUrl (which also matches /api/runs/trigger) so this wins for the POST.
 	await page.route(triggerUrl, (route) => {
@@ -93,6 +96,9 @@ export async function mockWaitingRun(page: Page, id = 'run-approve-1'): Promise<
 	);
 	// coverage sidebar is best-effort; 404 keeps it out of the way (the client swallows it)
 	await page.route(/\/api\/coverage/, (route) => route.fulfill({ status: 404, json: {} }));
+	await page.route(/\/api\/runs\/[^/?]+\/logs$/, (route) =>
+		route.fulfill({ json: { runId: 'x', lines: [] } })
+	);
 	await page.route(detailUrl, (route) =>
 		route.fulfill({
 			json: {

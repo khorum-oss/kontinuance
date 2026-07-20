@@ -18,6 +18,12 @@ export interface RunsResponse {
 	runs: RunRecord[];
 }
 
+// A run's recorded output (018): already-masked, step-prefixed lines in production order.
+export interface RunLogs {
+	runId: string;
+	lines: string[];
+}
+
 // The UI's read of the current auth state (016 server). `authRequired` is false in open mode;
 // `username` is present only when authenticated. Mirrors /api/auth/me and /api/auth/login.
 export interface Session {

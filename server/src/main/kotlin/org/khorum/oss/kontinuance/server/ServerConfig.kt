@@ -1,6 +1,8 @@
 package org.khorum.oss.kontinuance.server
 
+import org.khorum.oss.kontinuance.persistence.FileRunLogStore
 import org.khorum.oss.kontinuance.persistence.FileRunStore
+import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -28,4 +30,18 @@ class ServerConfig {
 
     @Bean
     fun runApi(store: RunStore): RunApi = RunApi(store)
+
+    /**
+     * The per-run output store (018), file-backed under `<kontinuance.store>/logs`. Shares the run store's
+     * base directory so a run's record and its log live together. A test can override this bean to point at
+     * a seeded/temp store (mirrors the [runStore] convention).
+     */
+    @Bean
+    fun runLogStore(
+        @Value("\${kontinuance.store:#{null}}") storeDir: String?,
+    ): RunLogStore {
+        val base = storeDir?.let { Path.of(it) }
+            ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
+        return FileRunLogStore(base.resolve("logs"))
+    }
 }

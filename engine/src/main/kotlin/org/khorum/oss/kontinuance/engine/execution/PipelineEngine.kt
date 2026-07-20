@@ -32,11 +32,15 @@ interface PipelineEngine {
      *
      * [completedStages] resumes a previously paused run: stages already completed (matched by name) are
      * skipped and reused, so execution continues from the gate. Pass the empty list for a fresh run.
+     *
+     * [logSink] overrides the engine's configured output sink for **this invocation only** (e.g. to record
+     * one run's masked output into a per-run store); `null` keeps the engine's default sink.
      */
     suspend fun run(
         pipeline: Pipeline,
         secrets: SecretSource = EnvSecretSource(),
         completedStages: List<StageRun> = emptyList(),
+        logSink: LogSink? = null,
     ): Run
 
     /** Observes lifecycle transitions for the run identified by [runId] as they happen. */

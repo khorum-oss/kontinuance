@@ -68,8 +68,15 @@ class DefaultPipelineEngine(
     // SwallowedException: cancellation is the signalling mechanism for cancel(); it is intentionally
     // converted into a terminal Cancelled Run rather than propagated to the caller (FR-014).
     @Suppress("SwallowedException")
-    override suspend fun run(pipeline: Pipeline, secrets: SecretSource, completedStages: List<StageRun>): Run {
+    override suspend fun run(
+        pipeline: Pipeline,
+        secrets: SecretSource,
+        completedStages: List<StageRun>,
+        logSink: LogSink?,
+    ): Run {
         val runId = runIdFactory()
+        // Per-invocation sink override (e.g. the server records one run's output); null keeps the default.
+        val sink = logSink ?: this.logSink
         val flow = newRunFlow()
         runFlows[runId] = flow
 
@@ -81,7 +88,7 @@ class DefaultPipelineEngine(
         val workspace = Files.createTempDirectory(WORKSPACE_PREFIX)
         val exec = Execution(
             gate = ConcurrencyGate(pipeline.concurrency),
-            stepRunner = StepRunner(registry, secrets, logSink, workspace),
+            stepRunner = StepRunner(registry, secrets, sink, workspace),
             flow = flow,
         )
         val collected = CopyOnWriteArrayList<StageRun>()

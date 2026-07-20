@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.execution.ApprovalDecision
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.logging.LogSink
+import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import java.nio.file.Files
@@ -36,7 +37,12 @@ class RunApprovalsTest {
     /** A fresh set of components sharing [store] — a new one models a server restart. */
     private class Host(store: RunStore, descriptor: Path) {
         val gate = ServerApprovalGate()
-        val launcher = RunLauncher(store, PipelineEngine.default(LogSink { }, gate), CoroutineScope(Dispatchers.Unconfined))
+        val launcher = RunLauncher(
+            store,
+            PipelineEngine.default(LogSink { }, gate),
+            CoroutineScope(Dispatchers.Unconfined),
+            InMemoryRunLogStore(),
+        )
         val trigger = RunTrigger(store, launcher, descriptor.toString())
         val approvals = RunApprovals(store, gate, launcher, descriptor.toString())
     }

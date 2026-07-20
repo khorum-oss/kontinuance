@@ -100,6 +100,24 @@ describe('api.approveRun / rejectRun', () => {
 	});
 });
 
+describe('api.getRunLogs', () => {
+	it('requests the run logs endpoint and returns the lines', async () => {
+		const seen: string[] = [];
+		mockFetch((url) => {
+			seen.push(url);
+			return json({ runId: '#KX 9', lines: ['[build] compiling', '[test] 12 passed'] });
+		});
+		const lines = await api.getRunLogs('#KX 9');
+		expect(seen[0]).toBe('/api/runs/%23KX%209/logs');
+		expect(lines).toEqual(['[build] compiling', '[test] 12 passed']);
+	});
+
+	it('tolerates a missing lines field', async () => {
+		mockFetch(() => json({ runId: 'x' }));
+		expect(await api.getRunLogs('x')).toEqual([]);
+	});
+});
+
 describe('api.me', () => {
 	it('returns the session on 200', async () => {
 		mockFetch(() => json({ authenticated: true, authRequired: true, username: 'operator' }));

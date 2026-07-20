@@ -1,9 +1,11 @@
 package org.khorum.oss.kontinuance.server
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import org.khorum.oss.kontinuance.persistence.RunRecord
 
 /**
@@ -20,6 +22,13 @@ internal object JsonView {
 
     /** A single run object (the record's own JSON). */
     fun run(record: RunRecord): String = record.toJson()
+
+    /** A run's recorded log: `{"runId":"…","lines":[ "<line>"… ]}` (lines are already masked). */
+    fun runLogs(runId: String, lines: List<String>): String =
+        buildJsonObject {
+            put("runId", runId)
+            putJsonArray("lines") { lines.forEach { add(it) } }
+        }.toString()
 
     /** A simple `{"<key>":"<value>"}` message (health, errors). */
     fun message(key: String, value: String): String =
