@@ -102,7 +102,7 @@ test.describe('runs screen', () => {
 		await expect(page).toHaveURL(/\/runs\/%23KX-2045$/);
 		await expect(page.getByText('RUN DETAIL')).toBeVisible();
 		await expect(page.getByText('LOG STREAM', { exact: true })).toBeVisible();
-		await expect(page.getByText(/live step-log streaming/)).toBeVisible();
+		await expect(page.getByText('[test] 12 passed')).toBeVisible(); // real recorded step output
 		await expect(page.getByText('84.2%')).toBeVisible(); // coverage sidebar total
 
 		await page.getByRole('button', { name: '← RUNS' }).click();

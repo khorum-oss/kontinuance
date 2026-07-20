@@ -2,7 +2,16 @@
 // server (see vite.config.ts). Every call throws [ApiError] on a non-2xx or transport failure so screens
 // can render a clear error state.
 
-import type { Config, Coverage, Deploy, Pipeline, RunRecord, RunsResponse, Session } from './types';
+import type {
+	Config,
+	Coverage,
+	Deploy,
+	Pipeline,
+	RunLogs,
+	RunRecord,
+	RunsResponse,
+	Session
+} from './types';
 
 export class ApiError extends Error {
 	constructor(
@@ -104,6 +113,13 @@ export const api = {
 	},
 
 	getRun: (id: string) => getJson<RunRecord>(`/api/runs/${encodeURIComponent(id)}`),
+
+	// A run's recorded, already-masked step output (018). Returns the lines in order; an empty array when
+	// the run produced none (the endpoint answers 200 even for an unknown id).
+	getRunLogs: async (id: string): Promise<string[]> => {
+		const body = await getJson<RunLogs>(`/api/runs/${encodeURIComponent(id)}/logs`);
+		return body.lines ?? [];
+	},
 
 	// Starts a run of the configured pipeline. Resolves to the new run's id (202); throws [ApiError]
 	// with the server's `error` message when no valid descriptor is configured (400) or on transport failure.

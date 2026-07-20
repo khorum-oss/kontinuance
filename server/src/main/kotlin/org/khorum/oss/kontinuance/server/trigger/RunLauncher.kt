@@ -7,8 +7,10 @@ import org.khorum.oss.kontinuance.engine.execution.ApprovalToken
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.StageRun
+import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.logs.RecordingLogSink
 import org.springframework.stereotype.Component
 import java.time.Instant
 
@@ -26,6 +28,7 @@ class RunLauncher(
     private val store: RunStore,
     private val engine: PipelineEngine,
     private val scope: CoroutineScope,
+    private val logStore: RunLogStore,
 ) {
     fun launch(
         id: String,
@@ -36,7 +39,12 @@ class RunLauncher(
         scope.launch {
             val record = runCatching {
                 withContext(ApprovalToken(id)) {
-                    val run = engine.run(pipeline, completedStages = completedStages)
+                    // Record this run's masked output under its id (018) so the UI can show real logs.
+                    val run = engine.run(
+                        pipeline,
+                        completedStages = completedStages,
+                        logSink = RecordingLogSink(id, logStore),
+                    )
                     RunRecord.from(run, Instant.now(), trigger = "manual").copy(id = id)
                 }
             }.getOrElse {

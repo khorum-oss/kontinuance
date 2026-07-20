@@ -12,6 +12,7 @@
 
 	let {
 		run = null,
+		logs = [],
 		coverage = null,
 		loading = false,
 		error = null,
@@ -24,6 +25,7 @@
 		onreject
 	}: {
 		run?: RunRecord | null;
+		logs?: string[];
 		coverage?: Coverage | null;
 		loading?: boolean;
 		error?: string | null;
@@ -37,6 +39,7 @@
 	} = $props();
 
 	const status = $derived(run ? normalizeStatus(run.status) : 'pending');
+	const active = $derived(status === 'running' || status === 'waiting' || status === 'pending');
 
 	function hhmmss(iso?: string): string {
 		if (!iso) return '';
@@ -45,8 +48,8 @@
 		return `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 	}
 
-	// The engine records run metadata, not step logs (persistence stores no logs), so the log panel
-	// reconstructs the run's timeline from the record and notes that live step-log streaming is pending.
+	// A short metadata summary from the run record, followed by the run's real recorded step output (018).
+	// While the run is active the page re-fetches the log; an empty log shows an explicit state.
 	const lines = $derived.by<Line[]>(() => {
 		if (!run) return [];
 		const out: Line[] = [];
@@ -59,7 +62,16 @@
 		if (status === 'failed' && (run.failingStep || run.reason)) {
 			out.push({ time: hhmmss(run.endedAt), message: `${run.failingStep ?? 'failure'}: ${run.reason ?? ''}`.trim(), tone: 'error' });
 		}
-		out.push({ time: '', message: '— live step-log streaming will appear here once the engine exposes it —', tone: 'muted' });
+		out.push({ time: '', message: '── step output ──', tone: 'muted' });
+		if (logs.length) {
+			for (const line of logs) out.push({ time: '', message: line, tone: 'normal' });
+		} else {
+			out.push({
+				time: '',
+				message: active ? '— waiting for output… —' : '— no output recorded for this run —',
+				tone: 'muted'
+			});
+		}
 		return out;
 	});
 </script>

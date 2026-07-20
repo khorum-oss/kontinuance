@@ -78,9 +78,10 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    screen, when auth is enforced) ends the session and returns to sign-in.
 3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
-4. **Approve a gated run.** When a run reaches a manual-approval step it pauses (`WaitingOnApproval`,
-   shown amber). Open the run and click **APPROVE** to continue it, or **REJECT** to end it. Approval is
-   durable — it works from the persisted run, so it survives a server restart.
+4. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
+   lines the pipeline produced — and refreshes while the run is still active. When a run reaches a
+   manual-approval step it pauses (`WaitingOnApproval`, shown amber); click **APPROVE** to continue it or
+   **REJECT** to end it. Approval is durable — it works from the persisted run, so it survives a restart.
 5. **Explore the screens** from the sidebar: **Pipeline** (stage/task flow of a run), **Coverage** (the
    Kover report), **Config** (the resolved `kontinuance.yml` and its plan), and **Deploy** (a promotion
    view — currently a stub for an external ArgoCD/registry).

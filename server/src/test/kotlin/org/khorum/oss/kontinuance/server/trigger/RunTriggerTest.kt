@@ -7,12 +7,14 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.execution.StatusEvent
+import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.model.RunId
 import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
+import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,8 +37,10 @@ class RunTriggerTest {
             pipeline: Pipeline,
             secrets: SecretSource,
             completedStages: List<StageRun>,
+            logSink: LogSink?,
         ): Run {
             failWith?.let { throw it }
+            logSink?.emit("[demo] hello")
             return Run(RunId("engine-generated"), pipeline, outcome, emptyList())
         }
 
@@ -51,7 +55,7 @@ class RunTriggerTest {
     """.trimIndent()
 
     private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {
-        val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined))
+        val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined), InMemoryRunLogStore())
         return RunTrigger(store, launcher, path.toString())
     }
 
