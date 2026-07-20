@@ -5,6 +5,15 @@
 	import { page } from '$app/state';
 	import { api } from '$lib/api/client';
 	import type { Session } from '$lib/api/types';
+	import {
+		BRIGHTNESS_KEY,
+		BRIGHTNESS_DEFAULT,
+		MODE_KEY,
+		clampBrightness,
+		otherMode,
+		resolveMode,
+		type ThemeMode
+	} from '$lib/theme/preferences';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
 	import Login from '$lib/components/Login.svelte';
@@ -25,7 +34,12 @@
 	const path = $derived(page.url.pathname);
 	const title = $derived(titleFor(path));
 
+	// Appearance preference (019): device-local, no sign-in. Applied to <html> so it themes every view.
+	let mode = $state<ThemeMode>('dark');
+	let brightness = $state<number>(BRIGHTNESS_DEFAULT);
+
 	onMount(async () => {
+		initAppearance();
 		try {
 			session = await api.me();
 		} catch {
@@ -35,6 +49,29 @@
 		}
 		view = requireSignIn ? 'signin' : 'project';
 	});
+
+	function initAppearance() {
+		const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)').matches ?? false;
+		mode = resolveMode(localStorage.getItem(MODE_KEY), prefersLight);
+		brightness = clampBrightness(parseFloat(localStorage.getItem(BRIGHTNESS_KEY) ?? ''));
+	}
+
+	// Apply the preference to the document root: a `data-theme` attribute re-themes every --k-* variable,
+	// and `--k-brightness` drives the global brightness filter on <body>.
+	$effect(() => {
+		document.documentElement.dataset.theme = mode;
+		document.documentElement.style.setProperty('--k-brightness', String(brightness));
+	});
+
+	function toggleTheme() {
+		mode = otherMode(mode);
+		localStorage.setItem(MODE_KEY, mode);
+	}
+
+	function setBrightness(value: number) {
+		brightness = clampBrightness(value);
+		localStorage.setItem(BRIGHTNESS_KEY, String(brightness));
+	}
 
 	function onAuthenticated(username: string) {
 		session = { authenticated: true, authRequired: true, username };
@@ -77,7 +114,13 @@
 	<div class="app">
 		<Sidebar active={path} {operator} onexit={onExit} />
 		<div class="main">
-			<Topbar {title} />
+			<Topbar
+				{title}
+				{mode}
+				{brightness}
+				ontoggletheme={toggleTheme}
+				onbrightness={setBrightness}
+			/>
 			<div class="content">{@render children()}</div>
 		</div>
 	</div>
