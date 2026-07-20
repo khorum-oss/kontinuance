@@ -9,4 +9,5 @@
 	});
 </script>
 
-<Story name="Sign in" />
+<Story name="Sign in" args={{ requireSignIn: true }} />
+<Story name="Project (signed in)" args={{ requireSignIn: false, operator: 'mkuraja' }} />

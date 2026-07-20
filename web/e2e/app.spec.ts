@@ -3,6 +3,7 @@ import {
 	enterApp,
 	mockApi,
 	mockApiError,
+	mockAuth,
 	mockConfig,
 	mockCoverage,
 	mockDeploy,
@@ -11,6 +12,58 @@ import {
 	mockWaitingRun,
 	sampleRuns
 } from './mock';
+
+// Every test runs against the mocked 016 auth endpoints (enforced by default; sign-in succeeds).
+test.beforeEach(async ({ page }) => {
+	await mockAuth(page);
+});
+
+test.describe('authentication', () => {
+	test('rejects wrong credentials with an error and stays on sign-in', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('operator');
+		await page.getByPlaceholder('password').fill('wrong');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		await expect(page.getByRole('alert')).toHaveText('invalid credentials');
+		await expect(page.getByText('MISSION CONTROL ACCESS')).toBeVisible();
+		await expect(page.getByText('ENTER MISSION CONTROL')).toHaveCount(0);
+	});
+
+	test('shows the signed-in operator in the sidebar', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
+		await expect(page.getByText('mkuraja')).toBeVisible();
+	});
+
+	test('EXIT returns to the project view, not the sign-in screen', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		await page.getByText('EXIT', { exact: true }).click();
+		// back on the project step (still signed in) — not the credentials screen
+		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
+		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
+		// and re-entering needs no fresh sign-in
+		await page.getByText('ENTER MISSION CONTROL').click();
+		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
+	});
+
+	test('open mode skips sign-in entirely', async ({ page }) => {
+		await mockAuth(page, { authRequired: false });
+		await mockApi(page);
+		await page.goto('/');
+		// no credentials prompt — straight to the project view
+		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
+		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
+		await page.getByText('ENTER MISSION CONTROL').click();
+		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
+	});
+});
 
 test.describe('entry shell', () => {
 	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {

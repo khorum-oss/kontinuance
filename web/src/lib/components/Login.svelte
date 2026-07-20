@@ -1,6 +1,10 @@
 <script lang="ts">
-	// Presentational entry shell: sign-in step → repo-setup selection → enter. No auth is enforced this
-	// feature; [oncomplete] fires when the operator finishes the flow.
+	// Entry shell: sign-in step → repo-setup selection → enter. The sign-in step calls the real server
+	// (016): SIGN IN posts the credentials; a wrong pair shows an error. When the server is open (or a
+	// session already exists) the layout passes [requireSignIn]=false and this starts on the repo step.
+	import { untrack } from 'svelte';
+	import { api, ApiError } from '$lib/api/client';
+
 	export interface RepoSetup {
 		name: string;
 		desc: string;
@@ -14,16 +18,52 @@
 
 	let {
 		repos = defaultRepos,
-		oncomplete
-	}: { repos?: RepoSetup[]; oncomplete?: (repo: string) => void } = $props();
+		requireSignIn = false,
+		operator = '',
+		onauthenticated,
+		oncomplete,
+		onsignout
+	}: {
+		repos?: RepoSetup[];
+		requireSignIn?: boolean;
+		operator?: string;
+		onauthenticated?: (username: string) => void;
+		oncomplete?: (repo: string) => void;
+		onsignout?: () => void;
+	} = $props();
 
-	let step = $state<'auth' | 'repo'>('auth');
-	let user = $state('');
+	// Seeded once from the props at mount (the layout re-creates this component per view, so the initial
+	// capture is intentional — untrack silences the "referenced locally" hint).
+	let step = $state<'auth' | 'repo'>(untrack(() => (requireSignIn ? 'auth' : 'repo')));
+	let user = $state(untrack(() => operator));
+	let password = $state('');
 	let picked = $state('');
+	let error = $state<string | null>(null);
+	let signingIn = $state(false);
+	// True when a real session backs this view (just signed in, or a returning session) — drives the
+	// "signed in as" identity row and the sign-out control, both hidden in open mode.
+	let authed = $state(untrack(() => !requireSignIn && operator !== ''));
 
 	$effect(() => {
 		if (picked === '') picked = repos[0]?.name ?? '';
 	});
+
+	async function signIn() {
+		if (signingIn) return;
+		error = null;
+		signingIn = true;
+		try {
+			const session = await api.login(user, password);
+			authed = true;
+			onauthenticated?.(session.username ?? user);
+			password = '';
+			step = 'repo';
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			signingIn = false;
+		}
+	}
 </script>
 
 <div class="overlay">
@@ -35,16 +75,36 @@
 		{#if step === 'auth'}
 			<div class="card">
 				<div class="k-mono label">OPERATOR CREDENTIALS</div>
-				<input class="k-mono field" placeholder="username" spellcheck="false" bind:value={user} />
-				<input class="k-mono field" placeholder="password" type="password" />
-				<button class="k-mono enter" onclick={() => (step = 'repo')}>SIGN IN</button>
+				<input
+					class="k-mono field"
+					placeholder="username"
+					spellcheck="false"
+					bind:value={user}
+					onkeydown={(e) => e.key === 'Enter' && signIn()}
+				/>
+				<input
+					class="k-mono field"
+					placeholder="password"
+					type="password"
+					bind:value={password}
+					onkeydown={(e) => e.key === 'Enter' && signIn()}
+				/>
+				{#if error}
+					<div class="k-mono err" role="alert">{error}</div>
+				{/if}
+				<button class="k-mono enter" onclick={signIn} disabled={signingIn}>
+					{signingIn ? 'SIGNING IN…' : 'SIGN IN'}
+				</button>
 			</div>
 		{:else}
 			<div class="card">
-				<div class="signed k-mono">
-					<span class="ok-dot"></span> signed in as <span class="who">{user || 'operator'}</span>
-					<button class="switch" onclick={() => (step = 'auth')}>SWITCH</button>
-				</div>
+				{#if authed}
+					<div class="signed k-mono">
+						<span class="ok-dot"></span> signed in as
+						<span class="who">{user || operator || 'operator'}</span>
+						<button class="switch" onclick={() => onsignout?.()}>SIGN OUT</button>
+					</div>
+				{/if}
 				<div class="k-mono label">SELECT REPO SETUP</div>
 				{#each repos as r (r.name)}
 					<button
@@ -155,6 +215,19 @@
 	}
 	.enter:hover {
 		background: rgba(94, 234, 212, 0.14);
+	}
+	.enter:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	.err {
+		font-size: 10px;
+		letter-spacing: 0.5px;
+		color: var(--k-fail);
+		background: rgba(248, 113, 113, 0.08);
+		border: 1px solid rgba(248, 113, 113, 0.3);
+		border-radius: 5px;
+		padding: 9px 12px;
 	}
 	.signed {
 		display: flex;

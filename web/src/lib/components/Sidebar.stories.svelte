@@ -16,6 +16,6 @@
 	</div>
 {/snippet}
 
-<Story name="Runs active" args={{ active: '/' }} {template} />
+<Story name="Runs active" args={{ active: '/', operator: 'mkuraja' }} {template} />
 <Story name="Deploy active" args={{ active: '/deploy' }} {template} />
 <Story name="Coverage active" args={{ active: '/coverage' }} {template} />

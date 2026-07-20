@@ -7,7 +7,7 @@
 	let {
 		active = '/',
 		lanes = 3,
-		operator = 'mkuraja',
+		operator = 'operator',
 		onexit
 	}: { active?: string; lanes?: number; operator?: string; onexit?: () => void } = $props();
 

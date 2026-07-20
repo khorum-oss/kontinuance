@@ -100,6 +100,77 @@ describe('api.approveRun / rejectRun', () => {
 	});
 });
 
+describe('api.me', () => {
+	it('returns the session on 200', async () => {
+		mockFetch(() => json({ authenticated: true, authRequired: true, username: 'operator' }));
+		const s = await api.me();
+		expect(s).toEqual({ authenticated: true, authRequired: true, username: 'operator' });
+	});
+
+	it('maps a 401 to a not-authenticated session (not an error)', async () => {
+		mockFetch(() => json({ authenticated: false, authRequired: true }, { status: 401 }));
+		const s = await api.me();
+		expect(s).toEqual({ authenticated: false, authRequired: true });
+	});
+
+	it('reports open mode', async () => {
+		mockFetch(() => json({ authenticated: false, authRequired: false }));
+		expect(await api.me()).toEqual({ authenticated: false, authRequired: false });
+	});
+});
+
+describe('api.login', () => {
+	it('POSTs the credentials and returns the session', async () => {
+		const seen: { url: string; method?: string; body?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method, body: init?.body as string });
+				return Promise.resolve(json({ authenticated: true, authRequired: true, username: 'operator' }));
+			})
+		);
+		const s = await api.login('operator', 's3cret');
+		expect(seen[0].url).toBe('/api/auth/login');
+		expect(seen[0].method).toBe('POST');
+		expect(JSON.parse(seen[0].body ?? '{}')).toEqual({ username: 'operator', password: 's3cret' });
+		expect(s.username).toBe('operator');
+	});
+
+	it('throws ApiError with the server message on a 401', async () => {
+		mockFetch(() =>
+			json({ authenticated: false, authRequired: true, error: 'invalid credentials' }, { status: 401 })
+		);
+		const err = await api.login('operator', 'wrong').catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(401);
+		expect(err.message).toBe('invalid credentials');
+	});
+});
+
+describe('api.logout', () => {
+	it('POSTs the logout endpoint', async () => {
+		const seen: { url: string; method?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method });
+				return Promise.resolve(json({ authenticated: false }));
+			})
+		);
+		await api.logout();
+		expect(seen[0].url).toBe('/api/auth/logout');
+		expect(seen[0].method).toBe('POST');
+	});
+
+	it('resolves even when the request fails (best-effort)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => Promise.reject(new Error('network down')))
+		);
+		await expect(api.logout()).resolves.toBeUndefined();
+	});
+});
+
 describe('error handling', () => {
 	it('throws ApiError with the status on a non-2xx response', async () => {
 		mockFetch(() => json({ error: 'not found' }, { status: 404, statusText: 'Not Found' }));

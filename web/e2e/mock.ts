@@ -195,9 +195,42 @@ export async function mockApiError(page: Page): Promise<void> {
 	);
 }
 
-/** Drive the presentational entry flow (sign in → repo pick → enter). */
+/**
+ * Mock the 016 auth endpoints. Default: auth is enforced but no session yet (`/api/auth/me` → 401), a
+ * correct sign-in succeeds, and a password of `wrong` is rejected — so tests can drive both the happy path
+ * and the error path. Pass `{ authRequired: false }` for open mode (no sign-in required).
+ */
+export async function mockAuth(
+	page: Page,
+	opts: { authRequired?: boolean; username?: string } = {}
+): Promise<void> {
+	const authRequired = opts.authRequired ?? true;
+	const username = opts.username ?? 'mkuraja';
+	await page.route(/\/api\/auth\/me$/, (route) =>
+		authRequired
+			? route.fulfill({ status: 401, json: { authenticated: false, authRequired: true } })
+			: route.fulfill({ json: { authenticated: false, authRequired: false } })
+	);
+	await page.route(/\/api\/auth\/login$/, (route) => {
+		const body = JSON.parse(route.request().postData() ?? '{}') as { username?: string; password?: string };
+		return body.password === 'wrong'
+			? route.fulfill({
+					status: 401,
+					json: { authenticated: false, authRequired: true, error: 'invalid credentials' }
+				})
+			: route.fulfill({
+					json: { authenticated: true, authRequired: true, username: body.username || username }
+				});
+	});
+	await page.route(/\/api\/auth\/logout$/, (route) =>
+		route.fulfill({ json: { authenticated: false } })
+	);
+}
+
+/** Drive the entry flow against the mocked server (sign in → repo pick → enter). */
 export async function enterApp(page: Page): Promise<void> {
 	await page.getByPlaceholder('username').fill('mkuraja');
-	await page.getByText('SIGN IN').click();
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
 	await page.getByText('ENTER MISSION CONTROL').click();
 }
