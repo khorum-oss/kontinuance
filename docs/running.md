@@ -44,8 +44,10 @@ All server settings use Spring's relaxed binding — set them as JVM properties 
 
 | Setting | Environment variable | Default | What it does |
 |---|---|---|---|
-| `server.address` | `SERVER_ADDRESS` | `127.0.0.1` | Bind address. Loopback by default — see [Limitations](#security-no-authentication-yet). |
+| `server.address` | `SERVER_ADDRESS` | `127.0.0.1` | Bind address. Loopback by default — see [Authentication](#authentication). |
 | `server.port` | `SERVER_PORT` | `8077` | Listen port. |
+| `kontinuance.auth.username` | `KONTINUANCE_AUTH_USERNAME` | _(unset)_ | Operator login name. Set **with** the password to enforce authentication; see [Authentication](#authentication). |
+| `kontinuance.auth.password` | `KONTINUANCE_AUTH_PASSWORD` | _(unset)_ | Operator password. Never commit the value. Both must be set to enforce auth; unset ⇒ open mode + startup warning. |
 | `kontinuance.store` | `KONTINUANCE_STORE` | `~/.kontinuance/runs` | Directory of run history (the file-backed run store). |
 | `kontinuance.config.descriptor` | `KONTINUANCE_CONFIG_DESCRIPTOR` | `kontinuance.yml` | Pipeline descriptor loaded for `/api/config` and for triggered/resumed runs. |
 | `kontinuance.coverage.report` | `KONTINUANCE_COVERAGE_REPORT` | `build/reports/kover/report.xml` | Kover XML surfaced by the coverage screen. |
@@ -127,13 +129,30 @@ work. Rejecting a gated run ends it **Cancelled** (a deliberate stop, not a fail
 
 Understand these before putting Kontinuance on a network.
 
-### Security: no authentication yet
+### Authentication
 
-The trigger, approve, and reject endpoints (`POST /api/runs/trigger`,
-`POST /api/runs/{id}/approve|reject`) are **unauthenticated** in this release. Anyone who can reach the
-API can start or approve runs. The default loopback bind (`127.0.0.1`) is the safe default: the service is
-not network-reachable until you change `SERVER_ADDRESS` or front it with a proxy. **Before exposing it,
-put an authenticating layer in front** (SSO/forward-auth, mTLS, or basic auth at the proxy).
+Authentication is **opt-in** and off by default. Set **both** `KONTINUANCE_AUTH_USERNAME` and
+`KONTINUANCE_AUTH_PASSWORD` (never commit the values) to enforce a login gate on the API: every endpoint —
+the runs read API, `POST /api/runs/trigger`, `POST /api/runs/{id}/approve|reject`, the SSE stream, and the
+WebSocket — then requires a valid session. Public paths stay open in both modes: the auth endpoints
+(`/api/auth/login`, `/api/auth/me`, `/api/auth/logout`), `/api/health`, and `/actuator/health`.
+
+- **Sign in** with `POST /api/auth/login` (`{"username","password"}`). On success the server sets an
+  HttpOnly `KSESSION` cookie; subsequent calls carry it. `GET /api/auth/me` reports the signed-in user and
+  whether auth is required; `POST /api/auth/logout` ends the session.
+- Credentials are compared in constant time; a wrong username and a wrong password are indistinguishable.
+- **When the two variables are unset the server runs open** (unauthenticated) and logs a warning at startup.
+  The loopback bind (`127.0.0.1`) remains the safe default for open mode — the service is not
+  network-reachable until you change `SERVER_ADDRESS` or front it with a proxy.
+
+Sessions are in-memory and single-instance: they do not survive a restart and are not shared across
+instances (consistent with [durability](#durability-only-paused-runs-survive-a-restart)). For a stronger
+posture you can still terminate TLS and add SSO/forward-auth or mTLS at the reverse proxy.
+
+> **Web UI note**: the SPA login screen does not yet call `/api/auth/login` — wiring the browser flow
+> (real sign-in, the signed-in name in the sidebar, EXIT → project view) is the remaining follow-up. Enable
+> server auth today via the API/`curl` or a proxy; with auth enforced, use the UI only once that wiring
+> lands (otherwise the SPA's calls are rejected).
 
 ### Durability: only paused runs survive a restart
 
