@@ -68,12 +68,14 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 
 ## Using the UI
 
-1. **Sign in.** Enter any username and password and click **SIGN IN**. The **server** now supports real,
-   opt-in authentication (`KONTINUANCE_AUTH_USERNAME` / `KONTINUANCE_AUTH_PASSWORD` — see
-   [running.md](./running.md#authentication)), but the **login screen is not yet wired to it**, so what you
-   type here is not checked (see [limitations](#current-limitations--planned-work)). Leave server auth off
-   for local UI runs.
-2. **Select a repo setup** and click **ENTER MISSION CONTROL**.
+1. **Sign in.** If the server is configured with `KONTINUANCE_AUTH_USERNAME` /
+   `KONTINUANCE_AUTH_PASSWORD` (see [running.md](./running.md#authentication)), enter those credentials and
+   click **SIGN IN** — a wrong pair is rejected with an error, a correct one establishes your session. If the
+   server runs **open** (no credentials configured), the sign-in step is skipped and you land straight on the
+   repo/project view.
+2. **Select a repo setup** and click **ENTER MISSION CONTROL**. Your signed-in name shows in the sidebar;
+   **EXIT** returns you here (the project view) without ending your session, and **SIGN OUT** (on this
+   screen, when auth is enforced) ends the session and returns to sign-in.
 3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
 4. **Approve a gated run.** When a run reaches a manual-approval step it pauses (`WaitingOnApproval`,
@@ -171,16 +173,14 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
   the checkout lives in the descriptor's `git:` step.
 
 **Auth & session**
-- **Server authentication is real and opt-in** — set `KONTINUANCE_AUTH_USERNAME` /
-  `KONTINUANCE_AUTH_PASSWORD` to enforce a login gate (session cookie via `/api/auth/login`), or leave them
-  unset to run open on loopback (the server warns at startup). See
-  [running.md](./running.md#authentication).
-- **The web login screen is not yet wired to it.** The SPA's **SIGN IN** does not call `/api/auth/login`, so
-  enabling server auth today is best exercised via the API/`curl` or a proxy. *Planned: wire the browser
-  sign-in flow.*
-- **The operator name in the sidebar is a placeholder**, not the signed-in user. *Planned: reflect the
-  logged-in person (from `/api/auth/me`).*
-- **EXIT returns to the sign-in screen.** *Planned: return to the project/repo view instead.*
+- **Authentication is real, opt-in, and wired end to end.** Set `KONTINUANCE_AUTH_USERNAME` /
+  `KONTINUANCE_AUTH_PASSWORD` to enforce a login gate; the UI signs in against it (session cookie via
+  `/api/auth/login`), shows the signed-in operator in the sidebar, and **EXIT** returns to the project view
+  while **SIGN OUT** ends the session. With no credentials configured the server runs open (warns at
+  startup) and the UI skips sign-in. See [running.md](./running.md#authentication).
+- Still single-operator: multi-user accounts, roles, and external SSO/OAuth are future work; a session does
+  not survive a server restart, and an expired session surfaces as failing calls rather than an automatic
+  redirect back to sign-in.
 
 **UI**
 - **Dark theme only** — no light mode or brightness control yet. *Planned.*

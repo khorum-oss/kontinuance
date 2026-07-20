@@ -18,6 +18,14 @@ export interface RunsResponse {
 	runs: RunRecord[];
 }
 
+// The UI's read of the current auth state (016 server). `authRequired` is false in open mode;
+// `username` is present only when authenticated. Mirrors /api/auth/me and /api/auth/login.
+export interface Session {
+	authenticated: boolean;
+	authRequired: boolean;
+	username?: string;
+}
+
 // ----- stub contracts (forward-looking screens) -----
 
 export type TaskTool =

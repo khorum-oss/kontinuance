@@ -27,10 +27,9 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up --build
 New here? Start with **[Getting Started](docs/getting-started.md)** — it covers running locally (Compose
 or from source), a UI walkthrough, authoring a pipeline, and current limitations.
 
-> Pre-1.0: the server supports opt-in authentication (`KONTINUANCE_AUTH_USERNAME` /
+> Pre-1.0: opt-in authentication is wired end to end (`KONTINUANCE_AUTH_USERNAME` /
 > `KONTINUANCE_AUTH_PASSWORD`; open on loopback when unset — see
-> [running.md](docs/running.md#authentication)), but the web login screen isn't wired to it yet and some UI
-> pieces are still presentational. See
+> [running.md](docs/running.md#authentication)), and some UI pieces are still presentational. See
 > [Getting Started → limitations](docs/getting-started.md#current-limitations--planned-work).
 
 ## Documentation

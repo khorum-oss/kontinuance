@@ -2,7 +2,7 @@
 // server (see vite.config.ts). Every call throws [ApiError] on a non-2xx or transport failure so screens
 // can render a clear error state.
 
-import type { Config, Coverage, Deploy, Pipeline, RunRecord, RunsResponse } from './types';
+import type { Config, Coverage, Deploy, Pipeline, RunRecord, RunsResponse, Session } from './types';
 
 export class ApiError extends Error {
 	constructor(
@@ -47,6 +47,55 @@ async function postRun(id: string, action: 'approve' | 'reject'): Promise<void> 
 
 export const api = {
 	health: () => getJson<{ status: string }>('/api/health'),
+
+	// Current session (016). `/api/auth/me` is public: it answers 200 in open mode and when signed in, and
+	// 401 (with an `authRequired` body) when auth is enforced but there is no session. A 401 here is a
+	// normal "not signed in" answer, not a transport error, so it is mapped rather than thrown.
+	me: async (): Promise<Session> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/auth/me', { headers: { accept: 'application/json' } });
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		if (res.status === 401) {
+			const body = (await res.json().catch(() => ({}))) as { authRequired?: boolean };
+			return { authenticated: false, authRequired: body.authRequired ?? true };
+		}
+		if (!res.ok) {
+			throw new ApiError(`request failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return (await res.json()) as Session;
+	},
+
+	// Sign in. Resolves to the new [Session] on success; throws [ApiError] with the server's `error`
+	// message (e.g. "invalid credentials") on 401. The server sets the HttpOnly KSESSION cookie.
+	login: async (username: string, password: string): Promise<Session> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', accept: 'application/json' },
+				body: JSON.stringify({ username, password })
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as Session & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `sign-in failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	},
+
+	// End the session (best-effort). Logout always succeeds server-side; a transport failure is ignored.
+	logout: async (): Promise<void> => {
+		try {
+			await fetch('/api/auth/logout', { method: 'POST', headers: { accept: 'application/json' } });
+		} catch {
+			// best-effort: the local view resets regardless
+		}
+	},
 
 	listRuns: async (limit?: number): Promise<RunRecord[]> => {
 		const q = limit ? `?limit=${limit}` : '';
