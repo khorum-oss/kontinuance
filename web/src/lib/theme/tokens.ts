@@ -1,28 +1,29 @@
-// Typed design tokens mirroring app.css, for component logic (status → color, tool → color) and stories.
-
+// Typed design tokens for component logic (status → color, tool → color). Each value references the
+// corresponding `--k-*` CSS custom property in app.css, so colors applied via inline styles adapt to the
+// active theme (light/dark) exactly like the CSS chrome does — a single `data-theme` re-themes everything.
 export const color = {
-	bg: '#070b10',
-	surface: 'rgba(13,20,28,0.8)',
-	surface2: 'rgba(9,14,19,0.9)',
-	inset: '#101a23',
-	border: '#17222c',
-	borderSoft: '#131e28',
-	borderRow: '#141f29',
-	text: '#dce8e6',
-	heading: '#eafffa',
-	muted: '#9fb6b0',
-	muted2: '#7e9a93',
-	muted3: '#5c7a72',
-	muted4: '#4b6a63',
-	faint: '#33484f',
-	faint2: '#22313d',
-	teal: '#5eead4',
-	tealBright: '#8ff5e4',
-	teal2: '#2dd4bf',
-	ok: '#34d399',
-	fail: '#f87171',
-	warn: '#fbd46b',
-	purple: '#c4b5fd'
+	bg: 'var(--k-bg)',
+	surface: 'var(--k-surface)',
+	surface2: 'var(--k-surface-2)',
+	inset: 'var(--k-inset)',
+	border: 'var(--k-border)',
+	borderSoft: 'var(--k-border-soft)',
+	borderRow: 'var(--k-border-row)',
+	text: 'var(--k-text)',
+	heading: 'var(--k-heading)',
+	muted: 'var(--k-muted)',
+	muted2: 'var(--k-muted-2)',
+	muted3: 'var(--k-muted-3)',
+	muted4: 'var(--k-muted-4)',
+	faint: 'var(--k-faint)',
+	faint2: 'var(--k-faint-2)',
+	teal: 'var(--k-teal)',
+	tealBright: 'var(--k-teal-bright)',
+	teal2: 'var(--k-teal-2)',
+	ok: 'var(--k-ok)',
+	fail: 'var(--k-fail)',
+	warn: 'var(--k-warn)',
+	purple: 'var(--k-purple)'
 } as const;
 
 /** Canonical run/task status vocabulary the UI renders. */

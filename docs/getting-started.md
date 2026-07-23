@@ -184,7 +184,8 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
   redirect back to sign-in.
 
 **UI**
-- **Dark theme only** — no light mode or brightness control yet. *Planned.*
+- **Light & dark themes with a brightness control** — toggle from the top bar; the choice follows your OS
+  preference by default and is remembered per browser.
 - **The repo-setup screen is presentational** (demo repos). *Planned: redesign, plus first-run repo
   configuration.*
 

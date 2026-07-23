@@ -65,6 +65,36 @@ test.describe('authentication', () => {
 	});
 });
 
+test.describe('appearance', () => {
+	test('toggles theme and brightness, and persists both across a reload', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await enterApp(page);
+
+		const root = page.locator('html');
+		const initial = await root.getAttribute('data-theme');
+		expect(initial === 'light' || initial === 'dark').toBeTruthy();
+		const flipped = initial === 'dark' ? 'light' : 'dark';
+
+		// the toggle flips the theme
+		await page.getByRole('button', { name: /toggle light or dark theme/i }).click();
+		await expect(root).toHaveAttribute('data-theme', flipped);
+
+		// the slider drives the global brightness variable
+		await page.getByLabel('brightness').fill('0.8');
+		await expect
+			.poll(() => root.evaluate((el) => el.style.getPropertyValue('--k-brightness')))
+			.toBe('0.8');
+
+		// both survive a reload (persisted per-browser)
+		await page.reload();
+		await expect(root).toHaveAttribute('data-theme', flipped);
+		await expect
+			.poll(() => root.evaluate((el) => el.style.getPropertyValue('--k-brightness')))
+			.toBe('0.8');
+	});
+});
+
 test.describe('entry shell', () => {
 	test('signs in, picks a repo, and lands on the runs list', async ({ page }) => {
 		await mockApi(page);

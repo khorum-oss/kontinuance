@@ -34,6 +34,47 @@
 
 	--k-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 	--k-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+
+	/* the soft accent glow behind the canvas, and the global brightness dimmer (019) */
+	--k-glow: rgba(94, 234, 212, 0.05);
+	--k-scrollbar: #1b2833;
+	color-scheme: dark;
+	--k-brightness: 1;
+}
+
+/* Light theme (019): a legible off-white canvas with darker-toned accents. Applied by stamping
+   `data-theme="light"` on <html>; every --k-* below is overridden so chrome AND inline-styled status
+   colors (which read these vars via tokens.ts) switch together. */
+:root[data-theme='light'] {
+	--k-bg: #eef2f4;
+	--k-surface: rgba(255, 255, 255, 0.92);
+	--k-surface-2: #ffffff;
+	--k-inset: #e3eaed;
+
+	--k-border: #cdd8dc;
+	--k-border-soft: #dbe3e6;
+	--k-border-row: #e0e7ea;
+
+	--k-text: #172320;
+	--k-heading: #0a1614;
+	--k-muted: #43574f;
+	--k-muted-2: #566a62;
+	--k-muted-3: #6f847c;
+	--k-muted-4: #899b93;
+	--k-faint: #a6b6af;
+	--k-faint-2: #c3cfc9;
+
+	--k-teal: #0d9488;
+	--k-teal-bright: #0b7d72;
+	--k-teal-2: #0f766e;
+	--k-ok: #059669;
+	--k-fail: #dc2626;
+	--k-warn: #b45309;
+	--k-purple: #7c3aed;
+
+	--k-glow: rgba(13, 148, 136, 0.08);
+	--k-scrollbar: #c3cfc9;
+	color-scheme: light;
 }
 
 * {
@@ -48,11 +89,13 @@ body {
 
 body {
 	background:
-		radial-gradient(1200px 800px at 70% -10%, rgba(94, 234, 212, 0.05), transparent 60%),
+		radial-gradient(1200px 800px at 70% -10%, var(--k-glow), transparent 60%),
 		var(--k-bg);
 	color: var(--k-text);
 	font-family: var(--k-sans);
 	-webkit-font-smoothing: antialiased;
+	/* global brightness dimmer/brightener (019); the variable is set on <html> from the saved preference */
+	filter: brightness(var(--k-brightness, 1));
 }
 
 a {
@@ -68,7 +111,7 @@ a:hover {
 	height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-	background: #1b2833;
+	background: var(--k-scrollbar);
 	border-radius: 4px;
 }
 *::-webkit-scrollbar-track {

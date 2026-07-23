@@ -1,5 +1,22 @@
 <script lang="ts">
-	let { title = 'RUNS', runId = '—' }: { title?: string; runId?: string } = $props();
+	import ThemeControls from '$lib/components/ThemeControls.svelte';
+	import type { ThemeMode } from '$lib/theme/preferences';
+
+	let {
+		title = 'RUNS',
+		runId = '—',
+		mode = 'dark',
+		brightness = 1,
+		ontoggletheme,
+		onbrightness
+	}: {
+		title?: string;
+		runId?: string;
+		mode?: ThemeMode;
+		brightness?: number;
+		ontoggletheme?: () => void;
+		onbrightness?: (value: number) => void;
+	} = $props();
 
 	let clock = $state(formatClock());
 
@@ -20,6 +37,7 @@
 	<div class="right">
 		<div class="k-mono item">MISSION CLOCK <span class="teal">{clock}</span></div>
 		<div class="k-mono item">RUN <span class="val">{runId}</span></div>
+		<ThemeControls {mode} {brightness} ontoggle={ontoggletheme} {onbrightness} />
 	</div>
 </div>
 
