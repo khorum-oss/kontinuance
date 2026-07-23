@@ -1,0 +1,39 @@
+# Kontinuance pipeline for the sandbox demo. It checks out an application repo into the run's fresh,
+# ephemeral workspace and runs its Gradle build + tests — the real Kontinuance model (feature 015: a
+# source checkout + a per-run shared workspace), end to end.
+#
+# The repository to build is passed as REPO_URL (resolved from the environment and injected into the clone
+# step). `sandbox/run.sh` sets it to a throwaway local copy of this app for a fully-local, offline run; in
+# practice you would point it at your own repo, e.g.
+#   REPO_URL=https://github.com/you/your-app kontinuance sandbox/kontinuance.yml
+#
+# Notes:
+#   * every step shares one workspace for the run, so the `checkout` output is visible to later steps;
+#   * the Gradle steps run in the checked-out `app/` directory (workingDir), using the system `gradle`
+#     (this project ships no wrapper on purpose) — so Gradle must be on the PATH;
+#   * the sandbox app has no external dependencies, so the whole run is offline and deterministic.
+pipeline:
+  name: "sandbox-ci"
+  concurrency: 1
+  stages:
+    - name: "checkout"
+      steps:
+        - name: "clone"
+          run: 'rm -rf app && git clone --depth 1 "$REPO_URL" app'
+          secrets: ["REPO_URL"]
+
+    - name: "build"
+      steps:
+        - name: "assemble"
+          workingDir: "app"
+          gradle:
+            tasks: ["assemble"]
+            args: ["--no-daemon"]
+
+    - name: "test"
+      steps:
+        - name: "self-test"
+          workingDir: "app"
+          gradle:
+            tasks: ["selfTest"]
+            args: ["--no-daemon"]
