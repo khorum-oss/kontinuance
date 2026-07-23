@@ -233,10 +233,10 @@ export async function mockAuth(
 	);
 }
 
-/** Drive the entry flow against the mocked server (sign in → repo pick → enter). */
+/** Drive the entry flow against the mocked server (sign in → click a repo to enter mission control). */
 export async function enterApp(page: Page): Promise<void> {
 	await page.getByPlaceholder('username').fill('mkuraja');
 	await page.getByPlaceholder('password').fill('s3cret');
 	await page.getByText('SIGN IN', { exact: true }).click();
-	await page.getByText('ENTER MISSION CONTROL').click();
+	await page.getByText('kontinuance-service', { exact: true }).click();
 }

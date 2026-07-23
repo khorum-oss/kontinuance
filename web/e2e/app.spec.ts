@@ -45,22 +45,46 @@ test.describe('authentication', () => {
 		await enterApp(page);
 
 		await page.getByText('EXIT', { exact: true }).click();
-		// back on the project step (still signed in) — not the credentials screen
+		// back on the repo workspace (still signed in) — not the credentials screen
 		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
 		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
-		// and re-entering needs no fresh sign-in
-		await page.getByText('ENTER MISSION CONTROL').click();
+		// and re-entering needs no fresh sign-in — click a repo
+		await page.getByText('kontinuance-service', { exact: true }).click();
 		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
+	});
+
+	test('the repo workspace filters by provider and adds a repo', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('mkuraja');
+		await page.getByPlaceholder('password').fill('s3cret');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		// on the repo workspace: seeded repos are shown
+		await expect(page.getByText('kontinuance-service', { exact: true })).toBeVisible();
+		await expect(page.getByText('infra-charts', { exact: true })).toBeVisible();
+
+		// filter to gitlab hides a github-only repo
+		await page.getByLabel('filter gitlab').click();
+		await expect(page.getByText('kontinuance-service', { exact: true })).toHaveCount(0);
+		await expect(page.getByText('infra-charts', { exact: true })).toBeVisible();
+		await page.getByLabel('filter all').click();
+
+		// add a repo → it appears at the top of the list
+		await page.getByRole('button', { name: '+ ADD REPO', exact: true }).click();
+		await page.getByPlaceholder(/org\/repo/).fill('you/brand-new-app');
+		await page.getByRole('button', { name: 'ADD REPO', exact: true }).click();
+		await expect(page.getByText('brand-new-app', { exact: true })).toBeVisible();
 	});
 
 	test('open mode skips sign-in entirely', async ({ page }) => {
 		await mockAuth(page, { authRequired: false });
 		await mockApi(page);
 		await page.goto('/');
-		// no credentials prompt — straight to the project view
+		// no credentials prompt — straight to the repo workspace
 		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
 		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
-		await page.getByText('ENTER MISSION CONTROL').click();
+		await page.getByText('kontinuance-service', { exact: true }).click();
 		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
 	});
 });
