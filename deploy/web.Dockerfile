@@ -8,7 +8,7 @@ FROM node:22 AS build
 WORKDIR /web
 RUN corepack enable
 # Install with the lockfile first (better layer caching), then build.
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
 # adapter-static -> web/build (client-rendered SPA with an index.html fallback).

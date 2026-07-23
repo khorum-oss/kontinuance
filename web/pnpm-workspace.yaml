@@ -1,0 +1,5 @@
+# pnpm 11 moved dependency build-script approval here (the old package.json "pnpm.onlyBuiltDependencies"
+# is no longer read). esbuild ships a postinstall that fetches its platform-native binary, which
+# `vite build` requires, so it must be allowed to run.
+allowBuilds:
+  esbuild: true
