@@ -111,8 +111,16 @@ Understand the workspace model before you write a real pipeline:
   Put the checkout **first** (the workspace starts empty, so cloning into `.` works), then later steps
   build the checked-out code.
 
-The shipped demo still uses `echo` steps so it runs with no external repo, but a real pipeline checks out
-its source. (Checkout supports branch/tag refs today; arbitrary commit SHAs are a follow-up.)
+The compose demo above uses `echo` steps so it runs with no external repo. For a **real** example — a
+Kontinuance pipeline that checks out an actual Gradle app, builds it, and runs its tests, fresh, from one
+local command — see [`sandbox/`](../sandbox/README.md):
+
+```bash
+sandbox/run.sh   # checkout → gradle assemble → tests, streaming the real logs; ends green, exit 0
+```
+
+It's a self-contained, offline, zero-dependency app that Kontinuance treats like any external repo. (Checkout
+supports branch/tag refs today; arbitrary commit SHAs are a follow-up.)
 
 ## Authoring a pipeline
 
