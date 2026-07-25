@@ -10,10 +10,13 @@ import kotlin.time.Duration
  * @param enabled when `false` the step is SKIPPED (maps to the builder's `condition`).
  * @param secrets secret names injected into the step's scoped environment and masked in logs.
  * @param workingDir optional relative subdirectory resolved inside the step's isolated directory.
+ * @param image optional container image; when set the step runs inside that image (runner isolation)
+ *   with the workspace mounted, instead of on the host.
  */
 data class TypedStepOptions(
     val timeout: Duration? = null,
     val enabled: Boolean = true,
     val secrets: List<String> = emptyList(),
     val workingDir: String? = null,
+    val image: String? = null,
 )

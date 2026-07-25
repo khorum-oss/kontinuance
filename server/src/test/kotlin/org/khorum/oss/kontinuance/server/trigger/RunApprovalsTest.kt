@@ -39,7 +39,7 @@ class RunApprovalsTest {
         val gate = ServerApprovalGate()
         val launcher = RunLauncher(
             store,
-            PipelineEngine.default(LogSink { }, gate),
+            PipelineEngine.default(LogSink { }, approvalGate = gate),
             CoroutineScope(Dispatchers.Unconfined),
             InMemoryRunLogStore(),
         )

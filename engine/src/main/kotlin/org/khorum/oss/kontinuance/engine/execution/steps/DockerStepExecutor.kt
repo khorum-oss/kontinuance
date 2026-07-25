@@ -1,6 +1,8 @@
 package org.khorum.oss.kontinuance.engine.execution.steps
 
+import org.khorum.oss.kontinuance.engine.execution.DockerStepSandbox
 import org.khorum.oss.kontinuance.engine.execution.ProcessStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.StepSandbox
 import org.khorum.oss.kontinuance.engine.model.Step
 import org.khorum.oss.kontinuance.engine.model.StepDefinition
 import org.khorum.oss.kontinuance.engine.model.DockerMode
@@ -12,7 +14,7 @@ import java.nio.file.Path
  * `docker build …` for [DockerMode.BUILD]. A missing `docker` binary surfaces as a FAILED step
  * naming `docker` (via the shared [ProcessStepExecutor] launch handling).
  */
-class DockerStepExecutor : ProcessStepExecutor() {
+class DockerStepExecutor(sandbox: StepSandbox = DockerStepSandbox()) : ProcessStepExecutor(sandbox = sandbox) {
 
     override fun supports(definition: StepDefinition): Boolean = definition is DockerStep
 

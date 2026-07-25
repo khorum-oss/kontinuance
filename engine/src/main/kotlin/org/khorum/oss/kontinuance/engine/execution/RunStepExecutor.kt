@@ -15,10 +15,12 @@ import kotlin.time.Duration
  * unchanged.
  *
  * @param defaultTimeout applied when a step declares no explicit timeout.
+ * @param sandbox the runner sandbox; a step naming a container image runs inside it.
  */
 class RunStepExecutor(
     defaultTimeout: Duration = DEFAULT_TIMEOUT,
-) : ProcessStepExecutor(defaultTimeout) {
+    sandbox: StepSandbox = DockerStepSandbox(),
+) : ProcessStepExecutor(defaultTimeout, sandbox) {
 
     override fun supports(definition: StepDefinition): Boolean = definition is RunStep
 

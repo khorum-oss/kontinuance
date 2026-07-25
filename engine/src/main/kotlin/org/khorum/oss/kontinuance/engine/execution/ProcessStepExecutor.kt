@@ -38,9 +38,12 @@ import kotlin.time.Duration.Companion.seconds
  *   naming the offending program, never an unhandled exception (FR-007/SC-004).
  *
  * @param defaultTimeout applied when a step declares no explicit timeout.
+ * @param sandbox wraps the launch argv so a step naming a container image runs inside an isolated
+ *   runner ([DockerStepSandbox]); the default leaves host steps unchanged.
  */
 abstract class ProcessStepExecutor(
     private val defaultTimeout: Duration = DEFAULT_TIMEOUT,
+    private val sandbox: StepSandbox = DockerStepSandbox(),
 ) : StepExecutor {
 
     /**
@@ -56,7 +59,8 @@ abstract class ProcessStepExecutor(
     @Suppress("SwallowedException")
     override suspend fun execute(context: StepContext): StepRun = withContext(Dispatchers.IO) {
         val step = context.step
-        val argv = command(step, context.workingDir)
+        // The executor describes the host command; the sandbox may wrap it to run inside a container.
+        val argv = sandbox.wrap(command(step, context.workingDir), context)
         val startedAt = Instant.now()
 
         val process = try {

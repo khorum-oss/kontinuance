@@ -100,6 +100,18 @@ Understand the workspace model before you write a real pipeline:
   and build across steps**.
 - The workspace is isolated from the host (a step's `workingDir:` sub-path resolves *inside* it and can't
   escape), and secret masking + environment scoping stay per step.
+- **Runner isolation (024):** give a step an `image:` and its command runs **inside** that container (the
+  workspace is mounted as the working directory, and the step's secrets are forwarded into it by name), so it
+  uses the image's toolchain and can't touch the host filesystem outside the workspace. Steps without an
+  `image:` run on the host exactly as before. It runs via the host `docker` CLI, so a Docker daemon must be
+  available.
+
+  ```yaml
+  - name: "assemble"
+    image: "gradle:8.8-jdk21"   # run this step inside the image (omit to run on the host)
+    gradle:
+      tasks: ["assemble"]
+  ```
 - Use the **`git` checkout step** to fetch your source into the workspace:
 
   ```yaml

@@ -16,6 +16,9 @@ import kotlin.time.Duration
  * @param secrets names of secrets injected into this step's scoped environment and masked in logs.
  * @param workingDirHint optional relative subdirectory resolved **inside** the step's isolated
  *   working directory; it must never be absolute nor escape via `..`.
+ * @param image optional container image; when set, the step's command runs **inside** that image
+ *   (runner isolation) with the workspace mounted, instead of directly on the host. When `null` the
+ *   step runs on the host exactly as before. Must be non-blank when present.
  */
 @GeneratedDsl
 data class Step(
@@ -27,6 +30,7 @@ data class Step(
     @DefaultEmptyList
     val secrets: List<SecretRef> = emptyList(),
     val workingDirHint: String? = null,
+    val image: String? = null,
 ) {
     init {
         require(name.isNotBlank()) { "step name must be non-empty" }
@@ -37,6 +41,9 @@ data class Step(
             require(isContainedRelativePath(it)) {
                 "step '$name' workingDir '$it' must be a relative path inside the isolated directory"
             }
+        }
+        image?.let {
+            require(it.isNotBlank()) { "step '$name' image must be non-blank when set" }
         }
     }
 
