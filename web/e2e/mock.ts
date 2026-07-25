@@ -159,16 +159,19 @@ export async function mockDeploy(page: Page): Promise<void> {
 	await page.route(/\/api\/deploy/, (route) =>
 		route.fulfill({
 			json: {
+				// run-derived shape (022): SOURCE node + a node per real stage; no artifact registry (external)
 				nodes: [
-					{ id: 'build', label: 'SOURCE', title: 'kontinuance-service', status: 'synced', meta: 'commit a3f19c2' },
-					{ id: 'stage', label: 'STAGE', title: 'argocd / kontinuance-stage', status: 'progressing', meta: 'rollout 2/3' },
-					{ id: 'prod', label: 'PROD', title: 'manual promotion gate', status: 'pending', meta: 'awaiting approval' }
+					{ id: 'source', label: 'SOURCE', title: 'khorum-oss/kontinuance', status: 'synced', meta: 'commit a3f19c2' },
+					{ id: 'stage-0', label: 'BUILD', title: '1 step', status: 'synced', meta: 'assemble — synced' },
+					{ id: 'stage-1', label: 'TEST', title: '1 step', status: 'failed', meta: 'unit — failed' }
 				],
-				artifacts: [
-					{ kind: 'JAR', name: 'kontinuance-core-1.4.2.jar', digest: 'sha256:8c1e42aa', state: 'published' },
-					{ kind: 'OCI', name: 'kontinuance:1.4.2', digest: 'sha256:8c1e42aa', state: 'pushed' }
-				],
-				environment: { podsReady: '2/3', syncRevision: '1.4.2', health: 'Progressing', meta: 'namespace kontinuance-stage' }
+				artifacts: [],
+				environment: {
+					podsReady: '1/2',
+					syncRevision: 'a3f19c2',
+					health: 'FAILED',
+					meta: 'Registry & ArgoCD sync are external — not tracked by Kontinuance.'
+				}
 			}
 		})
 	);

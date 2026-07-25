@@ -84,7 +84,8 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    **REJECT** to end it. Approval is durable — it works from the persisted run, so it survives a restart.
 5. **Explore the screens** from the sidebar: **Pipeline** (stage/task flow of a run), **Coverage** (the
    Kover report), **Config** (the resolved `kontinuance.yml` and its plan), and **Deploy** (a promotion
-   view — currently a stub for an external ArgoCD/registry).
+   view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as
+   external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster).
 
 ---
 
@@ -204,6 +205,8 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 **Engine/ops**
 - Only runs **paused at an approval gate** survive a restart; an actively-executing run does not (in-process
   engine). The durable approval gate assumes a **single instance** sharing one run store.
-- The **Deploy** screen is a stub; ArgoCD/registry integration is external.
+- The **Deploy** screen is now derived from the latest run's real stages; the artifact registry and cluster
+  sync/health are genuinely external (ArgoCD/registry) and shown honestly rather than fabricated — a real
+  ArgoCD/registry integration is a later feature.
 
 See [roadmap.md](./roadmap.md) for the broader direction.

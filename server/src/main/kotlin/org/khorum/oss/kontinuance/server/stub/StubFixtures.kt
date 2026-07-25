@@ -9,11 +9,13 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * Fixture JSON for the forward-looking screens (pipeline, deploy, coverage, config). These are STUBS: the
- * engine does not yet record stage/task, deploy, or coverage data, so the endpoints serve a stable typed
- * shape (see specs/009-web-ui/contracts/stub-api.md) that the UI can consume now and that a real source
- * can back later without changing the contract. Built with the runtime JSON API (no compiler plugin, no
- * new dependency), mirroring [org.khorum.oss.kontinuance.server.JsonView].
+ * Fallback fixture JSON for the forward-looking screens. The pipeline / coverage / config endpoints serve
+ * these ONLY when their real source is absent — an unknown/old run (no persisted stages), a missing Kover
+ * report, or a missing descriptor — so the UI still renders a stable typed shape
+ * (see specs/009-web-ui/contracts/stub-api.md). Deploy is now derived from the latest real run
+ * ([org.khorum.oss.kontinuance.server.deploy.DeployController]) and no longer has a fixture. Built with the
+ * runtime JSON API (no compiler plugin, no new dependency), mirroring
+ * [org.khorum.oss.kontinuance.server.JsonView].
  */
 @Suppress("MagicNumber") // fixture data: literal progress/coverage/plan values are the point
 internal object StubFixtures {
@@ -38,25 +40,6 @@ internal object StubFixtures {
             }
             stage("s5", "PUBLISH") { task("pub", "publish → repo manager", "nexus", "pending", 0) }
             stage("s6", "DEPLOY") { task("argo", "argocd sync → stage", "argo", "pending", 0, "pub") }
-        }
-    }.toString()
-
-    fun deploy(): String = buildJsonObject {
-        putJsonArray("nodes") {
-            node("build", "SOURCE", "kontinuance-service", "synced", "commit a3f19c2\nbuilt 1.4.2")
-            node("stage", "STAGE", "argocd / kontinuance-stage", "progressing", "sync 1.4.2 → live\nrollout 2/3")
-            node("prod", "PROD", "manual promotion gate", "pending", "promotes by digest\nawaiting approval")
-        }
-        putJsonArray("artifacts") {
-            artifact("JAR", "kontinuance-core-1.4.2.jar", "sha256:8c1e42aa", "published")
-            artifact("JAR", "kontinuance-api-1.4.2.jar", "sha256:5b90d17c", "published")
-            artifact("OCI", "kontinuance:1.4.2", "sha256:8c1e42aa", "pushed")
-        }
-        putJsonObject("environment") {
-            put("podsReady", "2/3")
-            put("syncRevision", "1.4.2")
-            put("health", "Progressing")
-            put("meta", "namespace kontinuance-stage\nargocd auto-sync on")
         }
     }.toString()
 
@@ -127,23 +110,6 @@ private fun JsonArrayBuilder.task(
     put("progress", progress)
     putJsonArray("deps") { deps.forEach { add(it) } }
 }
-
-private fun JsonArrayBuilder.node(id: String, label: String, title: String, status: String, meta: String) =
-    addJsonObject {
-        put("id", id)
-        put("label", label)
-        put("title", title)
-        put("status", status)
-        put("meta", meta)
-    }
-
-private fun JsonArrayBuilder.artifact(kind: String, name: String, digest: String, state: String) =
-    addJsonObject {
-        put("kind", kind)
-        put("name", name)
-        put("digest", digest)
-        put("state", state)
-    }
 
 private fun JsonArrayBuilder.coverageModule(name: String, linePct: Int, branchPct: Int, missed: Int) =
     addJsonObject {

@@ -34,51 +34,62 @@
 			<button class="k-mono retry" onclick={() => onretry?.()}>RETRY</button>
 		</div>
 	{:else if deploy}
-		<div class="nodes">
-			{#each deploy.nodes as n, i (n.id)}
-				{#if i > 0}<div class="conn"></div>{/if}
-				<div class="node" style="border-color:{stateColor(n.status)}44;">
-					<div class="node-head">
-						<span class="dot" style="background:{stateColor(n.status)};"></span>
-						<span class="k-mono nlabel">{n.label}</span>
-						<span class="k-mono nstate" style="color:{stateColor(n.status)};">{n.status}</span>
+		{#if deploy.nodes.length === 0}
+			<div class="note k-mono">no runs yet — trigger a run to see its delivery</div>
+		{:else}
+			<div class="nodes">
+				{#each deploy.nodes as n, i (n.id)}
+					{#if i > 0}<div class="conn"></div>{/if}
+					<div class="node" style="border-color:{stateColor(n.status)}44;">
+						<div class="node-head">
+							<span class="dot" style="background:{stateColor(n.status)};"></span>
+							<span class="k-mono nlabel">{n.label}</span>
+							<span class="k-mono nstate" style="color:{stateColor(n.status)};">{n.status}</span>
+						</div>
+						<div class="ntitle">{n.title}</div>
+						<div class="k-mono nmeta">{n.meta}</div>
 					</div>
-					<div class="ntitle">{n.title}</div>
-					<div class="k-mono nmeta">{n.meta}</div>
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="cards">
 			<div class="card manifest">
 				<div class="k-mono label">ARTIFACT MANIFEST</div>
-				{#each deploy.artifacts as a (a.name)}
-					<div class="artifact">
-						<span class="k-mono kind" style="color:{stateColor(a.state)};">{a.kind}</span>
-						<span class="k-mono aname">{a.name}</span>
-						<span class="k-mono digest">{a.digest}</span>
-						<span class="k-mono astate" style="color:{stateColor(a.state)};">{a.state}</span>
+				{#if deploy.artifacts.length === 0}
+					<div class="k-mono ext">
+						no artifacts tracked — Kontinuance runs no artifact registry (publishing is a pipeline step);
+						a registry/artifact index is external.
 					</div>
-				{/each}
+				{:else}
+					{#each deploy.artifacts as a (a.name)}
+						<div class="artifact">
+							<span class="k-mono kind" style="color:{stateColor(a.state)};">{a.kind}</span>
+							<span class="k-mono aname">{a.name}</span>
+							<span class="k-mono digest">{a.digest}</span>
+							<span class="k-mono astate" style="color:{stateColor(a.state)};">{a.state}</span>
+						</div>
+					{/each}
+				{/if}
 			</div>
 			<div class="card env">
-				<div class="k-mono label">STAGE ENVIRONMENT</div>
+				<div class="k-mono label">DELIVERY</div>
 				<div class="stats">
 					<div class="stat">
 						<div class="big" style="color:{stateColor(deploy.environment.health)};">
 							{deploy.environment.podsReady}
 						</div>
-						<div class="k-mono slabel">PODS READY</div>
+						<div class="k-mono slabel">STAGES DONE</div>
 					</div>
 					<div class="stat">
 						<div class="big">{deploy.environment.syncRevision}</div>
-						<div class="k-mono slabel">SYNC REVISION</div>
+						<div class="k-mono slabel">COMMIT</div>
 					</div>
 					<div class="stat">
 						<div class="big" style="color:{stateColor(deploy.environment.health)};">
 							{deploy.environment.health}
 						</div>
-						<div class="k-mono slabel">APP HEALTH</div>
+						<div class="k-mono slabel">STATE</div>
 					</div>
 				</div>
 				<div class="k-mono emeta">{deploy.environment.meta}</div>
@@ -226,6 +237,11 @@
 		padding: 40px 16px;
 		text-align: center;
 		font-size: 11px;
+		color: var(--k-muted-4);
+	}
+	.ext {
+		font-size: 10.5px;
+		line-height: 1.7;
 		color: var(--k-muted-4);
 	}
 	.err {

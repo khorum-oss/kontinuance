@@ -278,17 +278,22 @@ test.describe('coverage screen', () => {
 });
 
 test.describe('deploy screen', () => {
-	test('renders the promotion nodes, artifact manifest, and environment', async ({ page }) => {
+	test('renders the run-derived promotion flow, honest empty manifest, and delivery state', async ({ page }) => {
 		await mockApi(page);
 		await mockDeploy(page);
 		await page.goto('/deploy');
 		await enterApp(page);
 
+		// SOURCE node + a node per real stage
 		await expect(page.getByText('SOURCE')).toBeVisible();
+		await expect(page.getByText('TEST', { exact: true })).toBeVisible();
+		// no artifact registry — honest empty manifest
 		await expect(page.getByText('ARTIFACT MANIFEST')).toBeVisible();
-		await expect(page.getByText('kontinuance-core-1.4.2.jar')).toBeVisible();
-		await expect(page.getByText('STAGE ENVIRONMENT')).toBeVisible();
-		await expect(page.getByText('PODS READY')).toBeVisible();
+		await expect(page.getByText(/no artifacts tracked/)).toBeVisible();
+		// real delivery state (stages done / commit / state)
+		await expect(page.getByText('DELIVERY', { exact: true })).toBeVisible();
+		await expect(page.getByText('STAGES DONE')).toBeVisible();
+		await expect(page.getByText(/not tracked by Kontinuance/)).toBeVisible();
 	});
 });
 

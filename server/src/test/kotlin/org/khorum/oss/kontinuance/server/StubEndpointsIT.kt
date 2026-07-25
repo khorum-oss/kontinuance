@@ -41,13 +41,6 @@ class StubEndpointsIT(
     }
 
     @Test
-    fun `deploy stub returns nodes, artifacts, and environment`() {
-        val json = body("/api/deploy")
-        assertTrue(json.contains("\"nodes\":[") && json.contains("\"artifacts\":["))
-        assertTrue(json.contains("\"environment\":{") && json.contains("\"podsReady\""))
-    }
-
-    @Test
     fun `coverage stub is kover-shaped with modules`() {
         val json = body("/api/coverage")
         assertTrue(json.contains("\"tool\":\"kover\""))
