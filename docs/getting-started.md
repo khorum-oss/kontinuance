@@ -79,7 +79,9 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
 4. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
-   lines the pipeline produced — and refreshes while the run is still active. When a run reaches a
+   lines the pipeline produced — as a **live tail** (023): each line streams in over
+   `GET /api/runs/{id}/logs/stream` (Server-Sent Events) as it is recorded, and the stream ends when the run
+   is terminal. When a run reaches a
    manual-approval step it pauses (`WaitingOnApproval`, shown amber); click **APPROVE** to continue it or
    **REJECT** to end it. Approval is durable — it works from the persisted run, so it survives a restart.
 5. **Explore the screens** from the sidebar: **Pipeline** (stage/task flow of a run), **Coverage** (the

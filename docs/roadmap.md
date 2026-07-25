@@ -78,8 +78,9 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    a cold `RunStream` Flow (initial snapshot + polled updates, blocking read offloaded) fanned out to both
    transports. This layer unlocks the UI, gives 003 a home for its status reporting, and carries remote
    approval actions. **Design the remaining API contract *from* the finished UI** (the maintainer's
-   screenshots). *Next here:* streamed step **logs** (vs. run-status records) and a push/DB-notify source
-   behind the same `RunStream` seam to replace polling. **Design the API contract *from* the finished UI.**
+   screenshots). *Done here:* a per-run **live SSE log-tail** (`GET /api/runs/{id}/logs/stream`, 023) beside
+   the run stream. *Next here:* a push/DB-notify source behind the same `RunStream` seam to replace polling.
+   **Design the API contract *from* the finished UI.**
 5. **Web UI** *(009 — ✅ built)* — SvelteKit + Storybook "mission control" dashboard (`web/`) against the
    (4) API. The **Observe UI** is done (read-only): sign-in shell, runs list, live status over SSE, run
    detail, and pipeline/deploy/coverage/config screens (the last four on additive server stubs). The
@@ -105,7 +106,8 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 history, serves it from a real Spring Boot 4.1 (WebFlux + coroutine) app with live SSE updates, and now
 has a **SvelteKit observe dashboard** over all of it. The **Control UI** is what remains: make the
 forward-looking screens real. Done since: **write endpoints** (manual trigger + approve/promote behind the
-`WaitingOnApproval` FSM, features 010/011) and **real step logs** (018 — the run detail shows the run's
-recorded masked output, refreshed while active). Remaining: **real data sources** for the pipeline/deploy
-stubs, a live **SSE/WebSocket log-tail** to push lines as they occur (018 records + polls today), and a
-push/DB-notify source to retire polling behind the `RunStream` seam.
+`WaitingOnApproval` FSM, features 010/011), **real step logs** (018 — the run detail shows the run's
+recorded masked output), and a **live SSE log-tail** (023 — `GET /api/runs/{id}/logs/stream` pushes each
+recorded line as it lands and ends when the run is terminal, replacing the run-detail view's interval
+polling). Remaining: **real data sources** for the remaining stubs, and a push/DB-notify source to retire
+polling behind the `RunStream` seam.
