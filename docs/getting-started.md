@@ -89,6 +89,12 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as
    external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster).
 
+> **Live updates (025):** the runs list and the run log-tail stream over SSE. By default the server
+> re-reads on a timer (`kontinuance.stream.mode=poll`). Set `kontinuance.stream.mode=push` to have
+> in-process writes (a run you trigger, a log line) wake the streams **immediately** — the poll interval
+> (`kontinuance.stream.poll-interval-ms`, default `1000`) is kept as a fallback so runs written by a
+> separate process are still picked up. Poll stays the default and remains selectable.
+
 ---
 
 ## Where the code comes from
