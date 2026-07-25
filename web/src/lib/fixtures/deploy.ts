@@ -1,21 +1,19 @@
 import type { Config, Deploy } from '$lib/api/types';
 
+// Run-derived delivery view (022): a SOURCE node + a node per the run's real stages; no artifact
+// registry (external), and the environment is the run's real stage-completion / commit / state.
 export const sampleDeploy: Deploy = {
 	nodes: [
-		{ id: 'build', label: 'SOURCE', title: 'kontinuance-service', status: 'synced', meta: 'commit a3f19c2\nbuilt 1.4.2' },
-		{ id: 'stage', label: 'STAGE', title: 'argocd / kontinuance-stage', status: 'progressing', meta: 'sync 1.4.2 → live\nrollout 2/3' },
-		{ id: 'prod', label: 'PROD', title: 'manual promotion gate', status: 'pending', meta: 'promotes by digest\nawaiting approval' }
+		{ id: 'source', label: 'SOURCE', title: 'khorum-oss/kontinuance', status: 'synced', meta: 'commit a3f19c2\ntrigger manual' },
+		{ id: 'stage-0', label: 'BUILD', title: '1 step', status: 'synced', meta: 'assemble — synced' },
+		{ id: 'stage-1', label: 'TEST', title: '1 step', status: 'failed', meta: 'unit — failed' }
 	],
-	artifacts: [
-		{ kind: 'JAR', name: 'kontinuance-core-1.4.2.jar', digest: 'sha256:8c1e42aa', state: 'published' },
-		{ kind: 'JAR', name: 'kontinuance-api-1.4.2.jar', digest: 'sha256:5b90d17c', state: 'published' },
-		{ kind: 'OCI', name: 'kontinuance:1.4.2', digest: 'sha256:8c1e42aa', state: 'pushed' }
-	],
+	artifacts: [],
 	environment: {
-		podsReady: '2/3',
-		syncRevision: '1.4.2',
-		health: 'Progressing',
-		meta: 'namespace kontinuance-stage\nargocd auto-sync on'
+		podsReady: '1/2',
+		syncRevision: 'a3f19c2',
+		health: 'FAILED',
+		meta: 'Registry & ArgoCD sync are external — not tracked by Kontinuance. This view derives from the latest run.'
 	}
 };
 
