@@ -55,20 +55,23 @@ interface PipelineEngine {
          * the v0 [RunStepExecutor] for `RunStep`, the typed [GradleStepExecutor], [DockerStepExecutor],
          * and [NpmStepExecutor], and the [ApprovalStepExecutor] for manual gates — the last backed by
          * [approvalGate], which defaults to [AutoApprovingGate] so non-interactive hosts still run
-         * gated pipelines to completion.
+         * gated pipelines to completion. [sandbox] is the runner backend shared by every process
+         * executor; it defaults to [DockerStepSandbox], which runs a step inside a container when it
+         * names an image (`Step.image`) and on the host otherwise.
          */
         fun default(
             sink: LogSink = StdoutLogSink(),
+            sandbox: StepSandbox = DockerStepSandbox(),
             approvalGate: ApprovalGate = AutoApprovingGate,
         ): PipelineEngine =
             DefaultPipelineEngine(
                 registry = StepExecutorRegistry(
                     listOf(
-                        RunStepExecutor(),
-                        GradleStepExecutor(),
-                        DockerStepExecutor(),
-                        NpmStepExecutor(),
-                        GitStepExecutor(),
+                        RunStepExecutor(sandbox = sandbox),
+                        GradleStepExecutor(sandbox),
+                        DockerStepExecutor(sandbox),
+                        NpmStepExecutor(sandbox),
+                        GitStepExecutor(sandbox),
                         ApprovalStepExecutor(approvalGate),
                     ),
                 ),

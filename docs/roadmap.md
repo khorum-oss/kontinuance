@@ -91,7 +91,11 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    control surface drives it.
 7. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
    `UAT`→**euri** (Playwright), each a `StepExecutor` plugin.
-8. **Runner isolation** (Docker/k8s) — overview v1 item; when parallel/multi-tenant runs matter.
+8. **Runner isolation** (Docker/k8s) *(024 — ✅ Docker MVP)* — a step may declare `image:` and its
+   command runs **inside** that container (workspace bind-mounted, secrets forwarded by name only) via a
+   `StepSandbox` seam, instead of on the host; unset steps run on the host unchanged. The real container run
+   needs a Docker daemon (validated in CI / on real hosts). A Kubernetes backend, UID mapping, and network/
+   pull policy are the remaining slices behind the same seam.
 
 ## Cross-repo artifacts (today)
 
@@ -109,5 +113,7 @@ forward-looking screens real. Done since: **write endpoints** (manual trigger + 
 `WaitingOnApproval` FSM, features 010/011), **real step logs** (018 — the run detail shows the run's
 recorded masked output), and a **live SSE log-tail** (023 — `GET /api/runs/{id}/logs/stream` pushes each
 recorded line as it lands and ends when the run is terminal, replacing the run-detail view's interval
-polling). Remaining: **real data sources** for the remaining stubs, and a push/DB-notify source to retire
-polling behind the `RunStream` seam.
+polling), and **Docker runner isolation** (024 — a step's `image:` runs its command inside that container
+via the `StepSandbox` seam, workspace mounted, host steps unchanged). Remaining: **real data sources** for
+the remaining stubs, a push/DB-notify source to retire polling behind the `RunStream` seam, and the
+Kubernetes runner backend behind the `StepSandbox` seam.

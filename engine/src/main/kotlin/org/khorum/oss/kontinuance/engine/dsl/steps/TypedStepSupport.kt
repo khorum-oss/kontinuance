@@ -21,4 +21,5 @@ internal fun StepDslBuilder.configureStep(
         secrets { options.secrets.forEach { add(SecretRef(it)) } }
     }
     this.workingDirHint = options.workingDir
+    this.image = options.image
 }

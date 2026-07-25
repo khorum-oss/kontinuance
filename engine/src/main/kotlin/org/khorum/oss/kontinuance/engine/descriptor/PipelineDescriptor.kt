@@ -35,7 +35,8 @@ object PipelineDescriptor {
     private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
     private val STAGE_KEYS = setOf("name", "steps")
     private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
-    private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir") + DEFINITION_KEYS
+    // `image` here is a STEP-level runner image (isolation) — distinct from the nested docker.run `image`.
+    private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir", "image") + DEFINITION_KEYS
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
     private val DOCKER_KEYS = setOf("run", "build")
     private val DOCKER_RUN_KEYS = setOf("image", "command", "env", "volumes")
@@ -86,6 +87,7 @@ object PipelineDescriptor {
         val secrets = asListOrEmpty(map["secrets"], "$path.secrets")
             .mapIndexed { i, s -> SecretRef(asString(s, "$path.secrets[$i]")) }
         val workingDir = map["workingDir"]?.let { asString(it, "$path.workingDir") }
+        val image = map["image"]?.let { asString(it, "$path.image") }
         return construct(path) {
             Step(
                 name = name,
@@ -94,6 +96,7 @@ object PipelineDescriptor {
                 condition = condition,
                 secrets = secrets,
                 workingDirHint = workingDir,
+                image = image,
             )
         }
     }

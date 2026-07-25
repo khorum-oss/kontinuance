@@ -1,6 +1,8 @@
 package org.khorum.oss.kontinuance.engine.execution.steps
 
+import org.khorum.oss.kontinuance.engine.execution.DockerStepSandbox
 import org.khorum.oss.kontinuance.engine.execution.ProcessStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.StepSandbox
 import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.Step
 import org.khorum.oss.kontinuance.engine.model.StepDefinition
@@ -12,7 +14,7 @@ import java.nio.file.Path
  * launch handling), not an exception. The argv is passed directly (no shell), so the URL/ref are not
  * subject to shell interpretation.
  */
-class GitStepExecutor : ProcessStepExecutor() {
+class GitStepExecutor(sandbox: StepSandbox = DockerStepSandbox()) : ProcessStepExecutor(sandbox = sandbox) {
 
     override fun supports(definition: StepDefinition): Boolean = definition is GitStep
 
