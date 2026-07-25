@@ -2,8 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api/client';
+	import { logStream } from '$lib/api/live';
 	import type { Coverage, RunRecord } from '$lib/api/types';
-	import { normalizeStatus } from '$lib/theme/tokens';
 	import RunDetail from '$lib/screens/RunDetail.svelte';
 
 	let run = $state<RunRecord | null>(null);
@@ -16,12 +16,6 @@
 	let decideError = $state<string | null>(null);
 
 	const id = $derived(page.params.id ?? '');
-	// While the run is active its output is still accumulating; the page re-fetches until it is terminal.
-	const active = $derived.by(() => {
-		if (!run) return false;
-		const s = normalizeStatus(run.status);
-		return s === 'running' || s === 'waiting' || s === 'pending';
-	});
 
 	async function load() {
 		loading = true;
@@ -29,7 +23,6 @@
 		notFound = false;
 		try {
 			run = await api.getRun(id);
-			logs = await api.getRunLogs(id).catch(() => []);
 			// coverage is a best-effort sidebar; a failure there must not fail the run view
 			coverage = await api.getCoverage().catch(() => null);
 		} catch (e) {
@@ -37,16 +30,6 @@
 			else error = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
 			loading = false;
-		}
-	}
-
-	// A lightweight refresh used while polling — updates the run + log without the full-screen loading state.
-	async function refresh() {
-		try {
-			run = await api.getRun(id);
-			logs = await api.getRunLogs(id).catch(() => logs);
-		} catch {
-			// keep the last good view; a transient failure shouldn't clobber the screen
 		}
 	}
 
@@ -68,12 +51,18 @@
 		load();
 	});
 
-	// Near-live: while the run is active, re-fetch its log (and status) on a short interval; the effect
-	// tears the interval down as soon as the run reaches a terminal state (active → false).
+	// Live log tail (023): subscribe to the run's SSE log stream; each line arrives as it is recorded and
+	// the server closes the tail with an `end` event once the run is terminal. On that terminal signal we
+	// re-fetch the run so its final status/timing settle. Re-subscribes when the id changes; the store's
+	// teardown closes the EventSource so navigating away stops the tail.
 	$effect(() => {
-		if (!active) return;
-		const timer = setInterval(refresh, 1500);
-		return () => clearInterval(timer);
+		const runId = id;
+		if (!runId) return;
+		const unsubscribe = logStream(runId).subscribe((tail) => {
+			logs = tail.lines;
+			if (tail.done) api.getRun(runId).then((r) => (run = r)).catch(() => {});
+		});
+		return unsubscribe;
 	});
 </script>
 

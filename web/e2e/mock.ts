@@ -48,6 +48,20 @@ export async function mockStream(page: Page, runs = sampleRuns): Promise<void> {
 	);
 }
 
+const logStreamUrl = /\/api\/runs\/[^/?]+\/logs\/stream/;
+
+/** SSE body for the live log tail (023): each line as a `log` event, then a terminal `end` event. */
+function logSseBody(lines: string[]): string {
+	return lines.map((l) => `event: log\ndata: ${l}\n\n`).join('') + 'event: end\ndata: \n\n';
+}
+
+/** Mock the per-run live log tail (`/api/runs/{id}/logs/stream`) to emit `lines` then `end`. */
+export async function mockLogStream(page: Page, lines: string[]): Promise<void> {
+	await page.route(logStreamUrl, (route) =>
+		route.fulfill({ contentType: 'text/event-stream', body: logSseBody(lines) })
+	);
+}
+
 const triggerUrl = /\/api\/runs\/trigger$/;
 
 /** The run a trigger starts; folded into the list once POST /api/runs/trigger has been called. */
@@ -76,6 +90,7 @@ export async function mockApi(page: Page, runs = sampleRuns): Promise<void> {
 	await page.route(/\/api\/runs\/[^/?]+\/logs$/, (route) =>
 		route.fulfill({ json: { runId: 'x', lines: ['[build] compiling', '[test] 12 passed'] } })
 	);
+	await mockLogStream(page, ['[build] compiling', '[test] 12 passed']);
 	await mockStream(page, runs);
 	// Registered after detailUrl (which also matches /api/runs/trigger) so this wins for the POST.
 	await page.route(triggerUrl, (route) => {
@@ -99,6 +114,7 @@ export async function mockWaitingRun(page: Page, id = 'run-approve-1'): Promise<
 	await page.route(/\/api\/runs\/[^/?]+\/logs$/, (route) =>
 		route.fulfill({ json: { runId: 'x', lines: [] } })
 	);
+	await mockLogStream(page, []);
 	await page.route(detailUrl, (route) =>
 		route.fulfill({
 			json: {
