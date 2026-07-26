@@ -93,11 +93,12 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    control surface drives it.
 7. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
    `UAT`→**euri** (Playwright), each a `StepExecutor` plugin.
-8. **Runner isolation** (Docker/k8s) *(024 — ✅ Docker MVP)* — a step may declare `image:` and its
-   command runs **inside** that container (workspace bind-mounted, secrets forwarded by name only) via a
-   `StepSandbox` seam, instead of on the host; unset steps run on the host unchanged. The real container run
-   needs a Docker daemon (validated in CI / on real hosts). A Kubernetes backend, UID mapping, and network/
-   pull policy are the remaining slices behind the same seam.
+8. **Runner isolation** (Docker/k8s) *(024 — ✅ Docker MVP; 030 — ✅ runner options)* — a step may declare
+   `image:` and its command runs **inside** that container (workspace bind-mounted, secrets forwarded by
+   name only) via a `StepSandbox` seam, instead of on the host; unset steps run on the host unchanged. Per-step
+   `runner:` options (030) add `--network`, `--pull`, and `-u` uid mapping (host-owned workspace files),
+   guarded to require an image. The real container run needs a Docker daemon (validated in CI / on real
+   hosts). A **Kubernetes backend** is the remaining slice behind the same seam.
 
 ## Cross-repo artifacts (today)
 

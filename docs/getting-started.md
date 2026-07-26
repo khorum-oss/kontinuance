@@ -118,6 +118,10 @@ Understand the workspace model before you write a real pipeline:
   ```yaml
   - name: "assemble"
     image: "gradle:8.8-jdk21"   # run this step inside the image (omit to run on the host)
+    runner:                     # optional container options (030), only with an image
+      network: "none"           # --network: cut the step off the network
+      pull: "missing"           # --pull: always | missing | never
+      mapUser: true             # run as the host user so workspace files aren't root-owned
     gradle:
       tasks: ["assemble"]
   ```
