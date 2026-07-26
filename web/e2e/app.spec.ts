@@ -4,6 +4,7 @@ import {
 	mockApi,
 	mockApiError,
 	mockAuth,
+	mockCancelableRun,
 	mockConfig,
 	mockCoverage,
 	mockDeploy,
@@ -179,6 +180,18 @@ test.describe('runs screen', () => {
 		await page.getByRole('button', { name: 'APPROVE' }).click();
 		await expect(page.getByText('paused for manual approval')).toHaveCount(0);
 		await expect(page.getByText('Success', { exact: true })).toBeVisible();
+	});
+
+	test('cancels a running run from its detail view', async ({ page }) => {
+		await mockCancelableRun(page);
+		await page.goto('/runs/run-cancel-1');
+		await enterApp(page);
+
+		const cancelBtn = page.getByRole('button', { name: 'CANCEL RUN' });
+		await expect(cancelBtn).toBeVisible();
+		await cancelBtn.click();
+		await expect(page.getByRole('button', { name: 'CANCEL RUN' })).toHaveCount(0);
+		await expect(page.getByText('Cancelled').first()).toBeVisible();
 	});
 
 	test('shows an error state with a retry when the API fails', async ({ page }) => {

@@ -14,6 +14,8 @@
 	let notFound = $state(false);
 	let deciding = $state(false);
 	let decideError = $state<string | null>(null);
+	let cancelling = $state(false);
+	let cancelError = $state<string | null>(null);
 
 	const id = $derived(page.params.id ?? '');
 
@@ -47,6 +49,21 @@
 		}
 	}
 
+	async function cancel() {
+		cancelling = true;
+		cancelError = null;
+		try {
+			await api.cancelRun(id);
+			// The run ends Cancelled once the engine stops the step; refresh now, and the log tail's
+			// terminal signal re-fetches again when the final status settles.
+			run = await api.getRun(id).catch(() => run);
+		} catch (e) {
+			cancelError = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			cancelling = false;
+		}
+	}
+
 	$effect(() => {
 		load();
 	});
@@ -75,8 +92,11 @@
 	{notFound}
 	{deciding}
 	{decideError}
+	{cancelling}
+	{cancelError}
 	onback={() => goto('/')}
 	onretry={load}
 	onapprove={() => decide('approve')}
 	onreject={() => decide('reject')}
+	oncancel={cancel}
 />

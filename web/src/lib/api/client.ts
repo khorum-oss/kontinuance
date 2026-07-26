@@ -36,9 +36,9 @@ async function getJson<T>(path: string): Promise<T> {
 	return (await res.json()) as T;
 }
 
-// POST an action on a run (approve/reject); resolves on 2xx, throws [ApiError] with the server's
+// POST an action on a run (approve/reject/cancel); resolves on 2xx, throws [ApiError] with the server's
 // `error` message otherwise.
-async function postRun(id: string, action: 'approve' | 'reject'): Promise<void> {
+async function postRun(id: string, action: 'approve' | 'reject' | 'cancel'): Promise<void> {
 	let res: Response;
 	try {
 		res = await fetch(`/api/runs/${encodeURIComponent(id)}/${action}`, {
@@ -141,6 +141,10 @@ export const api = {
 	// when no run with that id is currently waiting.
 	approveRun: (id: string) => postRun(id, 'approve'),
 	rejectRun: (id: string) => postRun(id, 'reject'),
+
+	// Requests cancellation of an in-flight run (028). Resolves on 2xx; throws [ApiError] with the server's
+	// message when the run is not running (409) or unknown (404). The run flips to Cancelled shortly after.
+	cancelRun: (id: string) => postRun(id, 'cancel'),
 
 	// forward-looking screens (stub endpoints; see contracts/stub-api.md)
 	getPipeline: (runId: string) => getJson<Pipeline>(`/api/runs/${encodeURIComponent(runId)}/pipeline`),
