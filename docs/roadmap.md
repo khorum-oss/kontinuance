@@ -136,6 +136,9 @@ exclusive with `ref`, fetched-then-checked-out; a project source that looks like
 automatically), and a **read-only GitHub source view** (035 — a `Source` screen + `GET /api/source` that make
 the headless `kontinuance-ci` event source observable: the server reads its config YAML — via the `github`
 module's own parser — and its poll-cursor file, showing the watched repos, cadence, last-processed commit per
-PR/branch, and the runs it triggered; the token env-var name only, never a value). Remaining: a **cross-process**
-notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, descriptor locking, event-source liveness +
-control (start/stop/live checks), and the Kubernetes runner backend behind the `StepSandbox` seam.
+PR/branch, and the runs it triggered; the token env-var name only, never a value), and **event-source
+liveness** (036 — the `kontinuance-ci` CLI writes a heartbeat file after each successful poll; the server
+stamps its age + a stale flag onto `/api/source` and the Source screen shows polling / stale / unknown with
+the time since the last poll and the cycle count). Remaining: a **cross-process** notify (DB `LISTEN`/broker)
+behind the `streamTriggers` seam, descriptor locking, event-source **control** (start/stop/live checks), and
+the Kubernetes runner backend behind the `StepSandbox` seam.

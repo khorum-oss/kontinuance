@@ -340,7 +340,8 @@ const sourceConfigured = {
 	cursors: [
 		{ key: 'khorum-oss/relikquary#pr-42', sha: 'abc123def456' },
 		{ key: 'khorum-oss/relikquary#push-main', sha: '0099aabbccdd' }
-	]
+	],
+	heartbeat: { lastPolledMillis: 1785000000000, ageSeconds: 12, stale: false, cycles: 137 }
 };
 
 /** Serve `GET /api/source`. Defaults to a configured event source; pass `{ configured: false }` for none. */

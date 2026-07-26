@@ -404,6 +404,8 @@ test.describe('source screen', () => {
 		await enterApp(page);
 
 		await expect(page.getByText('GITHUB EVENT SOURCE')).toBeVisible();
+		// liveness heartbeat (036): polling, with the cycle count
+		await expect(page.getByText(/POLLING · last checked .* ago · 137 cycles/)).toBeVisible();
 		// watched repo + its poll cursor
 		await expect(page.getByText('khorum-oss/relikquary', { exact: true }).first()).toBeVisible();
 		await expect(page.getByText('khorum-oss/relikquary#pr-42')).toBeVisible();

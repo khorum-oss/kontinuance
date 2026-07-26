@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.server.github
 
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.khorum.oss.kontinuance.github.health.FileHeartbeat
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -31,6 +32,7 @@ class GitHubSourceControllerIT(
         props.setProperty("khorum-oss/relikquary#pr-42", "abc123def")
         props.setProperty("khorum-oss/relikquary#push-main", "0099aabb")
         Files.newOutputStream(cursorFile).use { props.store(it, "kontinuance github poll cursors") }
+        Files.deleteIfExists(heartbeatFile) // liveness tests write their own; others expect none
     }
 
     @Test
@@ -59,6 +61,41 @@ class GitHubSourceControllerIT(
     }
 
     @Test
+    fun `a fresh heartbeat is reported live with its cycle count`() {
+        FileHeartbeat(heartbeatFile) { System.currentTimeMillis() }.beat()
+
+        client.get().uri("/api/source")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.heartbeat.stale").isEqualTo(false)
+            .jsonPath("$.heartbeat.cycles").isEqualTo(1)
+            .jsonPath("$.heartbeat.ageSeconds").exists()
+    }
+
+    @Test
+    fun `a heartbeat older than the stale threshold is reported stale`() {
+        // poll interval is 30s → stale beyond 3× (90s); 10_000s ago is well past it.
+        FileHeartbeat(heartbeatFile) { System.currentTimeMillis() - 10_000_000L }.beat()
+
+        client.get().uri("/api/source")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.heartbeat.stale").isEqualTo(true)
+    }
+
+    @Test
+    fun `no heartbeat file yields no heartbeat in the response`() {
+        client.get().uri("/api/source")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.configured").isEqualTo(true)
+            .jsonPath("$.heartbeat").doesNotExist()
+    }
+
+    @Test
     fun `answers configured false when no event-source config is present`() {
         Files.deleteIfExists(configFile)
         client.get().uri("/api/source")
@@ -71,6 +108,7 @@ class GitHubSourceControllerIT(
     companion object {
         private val configFile: Path = Files.createTempFile("knt-gh-config-", ".yaml")
         private val cursorFile: Path = Files.createTempFile("knt-gh-cursors-", ".properties")
+        private val heartbeatFile: Path = Files.createTempFile("knt-gh-heartbeat-", ".properties")
 
         private val CONFIG_YAML = """
             eventSource:
@@ -90,6 +128,7 @@ class GitHubSourceControllerIT(
         fun properties(registry: DynamicPropertyRegistry) {
             registry.add("kontinuance.github.config") { configFile.toString() }
             registry.add("kontinuance.github.cursors") { cursorFile.toString() }
+            registry.add("kontinuance.github.heartbeat") { heartbeatFile.toString() }
         }
     }
 }
