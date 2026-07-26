@@ -9,14 +9,17 @@ import {
 	mockCoverage,
 	mockDeploy,
 	mockPipeline,
+	mockProjects,
 	mockStream,
 	mockWaitingRun,
 	sampleRuns
 } from './mock';
 
-// Every test runs against the mocked 016 auth endpoints (enforced by default; sign-in succeeds).
+// Every test runs against the mocked 016 auth endpoints (enforced by default; sign-in succeeds) and the
+// 032 project registry (two seeded projects), so the entry flow can sign in and activate a project.
 test.beforeEach(async ({ page }) => {
 	await mockAuth(page);
+	await mockProjects(page);
 });
 
 test.describe('authentication', () => {
@@ -46,44 +49,59 @@ test.describe('authentication', () => {
 		await enterApp(page);
 
 		await page.getByText('EXIT', { exact: true }).click();
-		// back on the repo workspace (still signed in) — not the credentials screen
-		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
+		// back on the project picker (still signed in) — not the credentials screen
+		await expect(page.getByText('SELECT PROJECT')).toBeVisible();
 		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
-		// and re-entering needs no fresh sign-in — click a repo
+		// and re-entering needs no fresh sign-in — activate a project
 		await page.getByText('kontinuance-service', { exact: true }).click();
 		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();
 	});
 
-	test('the repo workspace filters by provider and adds a repo', async ({ page }) => {
+	test('the project picker lists projects and adds a new one', async ({ page }) => {
 		await mockApi(page);
 		await page.goto('/');
 		await page.getByPlaceholder('username').fill('mkuraja');
 		await page.getByPlaceholder('password').fill('s3cret');
 		await page.getByText('SIGN IN', { exact: true }).click();
 
-		// on the repo workspace: seeded repos are shown
+		// on the project picker: the seeded projects are shown, the active one badged ACTIVE
 		await expect(page.getByText('kontinuance-service', { exact: true })).toBeVisible();
 		await expect(page.getByText('infra-charts', { exact: true })).toBeVisible();
+		await expect(page.getByText('ACTIVE', { exact: true })).toBeVisible();
 
-		// filter to gitlab hides a github-only repo
-		await page.getByLabel('filter gitlab').click();
-		await expect(page.getByText('kontinuance-service', { exact: true })).toHaveCount(0);
-		await expect(page.getByText('infra-charts', { exact: true })).toBeVisible();
-		await page.getByLabel('filter all').click();
+		// add a project (name + descriptor, validated server-side) → it appears in the list
+		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
+		await page.getByPlaceholder(/project name/).fill('billing-api');
+		await page
+			.getByLabel('descriptor source')
+			.fill('pipeline:\n  name: "billing-api"\n  stages: []');
+		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
+		await expect(page.getByText('billing-api', { exact: true })).toBeVisible();
+	});
 
-		// add a repo → it appears at the top of the list
-		await page.getByRole('button', { name: '+ ADD REPO', exact: true }).click();
-		await page.getByPlaceholder(/org\/repo/).fill('you/brand-new-app');
-		await page.getByRole('button', { name: 'ADD REPO', exact: true }).click();
-		await expect(page.getByText('brand-new-app', { exact: true })).toBeVisible();
+	test('a project with an invalid descriptor is rejected inline', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('mkuraja');
+		await page.getByPlaceholder('password').fill('s3cret');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
+		await page.getByPlaceholder(/project name/).fill('bad-one');
+		await page.getByLabel('descriptor source').fill('BROKEN: not a pipeline');
+		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
+
+		// the server's parser message shows inline and the project is not added
+		await expect(page.getByRole('alert')).toHaveText('invalid descriptor');
+		await expect(page.getByText('bad-one', { exact: true })).toHaveCount(0);
 	});
 
 	test('open mode skips sign-in entirely', async ({ page }) => {
 		await mockAuth(page, { authRequired: false });
 		await mockApi(page);
 		await page.goto('/');
-		// no credentials prompt — straight to the repo workspace
-		await expect(page.getByText('SELECT REPO SETUP')).toBeVisible();
+		// no credentials prompt — straight to the project picker
+		await expect(page.getByText('SELECT PROJECT')).toBeVisible();
 		await expect(page.getByText('OPERATOR CREDENTIALS')).toHaveCount(0);
 		await page.getByText('kontinuance-service', { exact: true }).click();
 		await expect(page.getByText('ALL SYSTEMS NOMINAL')).toBeVisible();

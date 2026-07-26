@@ -7,6 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.khorum.oss.kontinuance.server.projects.ProjectStore
 import org.khorum.oss.kontinuance.server.stub.StubFixtures
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -29,6 +30,7 @@ import java.nio.file.Path
  */
 @RestController
 class ConfigController(
+    private val projects: ProjectStore,
     @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
@@ -44,8 +46,12 @@ class ConfigController(
         val text = parseText(requestBody)
             ?: return error(HttpStatus.BAD_REQUEST, "malformed request body — expected {\"text\": …}")
         return when (val result = withContext(Dispatchers.IO) { DescriptorConfigWriter.write(descriptor, text) }) {
-            is DescriptorConfigWriter.Result.Written ->
+            is DescriptorConfigWriter.Result.Written -> {
+                // Keep the active project's snapshot in sync with the edit (032), so switching projects and
+                // back preserves it rather than reverting to the stored copy.
+                withContext(Dispatchers.IO) { projects.activeName()?.let { projects.save(it, text) } }
                 ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result.json.toByteArray())
+            }
             is DescriptorConfigWriter.Result.Invalid ->
                 error(HttpStatus.BAD_REQUEST, result.message)
         }

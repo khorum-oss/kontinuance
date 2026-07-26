@@ -128,6 +128,16 @@ export interface Coverage {
 	modules: CoverageModule[];
 }
 
+// A named pipeline descriptor the server stores and can run (032). `active` marks the one in effect.
+export interface Project {
+	name: string;
+	active: boolean;
+}
+export interface ProjectsResponse {
+	active: string | null;
+	projects: Project[];
+}
+
 export interface PlanSummary {
 	stages: number;
 	tasks: number;
