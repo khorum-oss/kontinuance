@@ -87,9 +87,9 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    included). When a project has a source, a run of it checks out that repo/branch: the source **overrides**
    the descriptor's `git:` step, or, when the descriptor has no checkout, a checkout of the source is added
    ahead of the pipeline — so you point a project at a repo in the UI instead of hand-editing the descriptor.
-   The branch maps to the engine's branch/tag `ref` (an arbitrary commit SHA is not yet supported). A project
-   with no source runs the descriptor exactly as written, and a project-triggered run records its repo in the
-   runs list.
+   The source value can be a **branch, a tag, or an exact commit SHA** (034 — a hex value of 7–40 chars is
+   fetched and checked out as that commit; anything else is a branch/tag). A project with no source runs the
+   descriptor exactly as written, and a project-triggered run records its repo in the runs list.
 4. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
 5. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
@@ -145,7 +145,8 @@ Understand the workspace model before you write a real pipeline:
   - name: "checkout"
     git:
       url: "https://github.com/you/your-repo"
-      ref: "main"              # optional branch/tag
+      ref: "main"              # optional branch/tag …
+      # sha: "a3f19c2"         # … or pin an exact commit (034); ref and sha are mutually exclusive
       # dir: "."               # optional target sub-dir (default: the workspace root)
     secrets: ["GIT_TOKEN"]     # for a private repo, referenced from the environment
   ```
@@ -162,7 +163,7 @@ sandbox/run.sh   # checkout → gradle assemble → tests, streaming the real lo
 ```
 
 It's a self-contained, offline, zero-dependency app that Kontinuance treats like any external repo. (Checkout
-supports branch/tag refs today; arbitrary commit SHAs are a follow-up.)
+supports a branch/tag `ref` or an exact commit `sha` (034).)
 
 ## Authoring a pipeline
 
@@ -216,14 +217,14 @@ config surface are in [running.md](./running.md); runnable examples are in
 Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, roughly by area:
 
 **Source & workspace**
-- Checkout supports **branch/tag refs** (shallow clone); an arbitrary commit **SHA** is a follow-up.
+- Checkout supports a **branch/tag `ref`** (shallow clone) **or an exact commit `sha`** (034 — fetched and
+  checked out by id); the two are mutually exclusive.
 - The workspace lives for one run; a run **resumed after an approval gate** starts with a fresh (empty)
   workspace, so a checkout done *before* the gate isn't restored — keep post-gate steps self-sufficient.
   Persisting a workspace across a gate is a follow-up.
-- Choosing **which project (descriptor) to run** is real (032), and a project now carries a **repo + branch
-  source** (033) that drives the run's checkout — set/edited in the UI, overriding the descriptor's `git:`
-  step (or adding a checkout when it has none). A branch maps to the engine's branch/tag `ref`; an arbitrary
-  commit **SHA** is still a follow-up (015).
+- Choosing **which project (descriptor) to run** is real (032), and a project carries a **repo + source
+  ref** (033/034) that drives the run's checkout — set/edited in the UI, overriding the descriptor's `git:`
+  step (or adding a checkout when it has none). The source value can be a branch, tag, or exact commit SHA.
 
 **Auth & session**
 - **Authentication is real, opt-in, and wired end to end.** Set `KONTINUANCE_AUTH_USERNAME` /

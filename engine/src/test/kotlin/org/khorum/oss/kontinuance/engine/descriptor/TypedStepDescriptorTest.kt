@@ -70,6 +70,24 @@ class TypedStepDescriptorTest {
     }
 
     @Test
+    fun `the git key accepts an exact commit sha`() {
+        val yaml = oneStep(
+            "name: \"checkout\"",
+            "git: { url: \"https://example.com/repo.git\", sha: \"abc1234\" }",
+        )
+        assertEquals(GitStep(url = "https://example.com/repo.git", sha = "abc1234"), definitionOf(yaml))
+    }
+
+    @Test
+    fun `a git step declaring both ref and sha is rejected`() {
+        val yaml = oneStep(
+            "name: \"checkout\"",
+            "git: { url: \"https://example.com/repo.git\", ref: \"main\", sha: \"abc1234\" }",
+        )
+        assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
+    }
+
+    @Test
     fun `docker declaring both run and build is rejected`() {
         val yaml = oneStep("name: \"x\"", "docker: { run: { image: \"a\", command: [\"b\"] }, build: {} }")
         assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }

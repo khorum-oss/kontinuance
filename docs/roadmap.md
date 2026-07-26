@@ -130,6 +130,8 @@ server stores named descriptors ("projects") at `/api/projects`, the entry scree
 and activating one repoints the live descriptor so the trigger and Config screen run it; editing the
 descriptor keeps the active project's snapshot in sync), and a **per-project source** (033 — a project
 carries a repo + branch, set/edited in the UI, that drives the run's checkout: it overrides the descriptor's
-first `git:` step or synthesizes a checkout when there is none, and stamps the repo on the run). Remaining: a
-**cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, an arbitrary-commit-SHA
-checkout and descriptor locking, and the Kubernetes runner backend behind the `StepSandbox` seam.
+first `git:` step or synthesizes a checkout when there is none, and stamps the repo on the run), and
+**commit-SHA checkout** (034 — a `git:` step or project source may pin an exact commit `sha`, mutually
+exclusive with `ref`, fetched-then-checked-out; a project source that looks like a SHA routes there
+automatically). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam,
+descriptor locking, and the Kubernetes runner backend behind the `StepSandbox` seam.
