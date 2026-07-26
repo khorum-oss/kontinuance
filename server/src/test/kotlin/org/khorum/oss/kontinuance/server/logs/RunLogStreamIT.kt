@@ -13,7 +13,10 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.test.web.reactive.server.WebTestClient
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient
+import java.net.URI
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -68,5 +71,19 @@ class RunLogStreamIT(
         assertNotNull(payloads)
         assertTrue(payloads.any { it.contains("compiling") }, "tail includes the first recorded line")
         assertTrue(payloads.any { it.contains("12 passed") }, "tail includes the later recorded line")
+    }
+
+    @Test
+    fun `WebSocket tails the recorded lines as text frames and closes when terminal`() {
+        val frames = CopyOnWriteArrayList<String>()
+        val client = ReactorNettyWebSocketClient()
+        // The seeded run is terminal, so the log flow completes and the server closes the socket, which
+        // completes receive() — collecting all frames before the block() returns.
+        client.execute(URI("ws://localhost:$port/ws/runs/run-1/logs")) { session ->
+            session.receive().map { it.payloadAsText }.doOnNext { frames.add(it) }.then()
+        }.block(Duration.ofSeconds(10))
+
+        assertTrue(frames.any { it.contains("compiling") }, "a frame carries the first recorded line")
+        assertTrue(frames.any { it.contains("12 passed") }, "a frame carries the later recorded line")
     }
 }
