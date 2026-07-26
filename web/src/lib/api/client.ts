@@ -177,10 +177,17 @@ export const api = {
 	// The named pipeline descriptors ("projects", 032) and which is active.
 	getProjects: () => getJson<ProjectsResponse>('/api/projects'),
 
-	// Registers a new project from a name + descriptor text; the server validates the descriptor and rejects
-	// a bad name / duplicate / unparseable text with [ApiError] (400 / 409) carrying its message.
-	addProject: async (name: string, text: string): Promise<void> => {
-		await postJson('/api/projects', { name, text });
+	// Registers a new project from a name + descriptor text (and an optional source repo/branch, 033); the
+	// server validates the descriptor and rejects a bad name / duplicate / unparseable text with [ApiError]
+	// (400 / 409) carrying its message.
+	addProject: async (name: string, text: string, repo?: string, branch?: string): Promise<void> => {
+		await postJson('/api/projects', { name, text, repo, branch });
+	},
+
+	// Sets/updates a project's source (033) — the repo/branch a run of it checks out; a blank repo clears it.
+	// Throws [ApiError] (404) when the project is unknown.
+	setProjectSource: async (name: string, repo: string, branch: string): Promise<void> => {
+		await postJson(`/api/projects/${encodeURIComponent(name)}/source`, { repo, branch });
 	},
 
 	// Makes a project active: the server points its live descriptor at it (so trigger + config use it).

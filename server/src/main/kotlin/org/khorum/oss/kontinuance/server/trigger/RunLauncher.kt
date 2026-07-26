@@ -36,6 +36,7 @@ class RunLauncher(
         pipeline: Pipeline,
         startedAt: Instant,
         completedStages: List<StageRun> = emptyList(),
+        repo: String? = null,
     ) {
         scope.launch {
             val record = runCatching {
@@ -48,7 +49,8 @@ class RunLauncher(
                         logSink = RecordingLogSink(id, logStore),
                         runId = RunId(id),
                     )
-                    RunRecord.from(run, Instant.now(), trigger = "manual").copy(id = id)
+                    // Carry the active project's repo (033) onto the terminal record so the runs list shows it.
+                    RunRecord.from(run, Instant.now(), trigger = "manual").copy(id = id, repo = repo)
                 }
             }.getOrElse {
                 RunRecord(
@@ -58,6 +60,7 @@ class RunLauncher(
                     reason = it.message,
                     startedAt = startedAt,
                     endedAt = Instant.now(),
+                    repo = repo,
                     trigger = "manual",
                 )
             }

@@ -128,6 +128,8 @@ runs-list stream), **per-step runner options** (030 — `--network`/`--pull`/`-u
 closing the last fake-data gap in the dashboard), and a **real entry-screen project picker** (032 — the
 server stores named descriptors ("projects") at `/api/projects`, the entry screen lists/adds/activates them,
 and activating one repoints the live descriptor so the trigger and Config screen run it; editing the
-descriptor keeps the active project's snapshot in sync). Remaining: a **cross-process** notify (DB
-`LISTEN`/broker) behind the `streamTriggers` seam, a per-project repo/branch field and descriptor locking,
-and the Kubernetes runner backend behind the `StepSandbox` seam.
+descriptor keeps the active project's snapshot in sync), and a **per-project source** (033 — a project
+carries a repo + branch, set/edited in the UI, that drives the run's checkout: it overrides the descriptor's
+first `git:` step or synthesizes a checkout when there is none, and stamps the repo on the run). Remaining: a
+**cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, an arbitrary-commit-SHA
+checkout and descriptor locking, and the Kubernetes runner backend behind the `StepSandbox` seam.

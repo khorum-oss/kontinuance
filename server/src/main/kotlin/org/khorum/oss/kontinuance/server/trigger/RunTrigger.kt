@@ -3,6 +3,7 @@ package org.khorum.oss.kontinuance.server.trigger
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.projects.ProjectStore
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.nio.file.Files
@@ -21,21 +22,35 @@ import java.util.UUID
 class RunTrigger(
     private val store: RunStore,
     private val launcher: RunLauncher,
+    private val projects: ProjectStore,
     @param:Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 
     fun trigger(): Result {
         if (!Files.isRegularFile(descriptor)) return Result.Rejected("no pipeline descriptor at $descriptor")
-        val pipeline = runCatching { PipelineDescriptor.load(descriptor) }
+        val parsed = runCatching { PipelineDescriptor.load(descriptor) }
             .getOrElse { return Result.Rejected("invalid descriptor: ${it.message}") }
+
+        // Drive the checkout from the active project's source (033): override the descriptor's first `git:`
+        // step (or add a checkout when it has none). A project with no source leaves the pipeline unchanged.
+        val source = projects.activeName()?.let { projects.source(it) }
+        val pipeline = ProjectSourceInjector.apply(parsed, source)
+        val repo = source?.repo?.takeIf { it.isNotBlank() }
 
         val id = "run-" + UUID.randomUUID().toString().substring(0, ID_LEN)
         val startedAt = Instant.now()
         store.record(
-            RunRecord(id = id, pipeline = pipeline.name, status = "Running", startedAt = startedAt, trigger = "manual"),
+            RunRecord(
+                id = id,
+                pipeline = pipeline.name,
+                status = "Running",
+                startedAt = startedAt,
+                repo = repo,
+                trigger = "manual",
+            ),
         )
-        launcher.launch(id, pipeline, startedAt)
+        launcher.launch(id, pipeline, startedAt, repo = repo)
         return Result.Accepted(id)
     }
 

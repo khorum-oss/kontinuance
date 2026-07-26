@@ -82,9 +82,17 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    without ending your session, and **SIGN OUT** (on this screen, when auth is enforced) ends the session and
    returns to sign-in. On a fresh server that already has a descriptor on disk, a `default` project is seeded
    from it the first time you open this view, so there is always one to select.
-3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
+3. **Give a project a source (033).** A project can carry a **repo + branch** — set them when adding a project,
+   or edit them on any existing project via **SET SOURCE** / **EDIT SOURCE** on its card (the seeded `default`
+   included). When a project has a source, a run of it checks out that repo/branch: the source **overrides**
+   the descriptor's `git:` step, or, when the descriptor has no checkout, a checkout of the source is added
+   ahead of the pipeline — so you point a project at a repo in the UI instead of hand-editing the descriptor.
+   The branch maps to the engine's branch/tag `ref` (an arbitrary commit SHA is not yet supported). A project
+   with no source runs the descriptor exactly as written, and a project-triggered run records its repo in the
+   runs list.
+4. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
-4. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
+5. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
    lines the pipeline produced — as a **live tail** (023): each line streams in over
    `GET /api/runs/{id}/logs/stream` (Server-Sent Events) as it is recorded, and the stream ends when the run
    is terminal. A socket client can tail the same lines over **WebSocket** at `/ws/runs/{id}/logs` (029),
@@ -212,9 +220,10 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 - The workspace lives for one run; a run **resumed after an approval gate** starts with a fresh (empty)
   workspace, so a checkout done *before* the gate isn't restored — keep post-gate steps self-sufficient.
   Persisting a workspace across a gate is a follow-up.
-- Choosing **which project (descriptor) to run** is now real (032 — see UI below); the repo *checkout*
-  itself still lives in each descriptor's `git:` step (a per-project repo/branch field in the UI is a
-  follow-up).
+- Choosing **which project (descriptor) to run** is real (032), and a project now carries a **repo + branch
+  source** (033) that drives the run's checkout — set/edited in the UI, overriding the descriptor's `git:`
+  step (or adding a checkout when it has none). A branch maps to the engine's branch/tag `ref`; an arbitrary
+  commit **SHA** is still a follow-up (015).
 
 **Auth & session**
 - **Authentication is real, opt-in, and wired end to end.** Set `KONTINUANCE_AUTH_USERNAME` /
@@ -229,9 +238,10 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 **UI**
 - **Light & dark themes with a brightness control** — toggle from the top bar; the choice follows your OS
   preference by default and is remembered per browser.
-- **The entry screen is a real project picker (032).** It lists the named descriptors ("projects") the
-  server stores, adds one (name + descriptor, validated by the engine parser), and activates one on click —
-  repointing the live descriptor at it. *Planned: a per-project repo/branch field and richer project metadata.*
+- **The entry screen is a real project picker (032/033).** It lists the named descriptors ("projects") the
+  server stores, adds one (name + descriptor, validated by the engine parser), sets/edits each project's
+  **source** (repo + branch) inline, and activates one on click — repointing the live descriptor at it and
+  driving the checkout from the source. *Planned: richer project metadata and descriptor locking.*
 
 **Pipeline configuration**
 - **Edit `kontinuance.yml` in the UI (027).** The **Config** screen is editable: click **EDIT**, change the

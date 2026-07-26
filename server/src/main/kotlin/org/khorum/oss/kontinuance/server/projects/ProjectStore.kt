@@ -1,7 +1,13 @@
 package org.khorum.oss.kontinuance.server.projects
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -32,31 +38,60 @@ class ProjectStore(private val dir: Path) {
                 .toList()
         }
 
-    fun exists(name: String): Boolean = Files.isRegularFile(fileOf(name))
+    fun exists(name: String): Boolean = Files.isRegularFile(resolve(name + SUFFIX))
 
     /** The descriptor text of [name], or `null` if there is no such project. */
-    fun get(name: String): String? = fileOf(name).takeIf { Files.isRegularFile(it) }?.readText()
+    fun get(name: String): String? = resolve(name + SUFFIX).takeIf { Files.isRegularFile(it) }?.readText()
 
     /** Stores (or replaces) [name]'s descriptor [text]. */
     fun save(name: String, text: String) {
-        fileOf(name).writeText(text)
+        resolve(name + SUFFIX).writeText(text)
     }
 
     /** The active project's name, or `null` when none is set. */
     fun activeName(): String? =
-        activeFile().takeIf { Files.isRegularFile(it) }?.readText()?.trim()?.ifEmpty { null }
+        resolve(ACTIVE).takeIf { Files.isRegularFile(it) }?.readText()?.trim()?.ifEmpty { null }
 
     /** Marks [name] the active project. */
     fun setActive(name: String) {
-        activeFile().writeText(name)
+        resolve(ACTIVE).writeText(name)
     }
 
-    private fun fileOf(name: String): Path = dir.resolve(name + SUFFIX)
+    /**
+     * [name]'s source (repo/branch, 033), or `null` when it has none. Stored as a `<name>.meta.json`
+     * sidecar; a sidecar without a real repo reads back as `null`.
+     */
+    fun source(name: String): ProjectSource? {
+        val file = resolve(name + SOURCE_SUFFIX).takeIf { Files.isRegularFile(it) } ?: return null
+        val source = runCatching {
+            val obj = Json.parseToJsonElement(file.readText()).jsonObject
+            ProjectSource(
+                repo = obj["repo"]?.jsonPrimitive?.content,
+                branch = obj["branch"]?.jsonPrimitive?.content,
+            )
+        }.getOrNull() ?: return null
+        return source.takeIf { it.hasRepo }
+    }
 
-    private fun activeFile(): Path = dir.resolve(ACTIVE)
+    /** Sets (or, when [source] has no repo, clears) [name]'s source sidecar. */
+    fun saveSource(name: String, source: ProjectSource) {
+        val file = resolve(name + SOURCE_SUFFIX)
+        if (!source.hasRepo) {
+            file.deleteIfExists()
+            return
+        }
+        val json = buildJsonObject {
+            put("repo", source.repo)
+            source.branch?.takeIf { it.isNotBlank() }?.let { put("branch", it) }
+        }.toString()
+        file.writeText(json)
+    }
+
+    private fun resolve(child: String): Path = dir.resolve(child)
 
     companion object {
         const val SUFFIX = ".yml"
+        private const val SOURCE_SUFFIX = ".meta.json"
         private const val ACTIVE = ".active"
 
         /** A safe project name: letters, digits, and `. _ -`, 1–64 chars (never a path). */

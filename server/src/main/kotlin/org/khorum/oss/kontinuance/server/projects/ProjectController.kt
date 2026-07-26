@@ -43,19 +43,24 @@ class ProjectController(
 
     @GetMapping("/api/projects")
     suspend fun list(): ResponseEntity<ByteArray> {
-        withContext(Dispatchers.IO) { seedIfEmpty() }
-        val active = store.activeName()
-        val json = buildJsonObject {
-            put("active", active)
-            putJsonArray("projects") {
-                store.list().forEach { name ->
-                    addJsonObject {
-                        put("name", name)
-                        put("active", name == active)
+        val json = withContext(Dispatchers.IO) {
+            seedIfEmpty()
+            val active = store.activeName()
+            buildJsonObject {
+                put("active", active)
+                putJsonArray("projects") {
+                    store.list().forEach { name ->
+                        val src = store.source(name)
+                        addJsonObject {
+                            put("name", name)
+                            put("active", name == active)
+                            src?.repo?.let { put("repo", it) }
+                            src?.branch?.let { put("branch", it) }
+                        }
                     }
                 }
-            }
-        }.toString()
+            }.toString()
+        }
         return ok(json)
     }
 
@@ -71,8 +76,34 @@ class ProjectController(
         }
         runCatching { PipelineDescriptor.parse(request.text) }
             .getOrElse { return error(HttpStatus.BAD_REQUEST, it.message ?: "invalid descriptor") }
-        withContext(Dispatchers.IO) { store.save(request.name, request.text) }
+        withContext(Dispatchers.IO) {
+            store.save(request.name, request.text)
+            // Persist the optional source (033) alongside the descriptor when a repo was supplied.
+            store.saveSource(request.name, ProjectSource(request.repo, request.branch))
+        }
         return ok(buildJsonObject { put("name", request.name) }.toString())
+    }
+
+    @PostMapping("/api/projects/{name}/source")
+    suspend fun setSource(
+        @PathVariable name: String,
+        @RequestBody(required = false) requestBody: String?,
+    ): ResponseEntity<ByteArray> {
+        if (!store.exists(name)) return error(HttpStatus.NOT_FOUND, "no such project: $name")
+        val obj = runCatching { requestBody?.let { Json.parseToJsonElement(it).jsonObject } }.getOrNull()
+        val repo = obj?.get("repo")?.jsonPrimitive?.content
+        val branch = obj?.get("branch")?.jsonPrimitive?.content
+        val source = ProjectSource(repo, branch)
+        withContext(Dispatchers.IO) { store.saveSource(name, source) }
+        return ok(
+            buildJsonObject {
+                put("name", name)
+                if (source.hasRepo) {
+                    put("repo", source.repo)
+                    source.branch?.takeIf { it.isNotBlank() }?.let { put("branch", it) }
+                }
+            }.toString(),
+        )
     }
 
     @PostMapping("/api/projects/{name}/activate")
@@ -103,7 +134,9 @@ class ProjectController(
             val obj = Json.parseToJsonElement(requestBody).jsonObject
             val name = obj["name"]?.jsonPrimitive?.content
             val text = obj["text"]?.jsonPrimitive?.content
-            if (name != null && text != null) CreateRequest(name, text) else null
+            val repo = obj["repo"]?.jsonPrimitive?.content
+            val branch = obj["branch"]?.jsonPrimitive?.content
+            if (name != null && text != null) CreateRequest(name, text, repo, branch) else null
         }.getOrNull()
     }
 
@@ -115,7 +148,12 @@ class ProjectController(
         return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body)
     }
 
-    private data class CreateRequest(val name: String, val text: String)
+    private data class CreateRequest(
+        val name: String,
+        val text: String,
+        val repo: String? = null,
+        val branch: String? = null,
+    )
 
     private companion object {
         const val DEFAULT = "default"
