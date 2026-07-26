@@ -10,6 +10,7 @@ import org.khorum.oss.kontinuance.engine.model.StepDefinition
 import org.khorum.oss.kontinuance.engine.model.DockerStep
 import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.GradleStep
+import org.khorum.oss.kontinuance.engine.model.HestiaStep
 import org.khorum.oss.kontinuance.engine.model.NpmStep
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
@@ -34,7 +35,8 @@ object PipelineDescriptor {
 
     private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
     private val STAGE_KEYS = setOf("name", "steps")
-    private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
+    private val DEFINITION_KEYS =
+        setOf("run", "gradle", "docker", "npm", "approval", "git", "render", "deploy", "uat")
     // `image` here is a STEP-level runner image (isolation) — distinct from the nested docker.run `image`.
     private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir", "image") + DEFINITION_KEYS
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
@@ -44,6 +46,7 @@ object PipelineDescriptor {
     private val NPM_KEYS = setOf("script", "install")
     private val NPM_INSTALL_KEYS = setOf("clean")
     private val GIT_KEYS = setOf("url", "ref", "dir", "depth")
+    private val HESTIA_KEYS = setOf("args")
 
     /** Reads the descriptor at [path] and parses it into a [Pipeline]. */
     fun load(path: Path): Pipeline = parse(path.readText())
@@ -115,8 +118,21 @@ object PipelineDescriptor {
             "docker" -> parseDocker(asMap(map["docker"], "$path.docker"), "$path.docker")
             "approval" -> ApprovalStep(asString(requireKey(map, "approval", path), "$path.approval"))
             "git" -> parseGit(asMap(map["git"], "$path.git"), "$path.git")
+            "render" -> parseHestia(map["render"], "$path.render") { HestiaStep.render(it) }
+            "deploy" -> parseHestia(map["deploy"], "$path.deploy") { HestiaStep.deploy(it) }
+            "uat" -> parseHestia(map["uat"], "$path.uat") { HestiaStep.uat(it) }
             else -> parseNpm(asMap(map["npm"], "$path.npm"), "$path.npm")
         }
+    }
+
+    /**
+     * A khorum delivery step (`render`/`deploy`/`uat`): `<key>: { args: [ … ] }`. [make] builds the right
+     * [HestiaStep] variant from the pass-through args.
+     */
+    private inline fun parseHestia(raw: Any?, path: String, make: (List<String>) -> StepDefinition): StepDefinition {
+        val map = asMap(raw, path)
+        checkKeys(map, HESTIA_KEYS, path)
+        return make(asStringList(map["args"], "$path.args"))
     }
 
     private fun parseGradle(map: Map<String, Any?>, path: String): StepDefinition {

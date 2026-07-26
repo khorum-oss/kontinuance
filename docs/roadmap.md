@@ -91,8 +91,12 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
 6. **Approval / promotion step** *(010)* — makes the reserved `WaitingOnApproval` state actionable
    (environment promotion + manual approval), replacing today's manual prod pipeline. The UI's
    control surface drives it.
-7. **Typed-step wrappers for the khorum DSLs** — `render`→**zosn**, `deploy`→**logos**,
-   `UAT`→**euri** (Playwright), each a `StepExecutor` plugin.
+7. **Typed-step wrappers for the khorum DSLs** *(026 — ✅ built)* — `render`→**zosn**, `deploy`→**logos**,
+   `UAT`→**euri** (Playwright), as first-class steps: descriptor `render:`/`deploy:`/`uat:` (`{ args: [ … ] }`)
+   and DSL `renderStep`/`deployStep`/`uatStep`, backed by one `HestiaStepExecutor` (`<binary> <subcommand>
+   <args>`), inheriting the shared envelope (secrets/workingDir/timeout/`image` isolation). Tools are host
+   CLIs; `args` is a verbatim pass-through, so the exact flags stay the real tools' — validated on real
+   delivery hosts.
 8. **Runner isolation** (Docker/k8s) *(024 — ✅ Docker MVP)* — a step may declare `image:` and its
    command runs **inside** that container (workspace bind-mounted, secrets forwarded by name only) via a
    `StepSandbox` seam, instead of on the host; unset steps run on the host unchanged. The real container run

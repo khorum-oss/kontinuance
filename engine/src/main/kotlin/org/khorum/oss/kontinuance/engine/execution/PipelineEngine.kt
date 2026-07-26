@@ -7,6 +7,7 @@ import org.khorum.oss.kontinuance.engine.execution.steps.ApprovalStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.DockerStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.GitStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.GradleStepExecutor
+import org.khorum.oss.kontinuance.engine.execution.steps.HestiaStepExecutor
 import org.khorum.oss.kontinuance.engine.execution.steps.NpmStepExecutor
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.Run
@@ -53,7 +54,8 @@ interface PipelineEngine {
         /**
          * The default engine, streaming logs to [sink]. It registers every built-in step executor:
          * the v0 [RunStepExecutor] for `RunStep`, the typed [GradleStepExecutor], [DockerStepExecutor],
-         * and [NpmStepExecutor], and the [ApprovalStepExecutor] for manual gates — the last backed by
+         * [NpmStepExecutor], [GitStepExecutor], and [HestiaStepExecutor] (the khorum
+         * `render`/`deploy`/`uat` delivery tools), and the [ApprovalStepExecutor] for manual gates — the last backed by
          * [approvalGate], which defaults to [AutoApprovingGate] so non-interactive hosts still run
          * gated pipelines to completion. [sandbox] is the runner backend shared by every process
          * executor; it defaults to [DockerStepSandbox], which runs a step inside a container when it
@@ -72,6 +74,7 @@ interface PipelineEngine {
                         DockerStepExecutor(sandbox),
                         NpmStepExecutor(sandbox),
                         GitStepExecutor(sandbox),
+                        HestiaStepExecutor(sandbox),
                         ApprovalStepExecutor(approvalGate),
                     ),
                 ),

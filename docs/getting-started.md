@@ -172,13 +172,17 @@ pipeline:
           approval: "Promote this build to production?"
     - name: "deploy"
       steps:
+        # Typed khorum delivery steps (026): render→zosn, deploy→logos, uat→euri (Playwright).
         - name: "rollout"
-          run: "./deploy.sh"
+          deploy:
+            args: ["--env", "prod"]   # passed through verbatim to `logos deploy`
           secrets: ["DEPLOY_TOKEN"]
 ```
 
 Parser rules (strict — unknown keys are rejected): top-level `pipeline:`; each step declares **exactly
-one** of `run` / `gradle` / `docker` / `npm` / `approval` / `git`; the condition key is `when:`. Pipeline
+one** of `run` / `gradle` / `docker` / `npm` / `git` / `render` / `deploy` / `uat` / `approval`; the
+condition key is `when:`. The delivery steps (`render`/`deploy`/`uat`) take `{ args: [ … ] }` passed
+through to `zosn render` / `logos deploy` / `euri test`. Pipeline
 secrets
 are resolved from the server's environment variables and masked in logs. Full authoring rules and the
 config surface are in [running.md](./running.md); runnable examples are in
