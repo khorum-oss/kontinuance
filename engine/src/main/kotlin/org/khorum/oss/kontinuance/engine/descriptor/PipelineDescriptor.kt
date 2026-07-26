@@ -47,7 +47,7 @@ object PipelineDescriptor {
     private val DOCKER_BUILD_KEYS = setOf("context", "dockerfile", "tags", "buildArgs")
     private val NPM_KEYS = setOf("script", "install")
     private val NPM_INSTALL_KEYS = setOf("clean")
-    private val GIT_KEYS = setOf("url", "ref", "dir", "depth")
+    private val GIT_KEYS = setOf("url", "ref", "sha", "dir", "depth")
 
     /** Reads the descriptor at [path] and parses it into a [Pipeline]. */
     fun load(path: Path): Pipeline = parse(path.readText())
@@ -152,9 +152,10 @@ object PipelineDescriptor {
         checkKeys(map, GIT_KEYS, path)
         val url = asString(requireKey(map, "url", path), "$path.url")
         val ref = map["ref"]?.let { asString(it, "$path.ref") }
+        val sha = map["sha"]?.let { asString(it, "$path.sha") }
         val dir = map["dir"]?.let { asString(it, "$path.dir") } ?: "."
         val depth = map["depth"]?.let { asInt(it, "$path.depth") } ?: 1
-        return construct(path) { GitStep(url = url, ref = ref, dir = dir, depth = depth) }
+        return construct(path) { GitStep(url = url, ref = ref, sha = sha, dir = dir, depth = depth) }
     }
 
     private fun parseDocker(map: Map<String, Any?>, path: String): StepDefinition {

@@ -13,8 +13,11 @@ class GitStepBuilder {
     /** Repository URL to clone (required). */
     var url: String = ""
 
-    /** Optional branch or tag to clone. */
+    /** Optional branch or tag to clone. Mutually exclusive with [sha]. */
     var ref: String? = null
+
+    /** Optional exact commit SHA to check out (034). Mutually exclusive with [ref]. */
+    var sha: String? = null
 
     /** Target sub-directory in the workspace (default `"."`, the workspace root). */
     var dir: String = "."
@@ -22,7 +25,7 @@ class GitStepBuilder {
     /** Shallow clone depth; `null` for a full clone. */
     var depth: Int? = 1
 
-    internal fun build(): GitStep = GitStep(url = url, ref = ref, dir = dir, depth = depth)
+    internal fun build(): GitStep = GitStep(url = url, ref = ref, sha = sha, dir = dir, depth = depth)
 }
 
 /**

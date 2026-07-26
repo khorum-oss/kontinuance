@@ -232,7 +232,7 @@
 						<input
 							class="k-mono field"
 							aria-label="new project branch"
-							placeholder="branch (optional)"
+							placeholder="branch, tag, or commit SHA (optional)"
 							spellcheck="false"
 							bind:value={newBranch}
 						/>
@@ -311,7 +311,7 @@
 										<input
 											class="k-mono field"
 											aria-label="source branch"
-											placeholder="branch (optional)"
+											placeholder="branch, tag, or commit SHA (optional)"
 											spellcheck="false"
 											bind:value={srcBranch}
 										/>

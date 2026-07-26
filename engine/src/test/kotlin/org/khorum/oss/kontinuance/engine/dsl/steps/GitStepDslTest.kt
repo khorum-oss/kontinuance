@@ -42,4 +42,27 @@ class GitStepDslTest {
         assertEquals(expected, fromDsl.stages[0].steps[0].definition)
         assertEquals(fromYaml.stages[0].steps[0].definition, fromDsl.stages[0].steps[0].definition)
     }
+
+    @Test
+    fun `gitStep carries an exact commit sha`() {
+        val fromDsl = pipeline {
+            name = "p"
+            stages {
+                stage {
+                    name = "s"
+                    steps {
+                        gitStep("checkout") {
+                            url = "https://example.com/repo.git"
+                            sha = "abc1234"
+                        }
+                    }
+                }
+            }
+        }
+
+        assertEquals(
+            GitStep(url = "https://example.com/repo.git", sha = "abc1234"),
+            fromDsl.stages[0].steps[0].definition,
+        )
+    }
 }

@@ -81,6 +81,32 @@ class ProjectSourceInjectorTest {
     }
 
     @Test
+    fun `a source value that is a commit sha pins the first git step's sha and clears its ref`() {
+        val out = ProjectSourceInjector.apply(withGit(ref = "main"), ProjectSource("https://example.test/new", "a1b2c3d"))
+        val git = firstGit(out)
+        assertEquals("https://example.test/new", git.url)
+        assertEquals("a1b2c3d", git.sha)
+        assertNull(git.ref)
+    }
+
+    @Test
+    fun `a non-sha source value stays a branch ref and clears any sha`() {
+        val base = Pipeline("demo", listOf(Stage("checkout", listOf(Step("co", GitStep(url = "u", sha = "deadbeef"))))))
+        val out = ProjectSourceInjector.apply(base, ProjectSource("https://example.test/new", "release-2"))
+        val git = firstGit(out)
+        assertEquals("release-2", git.ref)
+        assertNull(git.sha)
+    }
+
+    @Test
+    fun `synthesizes a sha-pinned checkout when the value is a commit sha and there is no git step`() {
+        val out = ProjectSourceInjector.apply(noGit(), ProjectSource("https://example.test/new", "0123abcd"))
+        val git = out.stages.first().steps.first().definition as GitStep
+        assertEquals("0123abcd", git.sha)
+        assertNull(git.ref)
+    }
+
+    @Test
     fun `overrides only the first git step, leaving later checkouts alone`() {
         val p = Pipeline(
             "demo",
