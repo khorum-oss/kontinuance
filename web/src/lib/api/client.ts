@@ -7,6 +7,7 @@ import type {
 	Coverage,
 	Deploy,
 	Pipeline,
+	ProjectsResponse,
 	RunLogs,
 	RunRecord,
 	RunsResponse,
@@ -171,5 +172,40 @@ export const api = {
 			throw new ApiError(body.error ?? `save failed: ${res.status} ${res.statusText}`, res.status);
 		}
 		return body;
+	},
+
+	// The named pipeline descriptors ("projects", 032) and which is active.
+	getProjects: () => getJson<ProjectsResponse>('/api/projects'),
+
+	// Registers a new project from a name + descriptor text; the server validates the descriptor and rejects
+	// a bad name / duplicate / unparseable text with [ApiError] (400 / 409) carrying its message.
+	addProject: async (name: string, text: string): Promise<void> => {
+		await postJson('/api/projects', { name, text });
+	},
+
+	// Makes a project active: the server points its live descriptor at it (so trigger + config use it).
+	activateProject: async (name: string): Promise<void> => {
+		await postJson(`/api/projects/${encodeURIComponent(name)}/activate`);
 	}
 };
+
+// POST optional JSON to [path]; resolves on 2xx, throws [ApiError] with the server's `error` message
+// otherwise. Shared by the project actions (032).
+async function postJson(path: string, body?: unknown): Promise<void> {
+	let res: Response;
+	try {
+		res = await fetch(path, {
+			method: 'POST',
+			headers: body
+				? { 'content-type': 'application/json', accept: 'application/json' }
+				: { accept: 'application/json' },
+			body: body ? JSON.stringify(body) : undefined
+		});
+	} catch (e) {
+		throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+	}
+	if (!res.ok) {
+		const parsed = (await res.json().catch(() => ({}))) as { error?: string };
+		throw new ApiError(parsed.error ?? `request failed: ${res.status} ${res.statusText}`, res.status);
+	}
+}

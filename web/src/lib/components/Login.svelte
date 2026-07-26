@@ -1,37 +1,15 @@
 <script lang="ts">
-	// Entry shell: sign-in step → repo workspace → enter. The sign-in step calls the real server (016):
+	// Entry shell: sign-in step → project picker → enter. The sign-in step calls the real server (016):
 	// SIGN IN posts the credentials; a wrong pair shows an error. When the server is open (or a session
-	// already exists) the layout passes [requireSignIn]=false and this starts on the repo workspace.
+	// already exists) the layout passes [requireSignIn]=false and this starts on the project picker.
 	//
-	// The repo workspace is the first-run repo experience: browse configured/available repo setups, filter
-	// by provider, switch card/list layout, and add a repo (GitHub / GitLab / a git URL). Added repos are
-	// remembered per browser (localStorage) — a real repo-config backend is a later feature; clicking a repo
-	// enters mission control.
+	// The project picker is the first-run setup (032): the named pipeline descriptors ("projects") the
+	// server stores are listed from `/api/projects`; you add one (name + descriptor, validated server-side)
+	// and selecting a project **activates** it — the server points its live descriptor at it, so the trigger
+	// and Config screen use it — then enters mission control.
 	import { onMount, untrack } from 'svelte';
 	import { api, ApiError } from '$lib/api/client';
-
-	type Provider = 'github' | 'gitlab' | 'manual';
-	export interface RepoSetup {
-		name: string;
-		desc: string;
-		prov: Provider;
-		cfg: boolean;
-	}
-
-	const REPOS_KEY = 'knt-repos';
-	const seedRepos: RepoSetup[] = [
-		{ name: 'kontinuance-service', desc: 'gradle · deploys to stage', prov: 'github', cfg: true },
-		{ name: 'legacy-adapter', desc: 'maven · pom bridge · jar publish only', prov: 'github', cfg: true },
-		{ name: 'infra-charts', desc: 'helm · argo app-of-apps · no build phase', prov: 'gitlab', cfg: true },
-		{ name: 'kontinuance-dsl', desc: 'gradle · parser + tokenizer', prov: 'github', cfg: false },
-		{ name: 'registry-proxy', desc: 'gradle · artifact cache layer', prov: 'gitlab', cfg: false },
-		{ name: 'kntc-web', desc: 'sveltekit · phase 2 npm/bun lane', prov: 'github', cfg: false }
-	];
-	const provColor: Record<Provider, string> = {
-		github: '#c4b5fd',
-		gitlab: '#fb923c',
-		manual: '#7dd3fc'
-	};
+	import type { Project } from '$lib/api/types';
 
 	let {
 		requireSignIn = false,
@@ -43,7 +21,7 @@
 		requireSignIn?: boolean;
 		operator?: string;
 		onauthenticated?: (username: string) => void;
-		oncomplete?: (repo: string) => void;
+		oncomplete?: (project: string) => void;
 		onsignout?: () => void;
 	} = $props();
 
@@ -56,46 +34,36 @@
 	let signingIn = $state(false);
 	let authed = $state(untrack(() => !requireSignIn && operator !== ''));
 
-	// repo workspace state
-	let repos = $state<RepoSetup[]>([...seedRepos]);
-	let repoSrc = $state<'all' | Provider>('all');
-	let layout = $state<'cards' | 'list'>('cards');
+	// project picker state
+	let projects = $state<Project[]>([]);
+	let loadingProjects = $state(true);
+	let projectsError = $state<string | null>(null);
+	let selecting = $state<string | null>(null);
+
+	// add-project panel state
 	let addOpen = $state(false);
-	let addProv = $state<Provider>('github');
-	let manualUrl = $state('');
-	let manualBranch = $state('');
+	let newName = $state('');
+	let newText = $state('');
+	let adding = $state(false);
+	let addError = $state<string | null>(null);
 
 	const who = $derived(user || operator || 'operator');
-	const shown = $derived(repos.filter((r) => repoSrc === 'all' || r.prov === repoSrc));
-	const configured = $derived(repos.filter((r) => r.cfg).length);
-	const filters: Array<'all' | Provider> = ['all', 'github', 'gitlab', 'manual'];
-	const addProviders: Provider[] = ['github', 'gitlab', 'manual'];
-	function count(src: 'all' | Provider): number {
-		return src === 'all' ? repos.length : repos.filter((r) => r.prov === src).length;
+
+	async function loadProjects() {
+		loadingProjects = true;
+		projectsError = null;
+		try {
+			projects = (await api.getProjects()).projects;
+		} catch (e) {
+			projectsError = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			loadingProjects = false;
+		}
 	}
-	const addPlaceholder = $derived(
-		addProv === 'github'
-			? 'org/repo — e.g. you/your-app'
-			: addProv === 'gitlab'
-				? 'group/project — e.g. team/service'
-				: 'git url — https://… or git@…'
-	);
 
 	onMount(() => {
-		const saved = localStorage.getItem(REPOS_KEY);
-		if (saved) {
-			try {
-				const parsed = JSON.parse(saved) as RepoSetup[];
-				if (Array.isArray(parsed) && parsed.length) repos = parsed;
-			} catch {
-				// ignore a corrupt cache; fall back to the seeds
-			}
-		}
+		if (step === 'repo') loadProjects();
 	});
-
-	function persist() {
-		localStorage.setItem(REPOS_KEY, JSON.stringify(repos));
-	}
 
 	async function signIn() {
 		if (signingIn) return;
@@ -107,6 +75,7 @@
 			onauthenticated?.(session.username ?? user);
 			password = '';
 			step = 'repo';
+			loadProjects();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
@@ -114,15 +83,34 @@
 		}
 	}
 
-	function addRepo() {
-		if (!manualUrl.trim()) return;
-		const name = (manualUrl.split('/').pop() || 'repo').replace(/\.git$/, '');
-		repos = [{ name, desc: `${manualBranch || 'main'} · awaiting first scan`, prov: addProv, cfg: false }, ...repos];
-		persist();
-		manualUrl = '';
-		manualBranch = '';
-		addOpen = false;
-		repoSrc = 'all';
+	async function selectProject(name: string) {
+		if (selecting) return;
+		selecting = name;
+		projectsError = null;
+		try {
+			await api.activateProject(name);
+			oncomplete?.(name);
+		} catch (e) {
+			projectsError = e instanceof ApiError ? e.message : (e as Error).message;
+			selecting = null;
+		}
+	}
+
+	async function addProject() {
+		if (adding || !newName.trim() || !newText.trim()) return;
+		adding = true;
+		addError = null;
+		try {
+			await api.addProject(newName.trim(), newText);
+			addOpen = false;
+			newName = '';
+			newText = '';
+			await loadProjects();
+		} catch (e) {
+			addError = e instanceof ApiError ? e.message : (e as Error).message;
+		} finally {
+			adding = false;
+		}
 	}
 </script>
 
@@ -156,18 +144,18 @@
 					{signingIn ? 'SIGNING IN…' : 'SIGN IN'}
 				</button>
 			</div>
-			<div class="foot k-mono">CI // ORBITAL v0.4 · AUTH SCOPED PER REPO SETUP</div>
+			<div class="foot k-mono">CI // ORBITAL v0.4 · AUTH SCOPED PER PROJECT</div>
 		</div>
 	</div>
 {:else}
-	<!-- ===== step 2: repo workspace (full screen) ===== -->
+	<!-- ===== step 2: project picker (full screen) ===== -->
 	<div class="overlay ws">
 		<div class="ws-inner">
 			<!-- header -->
 			<div class="ws-head">
 				<div class="mark sm"><div class="core sm"></div></div>
 				<span class="ws-brand">KONTINUANCE</span>
-				<span class="k-mono ws-sub">// SELECT REPO SETUP</span>
+				<span class="k-mono ws-sub">// SELECT PROJECT</span>
 				<div class="ws-who">
 					<span class="dot ok"></span>
 					<span class="k-mono">{who}</span>
@@ -179,87 +167,82 @@
 
 			<!-- toolbar -->
 			<div class="ws-tools">
-				<button class="k-mono add" onclick={() => (addOpen = !addOpen)}>+ ADD REPO</button>
-				<div class="chips">
-					{#each filters as f (f)}
-						<button
-							class="chip"
-							class:sel={repoSrc === f}
-							aria-label="filter {f}"
-							onclick={() => (repoSrc = f)}
-						>
-							<span class="cdot" style:background={f === 'all' ? 'var(--k-teal)' : provColor[f]}></span>
-							<span class="k-mono clabel">{f.toUpperCase()}</span>
-							<span class="k-mono ccount">{count(f)}</span>
-						</button>
-					{/each}
-				</div>
-				<div class="lyt">
-					<button class="ly" class:on={layout === 'cards'} aria-label="card layout" onclick={() => (layout = 'cards')}>
-						<span class="lc"></span><span class="lc"></span>
-					</button>
-					<button class="ly" class:on={layout === 'list'} aria-label="list layout" onclick={() => (layout = 'list')}>
-						<span class="ll"></span><span class="ll"></span><span class="ll"></span>
-					</button>
-				</div>
+				<button class="k-mono add" onclick={() => (addOpen = !addOpen)}>+ ADD PROJECT</button>
+				<span class="k-mono tool-hint">a project is a named <code>kontinuance.yml</code> the server runs</span>
 			</div>
 
-			<!-- add repo panel -->
+			<!-- add project panel -->
 			{#if addOpen}
 				<div class="add-panel">
 					<div class="add-top">
-						<span class="k-mono add-title">ADD REPO</span>
+						<span class="k-mono add-title">ADD PROJECT</span>
 						<button class="k-mono link close" onclick={() => (addOpen = false)}>✕ CLOSE</button>
 					</div>
-					<div class="add-provs">
-						{#each addProviders as p (p)}
-							<button class="add-prov" class:sel={addProv === p} onclick={() => (addProv = p)}>
-								<span class="cdot" style:background={provColor[p]}></span>
-								<span class="k-mono">{p === 'manual' ? 'GIT URL' : `FROM ${p.toUpperCase()}`}</span>
-							</button>
-						{/each}
-					</div>
+					<input
+						class="k-mono field"
+						placeholder="project name — e.g. my-service"
+						spellcheck="false"
+						bind:value={newName}
+					/>
+					<textarea
+						class="k-mono editor"
+						aria-label="descriptor source"
+						placeholder="pipeline:&#10;  name: &quot;my-service&quot;&#10;  stages: …"
+						spellcheck="false"
+						bind:value={newText}
+					></textarea>
+					{#if addError}
+						<div class="k-mono add-err" role="alert">{addError}</div>
+					{/if}
 					<div class="add-row">
-						<input class="k-mono field grow" placeholder={addPlaceholder} spellcheck="false" bind:value={manualUrl} />
-						<input class="k-mono field" placeholder="branch (main)" spellcheck="false" bind:value={manualBranch} />
-						<button class="k-mono add-btn" disabled={!manualUrl.trim()} onclick={addRepo}>ADD REPO</button>
+						<button
+							class="k-mono add-btn"
+							disabled={adding || !newName.trim() || !newText.trim()}
+							onclick={addProject}
+						>
+							{adding ? 'SAVING…' : 'SAVE PROJECT'}
+						</button>
 					</div>
 					<div class="k-mono add-help">
-						kontinuance.yml is read from the repo root on first scan · each repo carries its own run config
+						the descriptor is validated by the engine parser — an invalid one is rejected, not stored
 					</div>
 				</div>
 			{/if}
 
-			<!-- repo grid / list -->
+			<!-- project grid -->
 			<div class="ws-body">
-				<div class="repos" class:list={layout === 'list'}>
-					{#each shown as r (r.name)}
-						<button class="repo" class:list={layout === 'list'} onclick={() => oncomplete?.(r.name)}>
-							<span class="repo-main">
-								<span class="rmark" style:background={r.cfg ? 'var(--k-teal)' : 'transparent'}></span>
-								<span class="rcol">
-									<span class="k-mono rname">{r.name}</span>
-									<span class="k-mono rdesc">{r.desc}</span>
+				{#if loadingProjects}
+					<div class="note k-mono">loading projects…</div>
+				{:else if projectsError}
+					<div class="note k-mono err-note">{projectsError}</div>
+				{:else if projects.length === 0}
+					<div class="note k-mono">no projects yet — add one to get started</div>
+				{:else}
+					<div class="repos">
+						{#each projects as p (p.name)}
+							<button class="repo" disabled={selecting !== null} onclick={() => selectProject(p.name)}>
+								<span class="repo-main">
+									<span class="rmark" style:background={p.active ? 'var(--k-teal)' : 'transparent'}></span>
+									<span class="rcol">
+										<span class="k-mono rname">{p.name}</span>
+										<span class="k-mono rdesc"
+											>{selecting === p.name ? 'activating…' : 'kontinuance.yml · click to run'}</span
+										>
+									</span>
 								</span>
-							</span>
-							<span class="badges">
-								<span
-									class="k-mono badge"
-									style="color:{provColor[r.prov]}; border-color:{provColor[r.prov]}55;"
-								>
-									{r.prov.toUpperCase()}
+								<span class="badges">
+									<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
 								</span>
-								<span class="k-mono badge" class:cfg={r.cfg}>{r.cfg ? 'CONFIGURED' : 'AVAILABLE'}</span>
-							</span>
-						</button>
-					{/each}
-				</div>
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 
 			<!-- footer -->
 			<div class="ws-foot">
-				<span class="k-mono">{count(repoSrc)} repo setups · {configured} configured</span>
-				<span class="k-mono hint">CLICK A REPO TO ENTER MISSION CONTROL</span>
+				<span class="k-mono">{projects.length} project{projects.length === 1 ? '' : 's'}</span>
+				<span class="k-mono hint">CLICK A PROJECT TO ACTIVATE IT AND ENTER MISSION CONTROL</span>
 			</div>
 		</div>
 	</div>
@@ -450,7 +433,7 @@
 		flex: none;
 		display: flex;
 		align-items: center;
-		gap: 14px;
+		gap: 16px;
 		padding: 16px 32px;
 	}
 	.add {
@@ -470,87 +453,12 @@
 	.add:hover {
 		background: var(--k-teal-bright);
 	}
-	.chips {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-	.chip {
-		display: flex;
-		align-items: center;
-		gap: 7px;
-		padding: 9px 14px;
-		border: 1px solid var(--k-border);
-		background: none;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-	.chip:hover,
-	.chip.sel {
-		border-color: rgba(94, 234, 212, 0.5);
-	}
-	.chip.sel {
-		background: rgba(94, 234, 212, 0.06);
-	}
-	.cdot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-	}
-	.clabel {
-		font-size: 10px;
-		letter-spacing: 1.5px;
-		color: var(--k-muted-3);
-	}
-	.chip.sel .clabel {
-		color: var(--k-heading);
-	}
-	.ccount {
-		font-size: 9px;
+	.tool-hint {
+		font-size: 9.5px;
 		color: var(--k-faint);
 	}
-	.lyt {
-		margin-left: auto;
-		display: flex;
-		border: 1px solid var(--k-border);
-		border-radius: 4px;
-		overflow: hidden;
-	}
-	.ly {
-		display: flex;
-		gap: 2px;
-		align-items: center;
-		justify-content: center;
-		padding: 8px 12px;
-		background: none;
-		border: none;
-		cursor: pointer;
-	}
-	.ly.on {
-		background: rgba(94, 234, 212, 0.1);
-	}
-	.ly:hover {
-		background: rgba(94, 234, 212, 0.1);
-	}
-	.lc {
-		width: 5px;
-		height: 10px;
-		border: 1px solid var(--k-faint);
-	}
-	.ly.on .lc {
-		border-color: var(--k-teal);
-	}
-	.ly:nth-child(2) {
-		flex-direction: column;
-		gap: 2px;
-	}
-	.ll {
-		width: 13px;
-		height: 2px;
-		background: var(--k-faint);
-	}
-	.ly.on .ll {
-		background: var(--k-teal);
+	.tool-hint code {
+		color: var(--k-muted-3);
 	}
 	.add-panel {
 		flex: none;
@@ -579,45 +487,35 @@
 	.close:hover {
 		color: var(--k-fail);
 	}
-	.add-provs {
-		display: flex;
-		gap: 10px;
-	}
-	.add-prov {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		gap: 9px;
+	.editor {
+		width: 100%;
+		box-sizing: border-box;
+		min-height: 160px;
+		resize: vertical;
 		padding: 12px 16px;
+		background: var(--k-surface-2);
 		border: 1px solid var(--k-border);
-		background: none;
 		border-radius: 5px;
-		cursor: pointer;
-		font-size: 10.5px;
-		letter-spacing: 1.5px;
-		color: var(--k-muted-3);
+		color: var(--k-text);
+		font-size: 11.5px;
+		line-height: 1.7;
+		outline: none;
 	}
-	.add-prov:hover,
-	.add-prov.sel {
-		border-color: rgba(94, 234, 212, 0.5);
+	.editor:focus {
+		border-color: rgba(94, 234, 212, 0.55);
 	}
-	.add-prov.sel {
-		background: rgba(94, 234, 212, 0.07);
-		color: var(--k-heading);
+	.add-err {
+		font-size: 10px;
+		color: var(--k-fail);
+		white-space: pre-wrap;
 	}
 	.add-row {
 		display: flex;
 		gap: 10px;
 	}
-	.grow {
-		flex: 2.2;
-	}
-	.add-row .field:nth-child(2) {
-		flex: 1;
-	}
 	.add-btn {
 		flex: none;
-		padding: 0 24px;
+		padding: 10px 24px;
 		font-size: 10.5px;
 		letter-spacing: 2px;
 		color: var(--k-teal);
@@ -643,20 +541,24 @@
 		overflow-y: auto;
 		padding: 4px 32px 20px;
 	}
+	.note {
+		padding: 40px 16px;
+		text-align: center;
+		font-size: 11px;
+		color: var(--k-muted-4);
+	}
+	.err-note {
+		color: var(--k-fail);
+	}
 	.repos {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 		gap: 12px;
 	}
-	.repos.list {
-		display: flex;
-		flex-direction: column;
-	}
 	.repo {
 		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 10px;
+		align-items: center;
+		gap: 14px;
 		padding: 16px 18px;
 		border: 1px solid var(--k-border);
 		background: var(--k-surface-2);
@@ -664,13 +566,12 @@
 		cursor: pointer;
 		text-align: left;
 	}
-	.repo.list {
-		flex-direction: row;
-		align-items: center;
-		gap: 14px;
-	}
-	.repo:hover {
+	.repo:hover:not(:disabled) {
 		border-color: rgba(94, 234, 212, 0.5);
+	}
+	.repo:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 	.repo-main {
 		display: flex;

@@ -124,7 +124,10 @@ via the `StepSandbox` seam, workspace mounted, host steps unchanged), an **in-pr
 the engine terminating the step and ending it `Cancelled`), and a **WebSocket log tail** (029 —
 `/ws/runs/{id}/logs` beside the 023 SSE tail, the log stream now offered over both transports like the
 runs-list stream), **per-step runner options** (030 — `--network`/`--pull`/`-u` uid mapping behind the
-`StepSandbox` seam), and the **Coverage class drilldown** (031 — real per-class breakdown from the Kover XML,
-closing the last fake-data gap in the dashboard). Remaining: a **cross-process** notify (DB `LISTEN`/broker)
-behind the `streamTriggers` seam, first-run repo/descriptor setup, and the Kubernetes runner backend behind
-the `StepSandbox` seam.
+`StepSandbox` seam), the **Coverage class drilldown** (031 — real per-class breakdown from the Kover XML,
+closing the last fake-data gap in the dashboard), and a **real entry-screen project picker** (032 — the
+server stores named descriptors ("projects") at `/api/projects`, the entry screen lists/adds/activates them,
+and activating one repoints the live descriptor so the trigger and Config screen run it; editing the
+descriptor keeps the active project's snapshot in sync). Remaining: a **cross-process** notify (DB
+`LISTEN`/broker) behind the `streamTriggers` seam, a per-project repo/branch field and descriptor locking,
+and the Kubernetes runner backend behind the `StepSandbox` seam.

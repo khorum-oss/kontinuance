@@ -72,10 +72,16 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    `KONTINUANCE_AUTH_PASSWORD` (see [running.md](./running.md#authentication)), enter those credentials and
    click **SIGN IN** — a wrong pair is rejected with an error, a correct one establishes your session. If the
    server runs **open** (no credentials configured), the sign-in step is skipped and you land straight on the
-   repo/project view.
-2. **Select a repo setup** and click **ENTER MISSION CONTROL**. Your signed-in name shows in the sidebar;
-   **EXIT** returns you here (the project view) without ending your session, and **SIGN OUT** (on this
-   screen, when auth is enforced) ends the session and returns to sign-in.
+   project view.
+2. **Pick a project.** The project view (032) lists the **named pipeline descriptors ("projects")** the
+   server stores, with the active one badged `ACTIVE`. Click **+ ADD PROJECT** to register a new one — give
+   it a name and paste a pipeline descriptor; the server validates it with the engine parser and only stores
+   it if it parses (a bad descriptor is rejected inline, not saved). **Click a project to activate it** — the
+   server points its live descriptor at that project (so the trigger and Config screen run it) — and enter
+   mission control. Your signed-in name shows in the sidebar; **EXIT** returns you here (the project view)
+   without ending your session, and **SIGN OUT** (on this screen, when auth is enforced) ends the session and
+   returns to sign-in. On a fresh server that already has a descriptor on disk, a `default` project is seeded
+   from it the first time you open this view, so there is always one to select.
 3. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately.
 4. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
@@ -206,8 +212,9 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 - The workspace lives for one run; a run **resumed after an approval gate** starts with a fresh (empty)
   workspace, so a checkout done *before* the gate isn't restored — keep post-gate steps self-sufficient.
   Persisting a workspace across a gate is a follow-up.
-- Configuring a repo per project in the UI ("configure a repo for first setup") is still to come; today
-  the checkout lives in the descriptor's `git:` step.
+- Choosing **which project (descriptor) to run** is now real (032 — see UI below); the repo *checkout*
+  itself still lives in each descriptor's `git:` step (a per-project repo/branch field in the UI is a
+  follow-up).
 
 **Auth & session**
 - **Authentication is real, opt-in, and wired end to end.** Set `KONTINUANCE_AUTH_USERNAME` /
@@ -222,15 +229,17 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 **UI**
 - **Light & dark themes with a brightness control** — toggle from the top bar; the choice follows your OS
   preference by default and is remembered per browser.
-- **The repo-setup screen is presentational** (demo repos). *Planned: redesign, plus first-run repo
-  configuration.*
+- **The entry screen is a real project picker (032).** It lists the named descriptors ("projects") the
+  server stores, adds one (name + descriptor, validated by the engine parser), and activates one on click —
+  repointing the live descriptor at it. *Planned: a per-project repo/branch field and richer project metadata.*
 
 **Pipeline configuration**
 - **Edit `kontinuance.yml` in the UI (027).** The **Config** screen is editable: click **EDIT**, change the
   descriptor, and **SAVE**. The server validates the edit with the engine's strict parser and only writes it
   if it parses — an invalid edit is rejected with the parser's message shown inline and never overwrites the
-  file. A saved descriptor is the one the next triggered run uses (no restart). *Planned: per-project
-  descriptors and locking.*
+  file. A saved descriptor is the one the next triggered run uses (no restart). **Per-project descriptors are
+  real (032):** the entry screen stores named descriptors and activates one on selection, and editing here
+  keeps the active project's stored snapshot in sync. *Planned: descriptor locking.*
 
 **Engine/ops**
 - Only runs **paused at an approval gate** survive a restart; an actively-executing run does not (in-process

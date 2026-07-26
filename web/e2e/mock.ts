@@ -265,6 +265,45 @@ export async function mockConfig(page: Page): Promise<void> {
 	});
 }
 
+/**
+ * Serve the named-project registry (032): the project list + add + activate. Seeded with two projects
+ * (`kontinuance-service` active, `infra-charts` available). `POST /api/projects` appends a project —
+ * rejecting a bad-slug name (400), a duplicate (409), and a descriptor containing `BROKEN` (400, a
+ * stand-in for the server's strict-parser validation). Activate flips which project is active. State is
+ * in-memory so the add + reload flow reflects the new project.
+ */
+export async function mockProjects(page: Page): Promise<void> {
+	const projects = [
+		{ name: 'kontinuance-service', active: true },
+		{ name: 'infra-charts', active: false }
+	];
+	await page.route(/\/api\/projects\/[^/?]+\/activate$/, (route) => {
+		const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').slice(-2)[0]);
+		projects.forEach((p) => (p.active = p.name === name));
+		return route.fulfill({ json: { active: name } });
+	});
+	await page.route(/\/api\/projects$/, (route) => {
+		if (route.request().method() === 'POST') {
+			const body = JSON.parse(route.request().postData() ?? '{}') as { name?: string; text?: string };
+			const name = body.name ?? '';
+			const text = body.text ?? '';
+			if (!/^[A-Za-z0-9._-]{1,64}$/.test(name)) {
+				return route.fulfill({ status: 400, json: { error: 'invalid project name' } });
+			}
+			if (projects.some((p) => p.name === name)) {
+				return route.fulfill({ status: 409, json: { error: `project already exists: ${name}` } });
+			}
+			if (text.includes('BROKEN')) {
+				return route.fulfill({ status: 400, json: { error: 'invalid descriptor' } });
+			}
+			projects.push({ name, active: false });
+			return route.fulfill({ json: { name } });
+		}
+		const active = projects.find((p) => p.active)?.name ?? null;
+		return route.fulfill({ json: { active, projects } });
+	});
+}
+
 /** Make every runs request fail, to exercise the error state. */
 export async function mockApiError(page: Page): Promise<void> {
 	await page.route(/\/api\/runs/, (route) =>
@@ -304,7 +343,10 @@ export async function mockAuth(
 	);
 }
 
-/** Drive the entry flow against the mocked server (sign in → click a repo to enter mission control). */
+/**
+ * Drive the entry flow against the mocked server (sign in → activate a project to enter mission control).
+ * Requires [mockProjects] to be in effect (registered in the suite's beforeEach).
+ */
 export async function enterApp(page: Page): Promise<void> {
 	await page.getByPlaceholder('username').fill('mkuraja');
 	await page.getByPlaceholder('password').fill('s3cret');

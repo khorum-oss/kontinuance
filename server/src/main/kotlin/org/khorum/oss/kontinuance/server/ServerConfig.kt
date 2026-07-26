@@ -4,6 +4,7 @@ import org.khorum.oss.kontinuance.persistence.FileRunLogStore
 import org.khorum.oss.kontinuance.persistence.FileRunStore
 import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.projects.ProjectStore
 import org.khorum.oss.kontinuance.server.stream.NotifyingRunLogStore
 import org.khorum.oss.kontinuance.server.stream.NotifyingRunStore
 import org.khorum.oss.kontinuance.server.stream.RunChangeNotifier
@@ -50,5 +51,18 @@ class ServerConfig {
             ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
         // Decorate so each appended line signals the push log-tail (025); reads are unaffected.
         return NotifyingRunLogStore(FileRunLogStore(base.resolve("logs")), notifier)
+    }
+
+    /**
+     * The named-descriptor registry (032), file-backed under `<kontinuance.store>/projects`. A test can
+     * override this bean to point at a temp directory (mirrors the store conventions).
+     */
+    @Bean
+    fun projectStore(
+        @Value("\${kontinuance.store:#{null}}") storeDir: String?,
+    ): ProjectStore {
+        val base = storeDir?.let { Path.of(it) }
+            ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
+        return ProjectStore(base.resolve("projects"))
     }
 }
