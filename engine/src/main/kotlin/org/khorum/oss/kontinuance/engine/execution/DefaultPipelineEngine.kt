@@ -73,12 +73,14 @@ class DefaultPipelineEngine(
         secrets: SecretSource,
         completedStages: List<StageRun>,
         logSink: LogSink?,
+        runId: RunId?,
     ): Run {
-        val runId = runIdFactory()
+        // A caller-supplied id lets the server address this run in cancel(); otherwise generate one.
+        val resolvedRunId = runId ?: runIdFactory()
         // Per-invocation sink override (e.g. the server records one run's output); null keeps the default.
         val sink = logSink ?: this.logSink
         val flow = newRunFlow()
-        runFlows[runId] = flow
+        runFlows[resolvedRunId] = flow
 
         validate(pipeline, secrets)
 
@@ -98,16 +100,16 @@ class DefaultPipelineEngine(
         emit(flow, pipelineTarget, PipelineStatus.Running)
         return supervisorScope {
             val execution = async { executeStages(pipeline, exec, collected, done) }
-            activeRuns[runId] = execution
+            activeRuns[resolvedRunId] = execution
             try {
                 val overall = execution.await()
                 emit(flow, pipelineTarget, overall)
-                Run(runId, pipeline, overall, collected.toList())
+                Run(resolvedRunId, pipeline, overall, collected.toList())
             } catch (cancelled: CancellationException) {
                 emit(flow, pipelineTarget, PipelineStatus.Cancelled)
-                Run(runId, pipeline, PipelineStatus.Cancelled, collected.toList())
+                Run(resolvedRunId, pipeline, PipelineStatus.Cancelled, collected.toList())
             } finally {
-                activeRuns.remove(runId)
+                activeRuns.remove(resolvedRunId)
                 workspace.toFile().deleteRecursively()
             }
         }

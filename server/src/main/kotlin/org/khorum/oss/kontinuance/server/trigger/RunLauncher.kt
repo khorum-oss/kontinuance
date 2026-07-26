@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import org.khorum.oss.kontinuance.engine.execution.ApprovalToken
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.Pipeline
+import org.khorum.oss.kontinuance.engine.model.RunId
 import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
@@ -40,10 +41,12 @@ class RunLauncher(
             val record = runCatching {
                 withContext(ApprovalToken(id)) {
                     // Record this run's masked output under its id (018) so the UI can show real logs.
+                    // Pass the server's id as the engine run id so a cancel request can address it (028).
                     val run = engine.run(
                         pipeline,
                         completedStages = completedStages,
                         logSink = RecordingLogSink(id, logStore),
+                        runId = RunId(id),
                     )
                     RunRecord.from(run, Instant.now(), trigger = "manual").copy(id = id)
                 }

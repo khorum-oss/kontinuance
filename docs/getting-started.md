@@ -84,6 +84,8 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    is terminal. When a run reaches a
    manual-approval step it pauses (`WaitingOnApproval`, shown amber); click **APPROVE** to continue it or
    **REJECT** to end it. Approval is durable — it works from the persisted run, so it survives a restart.
+   While a run is still executing, **CANCEL RUN** (028) stops it — the engine terminates the in-flight step
+   and the run ends `Cancelled`.
 5. **Explore the screens** from the sidebar: **Pipeline** (stage/task flow of a run), **Coverage** (the
    Kover report), **Config** (the resolved `kontinuance.yml` and its plan), and **Deploy** (a promotion
    view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as

@@ -129,6 +129,31 @@ export async function mockWaitingRun(page: Page, id = 'run-approve-1'): Promise<
 	);
 }
 
+/** Serve a single running run whose detail can be cancelled; cancelling flips it to Cancelled (028). */
+export async function mockCancelableRun(page: Page, id = 'run-cancel-1'): Promise<void> {
+	let canceled = false;
+	await page.route(/\/api\/runs\/[^/?]+\/cancel$/, (route) => {
+		canceled = true;
+		return route.fulfill({ status: 200, json: { status: 'cancelling' } });
+	});
+	// coverage sidebar is best-effort; 404 keeps it out of the way
+	await page.route(/\/api\/coverage/, (route) => route.fulfill({ status: 404, json: {} }));
+	await page.route(/\/api\/runs\/[^/?]+\/logs$/, (route) => route.fulfill({ json: { runId: 'x', lines: [] } }));
+	await mockLogStream(page, []);
+	await page.route(detailUrl, (route) =>
+		route.fulfill({
+			json: {
+				id,
+				pipeline: 'kontinuance-service',
+				status: canceled ? 'Cancelled' : 'Running',
+				repo: 'khorum-oss/kontinuance',
+				sha: 'abc123de1',
+				startedAt: '2026-07-17T00:00:00Z'
+			}
+		})
+	);
+}
+
 /** Serve the coverage stub (Kover-shaped) for the coverage screen. */
 export async function mockCoverage(page: Page): Promise<void> {
 	await page.route(/\/api\/coverage/, (route) =>

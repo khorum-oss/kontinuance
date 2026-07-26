@@ -41,6 +41,22 @@ class CancellationTest {
         assertFalse(orphan, "an orphaned 'sleep 30' process survived cancellation")
     }
 
+    @Test
+    fun `a caller-provided run id can be cancelled through the default engine`() = runBlocking {
+        // The server passes its own id as the run id (028) so it can address the run in cancel().
+        val engine = PipelineEngine.default(CapturingLogSink())
+        val id = RunId("srv-1")
+        val pipeline = Pipeline("p", listOf(Stage("s", listOf(Step("sleeper", RunStep("sleep 30"))))))
+
+        val execution = async(Dispatchers.Default) { engine.run(pipeline, runId = id) }
+        delay(START_GRACE_MS)
+        engine.cancel(id)
+        val run = execution.await()
+
+        assertEquals(PipelineStatus.Cancelled, run.status)
+        assertEquals("srv-1", run.id.value)
+    }
+
     private companion object {
         const val START_GRACE_MS = 500L
         const val STABILISE_MS = 300L

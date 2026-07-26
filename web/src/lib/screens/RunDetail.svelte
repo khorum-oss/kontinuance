@@ -19,10 +19,13 @@
 		notFound = false,
 		deciding = false,
 		decideError = null,
+		cancelling = false,
+		cancelError = null,
 		onback,
 		onretry,
 		onapprove,
-		onreject
+		onreject,
+		oncancel
 	}: {
 		run?: RunRecord | null;
 		logs?: string[];
@@ -32,14 +35,19 @@
 		notFound?: boolean;
 		deciding?: boolean;
 		decideError?: string | null;
+		cancelling?: boolean;
+		cancelError?: string | null;
 		onback?: () => void;
 		onretry?: () => void;
 		onapprove?: () => void;
 		onreject?: () => void;
+		oncancel?: () => void;
 	} = $props();
 
 	const status = $derived(run ? normalizeStatus(run.status) : 'pending');
 	const active = $derived(status === 'running' || status === 'waiting' || status === 'pending');
+	// A run is cancellable only while actively executing; a run waiting at a gate is ended via reject.
+	const cancellable = $derived(status === 'running' || status === 'pending');
 
 	function hhmmss(iso?: string): string {
 		if (!iso) return '';
@@ -89,6 +97,12 @@
 				{#if run.trigger}<span>trigger <span class="v">{run.trigger}</span></span>{/if}
 				{#if run.sha}<span>sha <span class="v">{run.sha.slice(0, 7)}</span></span>{/if}
 			</div>
+			{#if cancellable}
+				<button class="k-mono cancel-run" disabled={cancelling} onclick={() => oncancel?.()}>
+					{cancelling ? 'CANCELLING…' : 'CANCEL RUN'}
+				</button>
+			{/if}
+			{#if cancelError}<span class="k-mono crun-err">{cancelError}</span>{/if}
 		{/if}
 	</div>
 
@@ -185,6 +199,27 @@
 		gap: 18px;
 		font-size: 10.5px;
 		color: var(--k-muted-3);
+	}
+	.cancel-run {
+		font-size: 10px;
+		letter-spacing: 1.5px;
+		color: var(--k-fail);
+		background: none;
+		border: 1px solid rgba(248, 113, 113, 0.45);
+		border-radius: 4px;
+		padding: 6px 12px;
+		cursor: pointer;
+	}
+	.cancel-run:hover:not(:disabled) {
+		background: rgba(248, 113, 113, 0.1);
+	}
+	.cancel-run:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.crun-err {
+		font-size: 10px;
+		color: var(--k-fail);
 	}
 	.v {
 		color: var(--k-muted);

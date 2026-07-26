@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.test.web.reactive.server.WebTestClient
+import java.time.Duration
 import kotlin.test.assertTrue
 
 /**
@@ -24,8 +25,11 @@ class RunApiContractIT(
     @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
+    // A generous response timeout (well above WebTestClient's 5s default) so the concurrent-requests test
+    // stays robust when the CI runner is under load from many parallel Spring contexts.
     private val client: WebTestClient =
-        WebTestClient.bindToServer().baseUrl("http://localhost:$port").build()
+        WebTestClient.bindToServer().baseUrl("http://localhost:$port")
+            .responseTimeout(Duration.ofSeconds(30)).build()
 
     @TestConfiguration
     class SeededStore {

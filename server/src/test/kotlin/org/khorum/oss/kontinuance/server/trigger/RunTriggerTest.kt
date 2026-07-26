@@ -38,10 +38,11 @@ class RunTriggerTest {
             secrets: SecretSource,
             completedStages: List<StageRun>,
             logSink: LogSink?,
+            runId: RunId?,
         ): Run {
             failWith?.let { throw it }
             logSink?.emit("[demo] hello")
-            return Run(RunId("engine-generated"), pipeline, outcome, emptyList())
+            return Run(runId ?: RunId("engine-generated"), pipeline, outcome, emptyList())
         }
 
         override fun statuses(runId: RunId): Flow<StatusEvent> = throw UnsupportedOperationException()

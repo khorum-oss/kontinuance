@@ -117,7 +117,9 @@ recorded masked output), and a **live SSE log-tail** (023 — `GET /api/runs/{id
 recorded line as it lands and ends when the run is terminal, replacing the run-detail view's interval
 polling), **Docker runner isolation** (024 — a step's `image:` runs its command inside that container
 via the `StepSandbox` seam, workspace mounted, host steps unchanged), an **in-process push stream source**
-(025 — `kontinuance.stream.mode=poll|push`, poll retained as a fallback), and an **editable Config screen**
-(027 — edit/validate/save `kontinuance.yml` from the UI, the engine parser gating every write). Remaining:
+(025 — `kontinuance.stream.mode=poll|push`, poll retained as a fallback), an **editable Config screen**
+(027 — edit/validate/save `kontinuance.yml` from the UI, the engine parser gating every write), and
+**run cancellation from the UI** (028 — **CANCEL RUN** stops an in-flight run via `POST /api/runs/{id}/cancel`,
+the engine terminating the step and ending it `Cancelled`). Remaining:
 a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, and the Kubernetes runner
 backend behind the `StepSandbox` seam.

@@ -35,12 +35,16 @@ interface PipelineEngine {
      *
      * [logSink] overrides the engine's configured output sink for **this invocation only** (e.g. to record
      * one run's masked output into a per-run store); `null` keeps the engine's default sink.
+     *
+     * [runId] fixes the run's id so a caller that tracks runs by its own id (e.g. the server) can address
+     * this run in [cancel]; `null` lets the engine generate one.
      */
     suspend fun run(
         pipeline: Pipeline,
         secrets: SecretSource = EnvSecretSource(),
         completedStages: List<StageRun> = emptyList(),
         logSink: LogSink? = null,
+        runId: RunId? = null,
     ): Run
 
     /** Observes lifecycle transitions for the run identified by [runId] as they happen. */
