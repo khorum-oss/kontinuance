@@ -323,6 +323,43 @@ export async function mockProjects(page: Page): Promise<void> {
 	});
 }
 
+/** The GitHub event-source status (035): watched repos, cadence, and poll cursors. */
+const sourceConfigured = {
+	configured: true,
+	pollIntervalSeconds: 30,
+	baseUrl: 'https://api.github.com',
+	tokenEnv: 'GITHUB_TOKEN',
+	repositories: [
+		{
+			slug: 'khorum-oss/relikquary',
+			prPipeline: 'pipelines/pr.yaml',
+			pushPipeline: 'pipelines/deliver.yaml',
+			trackedBranch: 'main'
+		}
+	],
+	cursors: [
+		{ key: 'khorum-oss/relikquary#pr-42', sha: 'abc123def456' },
+		{ key: 'khorum-oss/relikquary#push-main', sha: '0099aabbccdd' }
+	]
+};
+
+/** Serve `GET /api/source`. Defaults to a configured event source; pass `{ configured: false }` for none. */
+export async function mockSource(page: Page, payload: object = sourceConfigured): Promise<void> {
+	await page.route(/\/api\/source$/, (route) => route.fulfill({ json: payload }));
+}
+
+/** A run triggered by the GitHub event source (uppercase trigger kind), for the Source screen. */
+export const githubRun = {
+	id: '#KX-3001',
+	pipeline: 'relikquary-pr',
+	status: 'Success',
+	repo: 'khorum-oss/relikquary',
+	sha: 'abc123def456',
+	trigger: 'PULL_REQUEST',
+	startedAt: '2026-07-17T00:00:00Z',
+	endedAt: '2026-07-17T00:04:00Z'
+};
+
 /** Make every runs request fail, to exercise the error state. */
 export async function mockApiError(page: Page): Promise<void> {
 	await page.route(/\/api\/runs/, (route) =>

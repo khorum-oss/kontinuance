@@ -133,5 +133,9 @@ carries a repo + branch, set/edited in the UI, that drives the run's checkout: i
 first `git:` step or synthesizes a checkout when there is none, and stamps the repo on the run), and
 **commit-SHA checkout** (034 — a `git:` step or project source may pin an exact commit `sha`, mutually
 exclusive with `ref`, fetched-then-checked-out; a project source that looks like a SHA routes there
-automatically). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam,
-descriptor locking, and the Kubernetes runner backend behind the `StepSandbox` seam.
+automatically), and a **read-only GitHub source view** (035 — a `Source` screen + `GET /api/source` that make
+the headless `kontinuance-ci` event source observable: the server reads its config YAML — via the `github`
+module's own parser — and its poll-cursor file, showing the watched repos, cadence, last-processed commit per
+PR/branch, and the runs it triggered; the token env-var name only, never a value). Remaining: a **cross-process**
+notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, descriptor locking, event-source liveness +
+control (start/stop/live checks), and the Kubernetes runner backend behind the `StepSandbox` seam.

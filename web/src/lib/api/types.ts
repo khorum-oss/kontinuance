@@ -141,6 +141,26 @@ export interface ProjectsResponse {
 	projects: Project[];
 }
 
+// The GitHub event source (035), read-only. When `configured` is false the rest is absent.
+export interface SourceRepo {
+	slug: string;
+	prPipeline: string;
+	pushPipeline?: string;
+	trackedBranch: string;
+}
+export interface SourceCursor {
+	key: string;
+	sha: string;
+}
+export interface SourceStatus {
+	configured: boolean;
+	pollIntervalSeconds?: number;
+	baseUrl?: string;
+	tokenEnv?: string;
+	repositories?: SourceRepo[];
+	cursors?: SourceCursor[];
+}
+
 export interface PlanSummary {
 	stages: number;
 	tasks: number;

@@ -23,6 +23,8 @@ group = "org.khorum.oss.kontinuance"
 dependencies {
     implementation(project(":engine"))
     implementation(project(":persistence"))
+    // Read-only reuse of the event source's own config parser + models for the /api/source view (035).
+    implementation(project(":github"))
     implementation(rootProject.libs.spring.boot.starter.webflux)
     implementation(rootProject.libs.spring.boot.starter.actuator)
     implementation(rootProject.libs.serialization.json)

@@ -10,8 +10,10 @@ import {
 	mockDeploy,
 	mockPipeline,
 	mockProjects,
+	mockSource,
 	mockStream,
 	mockWaitingRun,
+	githubRun,
 	sampleRuns
 } from './mock';
 
@@ -391,5 +393,31 @@ test.describe('config screen', () => {
 		await page.getByRole('button', { name: 'SAVE', exact: true }).click();
 		await expect(page.getByLabel('descriptor source')).toHaveCount(0); // editor closed
 		await expect(page.getByText('# edited by the operator')).toBeVisible();
+	});
+});
+
+test.describe('source screen', () => {
+	test('renders the GitHub event source: repos, cursors, and its runs', async ({ page }) => {
+		await mockApi(page, [githubRun]);
+		await mockSource(page);
+		await page.goto('/source');
+		await enterApp(page);
+
+		await expect(page.getByText('GITHUB EVENT SOURCE')).toBeVisible();
+		// watched repo + its poll cursor
+		await expect(page.getByText('khorum-oss/relikquary', { exact: true }).first()).toBeVisible();
+		await expect(page.getByText('khorum-oss/relikquary#pr-42')).toBeVisible();
+		// the run it triggered, tagged with the trigger kind (not a manual UI run)
+		await expect(page.getByText('#KX-3001')).toBeVisible();
+		await expect(page.getByText('PULL_REQUEST')).toBeVisible();
+	});
+
+	test('shows an honest not-configured state when no event source is set', async ({ page }) => {
+		await mockApi(page);
+		await mockSource(page, { configured: false });
+		await page.goto('/source');
+		await enterApp(page);
+
+		await expect(page.getByText('NO GITHUB EVENT SOURCE CONFIGURED')).toBeVisible();
 	});
 });
