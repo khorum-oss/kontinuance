@@ -81,7 +81,8 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
 4. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
    lines the pipeline produced — as a **live tail** (023): each line streams in over
    `GET /api/runs/{id}/logs/stream` (Server-Sent Events) as it is recorded, and the stream ends when the run
-   is terminal. When a run reaches a
+   is terminal. A socket client can tail the same lines over **WebSocket** at `/ws/runs/{id}/logs` (029),
+   mirroring the runs-list stream's SSE + WebSocket pair. When a run reaches a
    manual-approval step it pauses (`WaitingOnApproval`, shown amber); click **APPROVE** to continue it or
    **REJECT** to end it. Approval is durable — it works from the persisted run, so it survives a restart.
    While a run is still executing, **CANCEL RUN** (028) stops it — the engine terminates the in-flight step

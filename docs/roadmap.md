@@ -120,6 +120,7 @@ via the `StepSandbox` seam, workspace mounted, host steps unchanged), an **in-pr
 (025 — `kontinuance.stream.mode=poll|push`, poll retained as a fallback), an **editable Config screen**
 (027 — edit/validate/save `kontinuance.yml` from the UI, the engine parser gating every write), and
 **run cancellation from the UI** (028 — **CANCEL RUN** stops an in-flight run via `POST /api/runs/{id}/cancel`,
-the engine terminating the step and ending it `Cancelled`). Remaining:
-a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, and the Kubernetes runner
-backend behind the `StepSandbox` seam.
+the engine terminating the step and ending it `Cancelled`), and a **WebSocket log tail** (029 —
+`/ws/runs/{id}/logs` beside the 023 SSE tail, the log stream now offered over both transports like the
+runs-list stream). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers`
+seam, and the Kubernetes runner backend behind the `StepSandbox` seam.
