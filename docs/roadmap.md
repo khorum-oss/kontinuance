@@ -115,7 +115,9 @@ forward-looking screens real. Done since: **write endpoints** (manual trigger + 
 `WaitingOnApproval` FSM, features 010/011), **real step logs** (018 — the run detail shows the run's
 recorded masked output), and a **live SSE log-tail** (023 — `GET /api/runs/{id}/logs/stream` pushes each
 recorded line as it lands and ends when the run is terminal, replacing the run-detail view's interval
-polling), and **Docker runner isolation** (024 — a step's `image:` runs its command inside that container
-via the `StepSandbox` seam, workspace mounted, host steps unchanged). Remaining: **real data sources** for
-the remaining stubs, a push/DB-notify source to retire polling behind the `RunStream` seam, and the
-Kubernetes runner backend behind the `StepSandbox` seam.
+polling), **Docker runner isolation** (024 — a step's `image:` runs its command inside that container
+via the `StepSandbox` seam, workspace mounted, host steps unchanged), an **in-process push stream source**
+(025 — `kontinuance.stream.mode=poll|push`, poll retained as a fallback), and an **editable Config screen**
+(027 — edit/validate/save `kontinuance.yml` from the UI, the engine parser gating every write). Remaining:
+a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, and the Kubernetes runner
+backend behind the `StepSandbox` seam.

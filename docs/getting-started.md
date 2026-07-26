@@ -219,8 +219,11 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
   configuration.*
 
 **Pipeline configuration**
-- **No in-app editing of `kontinuance.yml`.** Today you edit the file the server points at. *Planned: edit
-  it in the UI, with the option for a pipeline to be project-provided or locked.*
+- **Edit `kontinuance.yml` in the UI (027).** The **Config** screen is editable: click **EDIT**, change the
+  descriptor, and **SAVE**. The server validates the edit with the engine's strict parser and only writes it
+  if it parses — an invalid edit is rejected with the parser's message shown inline and never overwrites the
+  file. A saved descriptor is the one the next triggered run uses (no restart). *Planned: per-project
+  descriptors and locking.*
 
 **Engine/ops**
 - Only runs **paused at an approval gate** survive a restart; an actively-executing run does not (in-process

@@ -193,24 +193,41 @@ export async function mockDeploy(page: Page): Promise<void> {
 	);
 }
 
-/** Serve the config stub for the config screen. */
+const configPlan = {
+	stages: 6,
+	tasks: 10,
+	maxParallel: 3,
+	toolchain: 'temurin-21 · gradle 8.8',
+	publish: 'nexus.internal',
+	deploy: 'argocd / kontinuance-stage'
+};
+
+/**
+ * Serve the config screen. `GET` returns the fixture descriptor; `PUT` (027) echoes the edited text back
+ * as the refreshed config, or rejects it 400 when the text contains `BROKEN` (a stand-in for the server's
+ * strict-parser validation) so the editor's inline-error path can be exercised.
+ */
 export async function mockConfig(page: Page): Promise<void> {
-	await page.route(/\/api\/config/, (route) =>
-		route.fulfill({
+	await page.route(/\/api\/config/, (route) => {
+		if (route.request().method() === 'PUT') {
+			const body = JSON.parse(route.request().postData() ?? '{}') as { text?: string };
+			const text = body.text ?? '';
+			if (text.includes('BROKEN')) {
+				return route.fulfill({
+					status: 400,
+					json: { error: 'pipeline.stages[0]: unknown key(s) [BROKEN]' }
+				});
+			}
+			return route.fulfill({ json: { source: 'kontinuance.yml', text, plan: configPlan } });
+		}
+		return route.fulfill({
 			json: {
 				source: 'kontinuance.yml',
 				text: '# kontinuance.yml — pipeline definition\nversion: 0.4\nproject: kontinuance-service',
-				plan: {
-					stages: 6,
-					tasks: 10,
-					maxParallel: 3,
-					toolchain: 'temurin-21 · gradle 8.8',
-					publish: 'nexus.internal',
-					deploy: 'argocd / kontinuance-stage'
-				}
+				plan: configPlan
 			}
-		})
-	);
+		});
+	});
 }
 
 /** Make every runs request fail, to exercise the error state. */
