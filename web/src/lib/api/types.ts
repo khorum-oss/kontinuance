@@ -102,12 +102,22 @@ export interface CoverageMetric {
 	total: number;
 }
 
+// A class-level coverage row within a module (031 drilldown).
+export interface CoverageClass {
+	name: string;
+	linePct: number;
+	branchPct: number;
+	missed: number;
+}
+
 export interface CoverageModule {
 	name: string;
 	kind: string;
 	linePct: number;
 	branchPct: number;
 	missed: number;
+	// Per-class breakdown, worst-covered first; absent for old/fixture responses.
+	classes?: CoverageClass[];
 }
 
 export interface Coverage {

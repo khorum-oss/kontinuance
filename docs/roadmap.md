@@ -123,5 +123,8 @@ via the `StepSandbox` seam, workspace mounted, host steps unchanged), an **in-pr
 **run cancellation from the UI** (028 — **CANCEL RUN** stops an in-flight run via `POST /api/runs/{id}/cancel`,
 the engine terminating the step and ending it `Cancelled`), and a **WebSocket log tail** (029 —
 `/ws/runs/{id}/logs` beside the 023 SSE tail, the log stream now offered over both transports like the
-runs-list stream). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the `streamTriggers`
-seam, and the Kubernetes runner backend behind the `StepSandbox` seam.
+runs-list stream), **per-step runner options** (030 — `--network`/`--pull`/`-u` uid mapping behind the
+`StepSandbox` seam), and the **Coverage class drilldown** (031 — real per-class breakdown from the Kover XML,
+closing the last fake-data gap in the dashboard). Remaining: a **cross-process** notify (DB `LISTEN`/broker)
+behind the `streamTriggers` seam, first-run repo/descriptor setup, and the Kubernetes runner backend behind
+the `StepSandbox` seam.

@@ -283,10 +283,17 @@ test.describe('coverage screen', () => {
 		await expect(page.getByText('84.2%')).toBeVisible();
 		await expect(page.getByRole('button', { name: /engine/ })).toBeVisible();
 
+		// drilling into engine shows its real per-class rows (031), worst-covered first
 		await page.getByRole('button', { name: /engine/ }).click();
-		await expect(page.getByText(/class-level breakdown for/)).toBeVisible();
+		await expect(page.getByText('execution.DefaultPipelineEngine')).toBeVisible();
+		await expect(page.getByText('model.Step')).toBeVisible();
+
 		await page.getByRole('button', { name: 'ALL MODULES' }).click();
 		await expect(page.getByRole('button', { name: /server/ })).toBeVisible();
+
+		// a module with no class data shows an honest empty state
+		await page.getByRole('button', { name: /server/ }).click();
+		await expect(page.getByText(/no class-level data/)).toBeVisible();
 	});
 });
 
