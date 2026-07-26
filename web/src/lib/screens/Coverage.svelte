@@ -16,6 +16,11 @@
 	} = $props();
 
 	let selected = $state<string | null>(null);
+
+	// The selected module's per-class breakdown (031), if the server supplied one.
+	const selectedClasses = $derived(
+		selected ? (coverage?.modules.find((m) => m.name === selected)?.classes ?? []) : []
+	);
 </script>
 
 <div class="screen">
@@ -58,7 +63,27 @@
 		</div>
 
 		{#if selected}
-			<div class="note k-mono">class-level breakdown for “{selected}” arrives with real Kover data</div>
+			{#if selectedClasses.length}
+				<div class="table">
+					<div class="thead k-mono">
+						<span>CLASS</span><span></span><span>LINES</span><span></span><span>BRANCHES</span><span
+						></span><span class="r">MISSED</span>
+					</div>
+					{#each selectedClasses as c (c.name)}
+						<div class="trow static">
+							<span class="name k-mono">{c.name}</span>
+							<span class="kind k-mono" style="color:var(--k-muted-3);">class</span>
+							<CoverageBar pct={c.linePct} />
+							<span class="pct k-mono" style="color:{coverageColor(c.linePct)};">{c.linePct}%</span>
+							<CoverageBar pct={c.branchPct} />
+							<span class="pct k-mono" style="color:{coverageColor(c.branchPct)};">{c.branchPct}%</span>
+							<span class="missed k-mono">{c.missed}</span>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="note k-mono">no class-level data for “{selected}” in this report</div>
+			{/if}
 		{:else}
 			<div class="table">
 				<div class="thead k-mono">
@@ -175,6 +200,12 @@
 	}
 	.trow:hover {
 		background: rgba(94, 234, 212, 0.04);
+	}
+	.trow.static {
+		cursor: default;
+	}
+	.trow.static:hover {
+		background: none;
 	}
 	.name {
 		font-size: 12px;

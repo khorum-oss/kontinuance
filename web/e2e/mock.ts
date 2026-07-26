@@ -164,7 +164,17 @@ export async function mockCoverage(page: Page): Promise<void> {
 				branch: { pct: '72.1%', covered: 611, total: 848 },
 				classes: 142,
 				modules: [
-					{ name: 'engine', kind: 'module', linePct: 91, branchPct: 84, missed: 214 },
+					{
+						name: 'engine',
+						kind: 'module',
+						linePct: 91,
+						branchPct: 84,
+						missed: 214,
+						classes: [
+							{ name: 'execution.DefaultPipelineEngine', linePct: 88, branchPct: 79, missed: 96 },
+							{ name: 'model.Step', linePct: 97, branchPct: 92, missed: 4 }
+						]
+					},
 					{ name: 'server', kind: 'module', linePct: 86, branchPct: 74, missed: 63 }
 				]
 			}

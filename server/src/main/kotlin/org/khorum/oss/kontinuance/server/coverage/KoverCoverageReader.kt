@@ -31,9 +31,12 @@ object KoverCoverageReader {
         fun pct(): Double = if (total == 0) 0.0 else covered * PERCENT / total
     }
 
+    private class ClassCov(val name: String, val line: Counter, val branch: Counter)
+
     private class Mod {
         var line = Counter(0, 0)
         var branch = Counter(0, 0)
+        val classes = ArrayList<ClassCov>()
         fun add(l: Counter?, b: Counter?) {
             if (l != null) line = Counter(line.missed + l.missed, line.covered + l.covered)
             if (b != null) branch = Counter(branch.missed + b.missed, branch.covered + b.covered)
@@ -58,11 +61,19 @@ object KoverCoverageReader {
         val modules = LinkedHashMap<String, Mod>()
 
         for (pkg in report.children("package")) {
-            classes += pkg.children("class").count()
-            val line = pkg.counter("LINE")
-            val branch = pkg.counter("BRANCH")
-            val mod = modules.getOrPut(moduleOf(pkg.getAttribute("name"))) { Mod() }
-            mod.add(line, branch)
+            val moduleName = moduleOf(pkg.getAttribute("name"))
+            val mod = modules.getOrPut(moduleName) { Mod() }
+            mod.add(pkg.counter("LINE"), pkg.counter("BRANCH"))
+            for (cls in pkg.children("class")) {
+                classes += 1
+                mod.classes.add(
+                    ClassCov(
+                        name = classDisplayName(cls.getAttribute("name"), moduleName),
+                        line = cls.counter("LINE") ?: Counter(0, 0),
+                        branch = cls.counter("BRANCH") ?: Counter(0, 0),
+                    ),
+                )
+            }
         }
         report.counter("LINE")?.let { totalLine = it }
         report.counter("BRANCH")?.let { totalBranch = it }
@@ -74,7 +85,7 @@ object KoverCoverageReader {
             put("classes", classes)
             putJsonArray("modules") {
                 modules.entries.sortedByDescending { it.value.line.total }.forEach { (name, m) ->
-                    addModule(name, m.line, m.branch)
+                    addModule(name, m)
                 }
             }
         }.toString()
@@ -87,14 +98,33 @@ object KoverCoverageReader {
             put("total", c.total)
         }
 
-    private fun JsonArrayBuilder.addModule(name: String, line: Counter, branch: Counter) =
+    private fun JsonArrayBuilder.addModule(name: String, m: Mod) =
         addJsonObject {
             put("name", name)
             put("kind", "module")
-            put("linePct", Math.round(line.pct()).toInt())
-            put("branchPct", Math.round(branch.pct()).toInt())
-            put("missed", line.missed)
+            put("linePct", Math.round(m.line.pct()).toInt())
+            put("branchPct", Math.round(m.branch.pct()).toInt())
+            put("missed", m.line.missed)
+            // Per-class breakdown, worst-covered first (most missed lines), for the UI drilldown (031).
+            putJsonArray("classes") {
+                m.classes.sortedByDescending { it.line.missed }.forEach { c ->
+                    addJsonObject {
+                        put("name", c.name)
+                        put("linePct", Math.round(c.line.pct()).toInt())
+                        put("branchPct", Math.round(c.branch.pct()).toInt())
+                        put("missed", c.line.missed)
+                    }
+                }
+            }
         }
+
+    /** A class's display name: the path after `kontinuance/<module>/`, dot-joined (e.g. `model.Step`). */
+    private fun classDisplayName(fullName: String, module: String): String {
+        val marker = "kontinuance/$module/"
+        val i = fullName.indexOf(marker)
+        val tail = if (i >= 0) fullName.substring(i + marker.length) else fullName
+        return tail.replace('/', '.')
+    }
 
     /** The module segment after `kontinuance` in a JaCoCo package name (`org/khorum/oss/kontinuance/<mod>/…`). */
     private fun moduleOf(pkgName: String): String {
