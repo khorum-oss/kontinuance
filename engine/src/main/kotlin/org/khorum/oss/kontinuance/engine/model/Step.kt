@@ -19,6 +19,7 @@ import kotlin.time.Duration
  * @param image optional container image; when set, the step's command runs **inside** that image
  *   (runner isolation) with the workspace mounted, instead of directly on the host. When `null` the
  *   step runs on the host exactly as before. Must be non-blank when present.
+ * @param runner optional container runner options (network/pull/uid, 030); applies only with an [image].
  */
 @GeneratedDsl
 data class Step(
@@ -31,6 +32,7 @@ data class Step(
     val secrets: List<SecretRef> = emptyList(),
     val workingDirHint: String? = null,
     val image: String? = null,
+    val runner: RunnerOptions? = null,
 ) {
     init {
         require(name.isNotBlank()) { "step name must be non-empty" }
@@ -44,6 +46,11 @@ data class Step(
         }
         image?.let {
             require(it.isNotBlank()) { "step '$name' image must be non-blank when set" }
+        }
+        // Guardrail: runner options are docker flags, so they only mean something inside a container.
+        // Setting them without an image would silently run on the host with none of the isolation.
+        if (runner != null) {
+            require(image != null) { "step '$name' runner options require an image" }
         }
     }
 

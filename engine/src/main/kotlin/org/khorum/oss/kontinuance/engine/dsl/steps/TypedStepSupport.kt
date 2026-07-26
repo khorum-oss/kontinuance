@@ -22,4 +22,5 @@ internal fun StepDslBuilder.configureStep(
     }
     this.workingDirHint = options.workingDir
     this.image = options.image
+    this.runner = options.runner
 }

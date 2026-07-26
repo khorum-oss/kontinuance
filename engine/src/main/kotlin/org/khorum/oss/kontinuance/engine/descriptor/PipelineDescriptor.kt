@@ -11,6 +11,8 @@ import org.khorum.oss.kontinuance.engine.model.DockerStep
 import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.GradleStep
 import org.khorum.oss.kontinuance.engine.model.NpmStep
+import org.khorum.oss.kontinuance.engine.model.PullPolicy
+import org.khorum.oss.kontinuance.engine.model.RunnerOptions
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
@@ -36,7 +38,9 @@ object PipelineDescriptor {
     private val STAGE_KEYS = setOf("name", "steps")
     private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
     // `image` here is a STEP-level runner image (isolation) — distinct from the nested docker.run `image`.
-    private val STEP_KEYS = setOf("name", "timeout", "when", "secrets", "workingDir", "image") + DEFINITION_KEYS
+    private val STEP_KEYS =
+        setOf("name", "timeout", "when", "secrets", "workingDir", "image", "runner") + DEFINITION_KEYS
+    private val RUNNER_KEYS = setOf("network", "pull", "mapUser")
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
     private val DOCKER_KEYS = setOf("run", "build")
     private val DOCKER_RUN_KEYS = setOf("image", "command", "env", "volumes")
@@ -88,6 +92,7 @@ object PipelineDescriptor {
             .mapIndexed { i, s -> SecretRef(asString(s, "$path.secrets[$i]")) }
         val workingDir = map["workingDir"]?.let { asString(it, "$path.workingDir") }
         val image = map["image"]?.let { asString(it, "$path.image") }
+        val runner = map["runner"]?.let { parseRunner(asMap(it, "$path.runner"), "$path.runner") }
         return construct(path) {
             Step(
                 name = name,
@@ -97,9 +102,25 @@ object PipelineDescriptor {
                 secrets = secrets,
                 workingDirHint = workingDir,
                 image = image,
+                runner = runner,
             )
         }
     }
+
+    /** Container runner options (030): `runner: { network, pull, mapUser }`. */
+    private fun parseRunner(map: Map<String, Any?>, path: String): RunnerOptions {
+        checkKeys(map, RUNNER_KEYS, path)
+        val network = map["network"]?.let { asString(it, "$path.network") }
+        val pull = map["pull"]?.let { parsePullPolicy(asString(it, "$path.pull"), "$path.pull") }
+        val mapUser = map["mapUser"]?.let { asBoolean(it, "$path.mapUser") } ?: false
+        return construct(path) { RunnerOptions(network = network, pull = pull, mapUser = mapUser) }
+    }
+
+    private fun parsePullPolicy(value: String, path: String): PullPolicy =
+        PullPolicy.entries.firstOrNull { it.flag == value }
+            ?: throw DescriptorException(
+                "$path: unknown pull policy '$value'; allowed: ${PullPolicy.entries.map { it.flag }}",
+            )
 
     /** A step declares exactly one of `run`/`gradle`/`docker`/`npm`; zero or more than one is an error. */
     private fun parseDefinition(map: Map<String, Any?>, path: String): StepDefinition {

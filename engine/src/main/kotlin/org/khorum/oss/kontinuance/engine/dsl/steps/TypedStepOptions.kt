@@ -1,5 +1,6 @@
 package org.khorum.oss.kontinuance.engine.dsl.steps
 
+import org.khorum.oss.kontinuance.engine.model.RunnerOptions
 import kotlin.time.Duration
 
 /**
@@ -12,6 +13,7 @@ import kotlin.time.Duration
  * @param workingDir optional relative subdirectory resolved inside the step's isolated directory.
  * @param image optional container image; when set the step runs inside that image (runner isolation)
  *   with the workspace mounted, instead of on the host.
+ * @param runner optional container runner options (network/pull/uid, 030); applies only with an [image].
  */
 data class TypedStepOptions(
     val timeout: Duration? = null,
@@ -19,4 +21,5 @@ data class TypedStepOptions(
     val secrets: List<String> = emptyList(),
     val workingDir: String? = null,
     val image: String? = null,
+    val runner: RunnerOptions? = null,
 )
