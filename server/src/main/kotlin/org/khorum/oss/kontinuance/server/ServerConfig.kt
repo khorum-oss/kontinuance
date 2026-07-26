@@ -4,6 +4,9 @@ import org.khorum.oss.kontinuance.persistence.FileRunLogStore
 import org.khorum.oss.kontinuance.persistence.FileRunStore
 import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.stream.NotifyingRunLogStore
+import org.khorum.oss.kontinuance.server.stream.NotifyingRunStore
+import org.khorum.oss.kontinuance.server.stream.RunChangeNotifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -22,10 +25,12 @@ class ServerConfig {
     @Bean
     fun runStore(
         @Value("\${kontinuance.store:#{null}}") storeDir: String?,
+        notifier: RunChangeNotifier,
     ): RunStore {
         val dir = storeDir?.let { Path.of(it) }
             ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
-        return FileRunStore(dir)
+        // Decorate so every in-process write signals the push streams (025); reads are unaffected.
+        return NotifyingRunStore(FileRunStore(dir), notifier)
     }
 
     @Bean
@@ -39,9 +44,11 @@ class ServerConfig {
     @Bean
     fun runLogStore(
         @Value("\${kontinuance.store:#{null}}") storeDir: String?,
+        notifier: RunChangeNotifier,
     ): RunLogStore {
         val base = storeDir?.let { Path.of(it) }
             ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
-        return FileRunLogStore(base.resolve("logs"))
+        // Decorate so each appended line signals the push log-tail (025); reads are unaffected.
+        return NotifyingRunLogStore(FileRunLogStore(base.resolve("logs")), notifier)
     }
 }

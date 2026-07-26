@@ -79,8 +79,10 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    transports. This layer unlocks the UI, gives 003 a home for its status reporting, and carries remote
    approval actions. **Design the remaining API contract *from* the finished UI** (the maintainer's
    screenshots). *Done here:* a per-run **live SSE log-tail** (`GET /api/runs/{id}/logs/stream`, 023) beside
-   the run stream. *Next here:* a push/DB-notify source behind the same `RunStream` seam to replace polling.
-   **Design the API contract *from* the finished UI.**
+   the run stream, and an **in-process push source** (025 — `kontinuance.stream.mode=poll|push`; push wakes
+   the streams instantly on an in-process write while keeping the poll as a fallback, both selectable). *Next
+   here:* a **cross-process** notify (DB `LISTEN`/broker) behind the same `streamTriggers` seam, for the
+   separate `kontinuance-ci` writer. **Design the API contract *from* the finished UI.**
 5. **Web UI** *(009 — ✅ built)* — SvelteKit + Storybook "mission control" dashboard (`web/`) against the
    (4) API. The **Observe UI** is done (read-only): sign-in shell, runs list, live status over SSE, run
    detail, and pipeline/deploy/coverage/config screens (the last four on additive server stubs). The
