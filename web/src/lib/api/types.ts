@@ -129,9 +129,12 @@ export interface Coverage {
 }
 
 // A named pipeline descriptor the server stores and can run (032). `active` marks the one in effect.
+// `repo`/`branch` are the project's optional source (033): when set, a run of the project checks them out.
 export interface Project {
 	name: string;
 	active: boolean;
+	repo?: string;
+	branch?: string;
 }
 export interface ProjectsResponse {
 	active: string | null;

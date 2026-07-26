@@ -138,10 +138,62 @@ class ProjectControllerIT(
             .jsonPath("$.error").exists()
     }
 
-    private fun createBody(name: String, text: String): String =
+    @Test
+    fun `POST with a repo and branch stores the source and GET echoes it`() {
+        client.post().uri("/api/projects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(createBody("sourced", ONE_STAGE, repo = "https://example.test/sourced", branch = "main"))
+            .exchange()
+            .expectStatus().isOk
+
+        client.get().uri("/api/projects")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.projects[?(@.name == 'sourced')].repo").isEqualTo("https://example.test/sourced")
+            .jsonPath("$.projects[?(@.name == 'sourced')].branch").isEqualTo("main")
+    }
+
+    @Test
+    fun `POST source updates an existing project's source`() {
+        client.post().uri("/api/projects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(createBody("svc", ONE_STAGE))
+            .exchange()
+            .expectStatus().isOk
+
+        client.post().uri("/api/projects/svc/source")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(buildJsonObject { put("repo", "https://example.test/svc"); put("branch", "dev") }.toString())
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.repo").isEqualTo("https://example.test/svc")
+            .jsonPath("$.branch").isEqualTo("dev")
+
+        client.get().uri("/api/projects")
+            .exchange()
+            .expectBody()
+            .jsonPath("$.projects[?(@.name == 'svc')].repo").isEqualTo("https://example.test/svc")
+    }
+
+    @Test
+    fun `POST source for an unknown project is a 404`() {
+        client.post().uri("/api/projects/nope/source")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(buildJsonObject { put("repo", "https://example.test/x") }.toString())
+            .exchange()
+            .expectStatus().isNotFound
+            .expectBody()
+            .jsonPath("$.error").exists()
+    }
+
+    private fun createBody(name: String, text: String, repo: String? = null, branch: String? = null): String =
         buildJsonObject {
             put("name", name)
             put("text", text)
+            repo?.let { put("repo", it) }
+            branch?.let { put("branch", it) }
         }.toString()
 
     companion object {

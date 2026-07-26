@@ -16,6 +16,7 @@ import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
+import org.khorum.oss.kontinuance.server.projects.ProjectStore
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -57,7 +58,8 @@ class RunTriggerTest {
 
     private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {
         val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined), InMemoryRunLogStore())
-        return RunTrigger(store, launcher, path.toString())
+        val projects = ProjectStore(path.resolveSibling("projects"))
+        return RunTrigger(store, launcher, projects, path.toString())
     }
 
     @Test

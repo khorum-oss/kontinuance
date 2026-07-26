@@ -64,19 +64,43 @@ test.describe('authentication', () => {
 		await page.getByPlaceholder('password').fill('s3cret');
 		await page.getByText('SIGN IN', { exact: true }).click();
 
-		// on the project picker: the seeded projects are shown, the active one badged ACTIVE
+		// on the project picker: the seeded projects are shown, the active one badged ACTIVE, and a project
+		// with no source says so plainly
 		await expect(page.getByText('kontinuance-service', { exact: true })).toBeVisible();
 		await expect(page.getByText('infra-charts', { exact: true })).toBeVisible();
 		await expect(page.getByText('ACTIVE', { exact: true })).toBeVisible();
+		await expect(page.getByText('no source · runs the descriptor as-is').first()).toBeVisible();
 
-		// add a project (name + descriptor, validated server-side) → it appears in the list
+		// add a project (name + descriptor + source repo/branch, validated server-side) → it appears with
+		// its source shown on the card
 		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
 		await page.getByPlaceholder(/project name/).fill('billing-api');
+		await page.getByLabel('new project repo').fill('https://example.test/billing');
+		await page.getByLabel('new project branch').fill('main');
 		await page
 			.getByLabel('descriptor source')
 			.fill('pipeline:\n  name: "billing-api"\n  stages: []');
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 		await expect(page.getByText('billing-api', { exact: true })).toBeVisible();
+		await expect(page.getByText('https://example.test/billing · main')).toBeVisible();
+	});
+
+	test('sets a source on an existing project inline', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('mkuraja');
+		await page.getByPlaceholder('password').fill('s3cret');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		const card = page.locator('.repo', { hasText: 'infra-charts' });
+		await card.getByRole('button', { name: 'SET SOURCE', exact: true }).click();
+		await page.getByLabel('source repo').fill('https://example.test/infra');
+		await page.getByLabel('source branch').fill('release');
+		await page.getByRole('button', { name: 'SAVE SOURCE', exact: true }).click();
+
+		// the card now shows the source, and the toggle flips to EDIT SOURCE
+		await expect(card.getByText('https://example.test/infra · release')).toBeVisible();
+		await expect(card.getByRole('button', { name: 'EDIT SOURCE', exact: true })).toBeVisible();
 	});
 
 	test('a project with an invalid descriptor is rejected inline', async ({ page }) => {

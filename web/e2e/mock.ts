@@ -273,7 +273,7 @@ export async function mockConfig(page: Page): Promise<void> {
  * in-memory so the add + reload flow reflects the new project.
  */
 export async function mockProjects(page: Page): Promise<void> {
-	const projects = [
+	const projects: { name: string; active: boolean; repo?: string; branch?: string }[] = [
 		{ name: 'kontinuance-service', active: true },
 		{ name: 'infra-charts', active: false }
 	];
@@ -282,9 +282,26 @@ export async function mockProjects(page: Page): Promise<void> {
 		projects.forEach((p) => (p.active = p.name === name));
 		return route.fulfill({ json: { active: name } });
 	});
+	// A project's source (033): repo/branch set here update the in-memory fixture (blank repo clears it).
+	await page.route(/\/api\/projects\/[^/?]+\/source$/, (route) => {
+		const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').slice(-2)[0]);
+		const p = projects.find((x) => x.name === name);
+		if (!p) return route.fulfill({ status: 404, json: { error: `no such project: ${name}` } });
+		const body = JSON.parse(route.request().postData() ?? '{}') as { repo?: string; branch?: string };
+		const repo = (body.repo ?? '').trim();
+		const branch = (body.branch ?? '').trim();
+		p.repo = repo || undefined;
+		p.branch = repo && branch ? branch : undefined;
+		return route.fulfill({ json: { name, repo: p.repo, branch: p.branch } });
+	});
 	await page.route(/\/api\/projects$/, (route) => {
 		if (route.request().method() === 'POST') {
-			const body = JSON.parse(route.request().postData() ?? '{}') as { name?: string; text?: string };
+			const body = JSON.parse(route.request().postData() ?? '{}') as {
+				name?: string;
+				text?: string;
+				repo?: string;
+				branch?: string;
+			};
 			const name = body.name ?? '';
 			const text = body.text ?? '';
 			if (!/^[A-Za-z0-9._-]{1,64}$/.test(name)) {
@@ -296,7 +313,9 @@ export async function mockProjects(page: Page): Promise<void> {
 			if (text.includes('BROKEN')) {
 				return route.fulfill({ status: 400, json: { error: 'invalid descriptor' } });
 			}
-			projects.push({ name, active: false });
+			const repo = (body.repo ?? '').trim() || undefined;
+			const branch = repo ? (body.branch ?? '').trim() || undefined : undefined;
+			projects.push({ name, active: false, repo, branch });
 			return route.fulfill({ json: { name } });
 		}
 		const active = projects.find((p) => p.active)?.name ?? null;

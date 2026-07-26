@@ -74,6 +74,54 @@ class ProjectStoreTest {
     }
 
     @Test
+    fun `saveSource then source round-trips the repo and branch`() {
+        val store = ProjectStore(dir)
+        store.save("svc", "x")
+        store.saveSource("svc", ProjectSource("https://example.test/svc", "main"))
+
+        val src = store.source("svc")
+        assertEquals("https://example.test/svc", src?.repo)
+        assertEquals("main", src?.branch)
+    }
+
+    @Test
+    fun `source is null when a project has no source sidecar`() {
+        val store = ProjectStore(dir)
+        store.save("svc", "x")
+        assertNull(store.source("svc"))
+    }
+
+    @Test
+    fun `a source with a repo but no branch round-trips with a null branch`() {
+        val store = ProjectStore(dir)
+        store.save("svc", "x")
+        store.saveSource("svc", ProjectSource("https://example.test/svc"))
+
+        val src = store.source("svc")
+        assertEquals("https://example.test/svc", src?.repo)
+        assertNull(src?.branch)
+    }
+
+    @Test
+    fun `saving a blank repo clears the source`() {
+        val store = ProjectStore(dir)
+        store.save("svc", "x")
+        store.saveSource("svc", ProjectSource("https://example.test/svc", "main"))
+        store.saveSource("svc", ProjectSource("  ", "main"))
+
+        assertNull(store.source("svc"))
+    }
+
+    @Test
+    fun `the source sidecar is not listed as a project`() {
+        val store = ProjectStore(dir)
+        store.save("svc", "x")
+        store.saveSource("svc", ProjectSource("https://example.test/svc", "main"))
+
+        assertEquals(listOf("svc"), store.list())
+    }
+
+    @Test
     fun `isValidName accepts slugs and rejects paths and empties`() {
         assertTrue(ProjectStore.isValidName("kontinuance-service"))
         assertTrue(ProjectStore.isValidName("infra_charts.v2"))

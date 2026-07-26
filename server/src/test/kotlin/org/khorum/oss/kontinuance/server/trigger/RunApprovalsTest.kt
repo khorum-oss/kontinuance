@@ -10,6 +10,7 @@ import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.projects.ProjectStore
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -43,7 +44,7 @@ class RunApprovalsTest {
             CoroutineScope(Dispatchers.Unconfined),
             InMemoryRunLogStore(),
         )
-        val trigger = RunTrigger(store, launcher, descriptor.toString())
+        val trigger = RunTrigger(store, launcher, ProjectStore(descriptor.resolveSibling("projects")), descriptor.toString())
         val approvals = RunApprovals(store, gate, launcher, descriptor.toString())
     }
 
