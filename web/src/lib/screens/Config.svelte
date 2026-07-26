@@ -5,18 +5,42 @@
 		config = null,
 		loading = false,
 		error = null,
-		onretry
+		saveError = null,
+		onretry,
+		onsave
 	}: {
 		config?: Config | null;
 		loading?: boolean;
 		error?: string | null;
+		/** Validation error from the last save attempt (the server parser's message), shown inline. */
+		saveError?: string | null;
 		onretry?: () => void;
+		/** Persists edited descriptor text; resolves `true` on success (editor then closes), `false` on a
+		 * rejected edit (editor stays open showing [saveError]). */
+		onsave?: (text: string) => Promise<boolean>;
 	} = $props();
 
 	const lines = $derived(config ? config.text.split('\n') : []);
 
+	let editing = $state(false);
+	let draft = $state('');
+	let saving = $state(false);
+
 	function isComment(line: string): boolean {
 		return line.trimStart().startsWith('#');
+	}
+
+	function startEdit() {
+		draft = config?.text ?? '';
+		editing = true;
+	}
+
+	async function save() {
+		if (!onsave) return;
+		saving = true;
+		const ok = await onsave(draft);
+		saving = false;
+		if (ok) editing = false;
 	}
 </script>
 
@@ -32,24 +56,42 @@
 		<div class="src">
 			<div class="src-head k-mono">
 				<span class="fname">{config.source}</span>
-				<span class="origin">SOURCE // repo root</span>
+				{#if editing}
+					<button class="act cancel" onclick={() => (editing = false)} disabled={saving}>CANCEL</button>
+					<button class="act save" onclick={save} disabled={saving}>{saving ? 'SAVING…' : 'SAVE'}</button>
+				{:else}
+					<span class="origin">SOURCE // repo root</span>
+					<button class="act edit" onclick={startEdit}>EDIT</button>
+				{/if}
 			</div>
-			<div class="code k-mono">
-				{#each lines as line, i (i)}
-					<div class="line">
-						<span class="ln">{i + 1}</span>
-						{#if isComment(line)}
-							<span class="comment">{line}</span>
-						{:else if line.includes(':')}
-							<span class="key">{line.slice(0, line.indexOf(':') + 1)}</span><span class="val"
-								>{line.slice(line.indexOf(':') + 1)}</span
-							>
-						{:else}
-							<span class="val">{line}</span>
-						{/if}
-					</div>
-				{/each}
-			</div>
+			{#if editing}
+				<textarea
+					class="editor k-mono"
+					aria-label="descriptor source"
+					spellcheck="false"
+					bind:value={draft}
+				></textarea>
+				{#if saveError}
+					<div class="save-err k-mono" role="alert">{saveError}</div>
+				{/if}
+			{:else}
+				<div class="code k-mono">
+					{#each lines as line, i (i)}
+						<div class="line">
+							<span class="ln">{i + 1}</span>
+							{#if isComment(line)}
+								<span class="comment">{line}</span>
+							{:else if line.includes(':')}
+								<span class="key">{line.slice(0, line.indexOf(':') + 1)}</span><span class="val"
+									>{line.slice(line.indexOf(':') + 1)}</span
+								>
+							{:else}
+								<span class="val">{line}</span>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 
 		<div class="side">
@@ -111,6 +153,51 @@
 		font-size: 9.5px;
 		letter-spacing: 1px;
 		color: var(--k-faint);
+	}
+	.act {
+		font-size: 9px;
+		letter-spacing: 2px;
+		background: none;
+		border: 1px solid var(--k-border);
+		border-radius: 4px;
+		padding: 5px 12px;
+		cursor: pointer;
+		color: var(--k-muted-2);
+	}
+	.act:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+	.act.edit {
+		margin-left: 12px;
+	}
+	.act.save {
+		margin-left: 8px;
+		color: var(--k-teal);
+		border-color: rgba(94, 234, 212, 0.4);
+	}
+	.act.cancel {
+		margin-left: auto;
+	}
+	.editor {
+		width: 100%;
+		min-height: 340px;
+		resize: vertical;
+		border: none;
+		outline: none;
+		background: transparent;
+		color: var(--k-text);
+		padding: 16px;
+		font-size: 12px;
+		line-height: 1.85;
+		box-sizing: border-box;
+	}
+	.save-err {
+		padding: 10px 16px;
+		font-size: 10.5px;
+		color: var(--k-fail);
+		border-top: 1px solid var(--k-border-soft);
+		white-space: pre-wrap;
 	}
 	.code {
 		padding: 16px 0;

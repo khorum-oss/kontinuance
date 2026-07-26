@@ -6,6 +6,7 @@
 	let config = $state<Config | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let saveError = $state<string | null>(null);
 
 	async function load() {
 		loading = true;
@@ -19,9 +20,22 @@
 		}
 	}
 
+	// Persist an edited descriptor; on success update the view with the refreshed config, on a rejected
+	// edit surface the server's validation message inline. Returns success so the editor can close.
+	async function save(text: string): Promise<boolean> {
+		saveError = null;
+		try {
+			config = await api.saveConfig(text);
+			return true;
+		} catch (e) {
+			saveError = e instanceof ApiError ? e.message : (e as Error).message;
+			return false;
+		}
+	}
+
 	$effect(() => {
 		load();
 	});
 </script>
 
-<ConfigScreen {config} {loading} {error} onretry={load} />
+<ConfigScreen {config} {loading} {error} {saveError} onretry={load} onsave={save} />

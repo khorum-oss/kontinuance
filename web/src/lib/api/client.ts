@@ -146,5 +146,26 @@ export const api = {
 	getPipeline: (runId: string) => getJson<Pipeline>(`/api/runs/${encodeURIComponent(runId)}/pipeline`),
 	getDeploy: () => getJson<Deploy>('/api/deploy'),
 	getCoverage: () => getJson<Coverage>('/api/coverage'),
-	getConfig: () => getJson<Config>('/api/config')
+	getConfig: () => getJson<Config>('/api/config'),
+
+	// Saves an edited pipeline descriptor (027). The server validates it with the engine parser and only
+	// persists it if it parses; resolves to the refreshed [Config], or throws [ApiError] with the parser's
+	// message on a 400 (invalid descriptor) so the editor can show it inline.
+	saveConfig: async (text: string): Promise<Config> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json', accept: 'application/json' },
+				body: JSON.stringify({ text })
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as Config & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `save failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	}
 };

@@ -309,4 +309,25 @@ test.describe('config screen', () => {
 		await expect(page.getByText(/max parallelism/)).toBeVisible();
 		await expect(page.getByText('KONTINUANCE DSL')).toBeVisible();
 	});
+
+	test('edits the descriptor and saves it, and shows a validation error for a bad edit', async ({ page }) => {
+		await mockApi(page);
+		await mockConfig(page);
+		await page.goto('/config');
+		await enterApp(page);
+
+		// a rejected edit keeps the editor open and surfaces the server's message
+		await page.getByRole('button', { name: 'EDIT', exact: true }).click();
+		const editor = page.getByLabel('descriptor source');
+		await editor.fill('pipeline:\n  name: "svc"\n  BROKEN: true');
+		await page.getByRole('button', { name: 'SAVE', exact: true }).click();
+		await expect(page.getByRole('alert')).toContainText(/unknown key/);
+		await expect(page.getByLabel('descriptor source')).toBeVisible(); // still editing
+
+		// a valid edit persists and the new text renders back in the read view
+		await editor.fill('# edited by the operator\nversion: 0.5');
+		await page.getByRole('button', { name: 'SAVE', exact: true }).click();
+		await expect(page.getByLabel('descriptor source')).toHaveCount(0); // editor closed
+		await expect(page.getByText('# edited by the operator')).toBeVisible();
+	});
 });
