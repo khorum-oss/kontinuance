@@ -16,7 +16,8 @@
 		{ label: 'PIPELINE', href: '/pipeline' },
 		{ label: 'DEPLOY', href: '/deploy' },
 		{ label: 'COVERAGE', href: '/coverage' },
-		{ label: 'CONFIG', href: '/config' }
+		{ label: 'CONFIG', href: '/config' },
+		{ label: 'SOURCE', href: '/source' }
 	];
 
 	function isActive(href: string): boolean {

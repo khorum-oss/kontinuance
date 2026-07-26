@@ -102,9 +102,15 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    While a run is still executing, **CANCEL RUN** (028) stops it — the engine terminates the in-flight step
    and the run ends `Cancelled`.
 5. **Explore the screens** from the sidebar: **Pipeline** (stage/task flow of a run), **Coverage** (the
-   Kover report), **Config** (the resolved `kontinuance.yml` and its plan), and **Deploy** (a promotion
+   Kover report), **Config** (the resolved `kontinuance.yml` and its plan), **Deploy** (a promotion
    view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as
-   external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster).
+   external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster), and
+   **Source** (035 — a read-only view of the GitHub **event source**: the repositories it watches, its poll
+   cadence, the last commit it processed per PR/branch, and the runs it triggered). The event source itself
+   runs as the separate `kontinuance-ci` CLI (003); point the server at its config with
+   `kontinuance.github.config` (and, if it differs from the default `~/.kontinuance/github-cursors.properties`,
+   its cursor file with `kontinuance.github.cursors`) to watch it here. Only the token env-var **name** is
+   shown, never a token value.
 
 > **Live updates (025):** the runs list and the run log-tail stream over SSE. By default the server
 > re-reads on a timer (`kontinuance.stream.mode=poll`). Set `kontinuance.stream.mode=push` to have

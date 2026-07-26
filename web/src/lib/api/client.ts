@@ -11,7 +11,8 @@ import type {
 	RunLogs,
 	RunRecord,
 	RunsResponse,
-	Session
+	Session,
+	SourceStatus
 } from './types';
 
 export class ApiError extends Error {
@@ -152,6 +153,10 @@ export const api = {
 	getDeploy: () => getJson<Deploy>('/api/deploy'),
 	getCoverage: () => getJson<Coverage>('/api/coverage'),
 	getConfig: () => getJson<Config>('/api/config'),
+
+	// Read-only status of the GitHub event source (035): watched repos, cadence, and poll cursors. Answers
+	// `{ configured: false }` when no event-source config is wired.
+	getSource: () => getJson<SourceStatus>('/api/source'),
 
 	// Saves an edited pipeline descriptor (027). The server validates it with the engine parser and only
 	// persists it if it parses; resolves to the refreshed [Config], or throws [ApiError] with the parser's
