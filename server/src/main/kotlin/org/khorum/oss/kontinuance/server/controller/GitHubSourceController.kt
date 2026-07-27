@@ -36,9 +36,9 @@ import java.util.Properties
  */
 @RestController
 class GitHubSourceController(
-    @Value($$"${kontinuance.github.config:#{null}}") configPath: String?,
-    @Value($$"${kontinuance.github.cursors:#{null}}") cursorsPath: String?,
-    @Value($$"${kontinuance.github.heartbeat:#{null}}") heartbeatPath: String?,
+    @Value("\${kontinuance.github.config:#{null}}") configPath: String?,
+    @Value("\${kontinuance.github.cursors:#{null}}") cursorsPath: String?,
+    @Value("\${kontinuance.github.heartbeat:#{null}}") heartbeatPath: String?,
 ) {
     private val config: Path? = configPath?.let { Path.of(it) }
     private val cursors: Path = cursorsPath?.let { Path.of(it) }

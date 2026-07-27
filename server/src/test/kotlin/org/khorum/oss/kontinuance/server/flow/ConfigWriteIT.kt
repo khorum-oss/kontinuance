@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ConfigWriteIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     private val client: WebTestClient

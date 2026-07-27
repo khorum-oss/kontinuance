@@ -26,7 +26,7 @@ class ServerConfig {
 
     @Bean
     fun runStore(
-        @Value($$"${kontinuance.store:#{null}}") storeDir: String?,
+        @Value("\${kontinuance.store:#{null}}") storeDir: String?,
         notifier: RunChangeNotifier,
     ): RunStore {
         val dir = storeDir?.let { Path.of(it) }
@@ -45,7 +45,7 @@ class ServerConfig {
      */
     @Bean
     fun runLogStore(
-        @Value($$"${kontinuance.store:#{null}}") storeDir: String?,
+        @Value("\${kontinuance.store:#{null}}") storeDir: String?,
         notifier: RunChangeNotifier,
     ): RunLogStore {
         val base = storeDir?.let { Path.of(it) }

@@ -34,7 +34,7 @@ class RunLogStream(
     private val runs: RunStore,
     private val notifier: RunChangeNotifier,
     @param:Value("\${kontinuance.stream.poll-interval-ms:1000}") private val pollIntervalMs: Long,
-    @Value($$"${kontinuance.stream.mode:poll}") modeRaw: String,
+    @Value("\${kontinuance.stream.mode:poll}") modeRaw: String,
 ) {
 
     private val mode = StreamMode.from(modeRaw)

@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
     properties = ["kontinuance.stream.poll-interval-ms=100"],
 )
 class RunLogStreamIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     @TestConfiguration

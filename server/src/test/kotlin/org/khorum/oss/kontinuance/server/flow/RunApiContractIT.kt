@@ -17,13 +17,14 @@ import kotlin.test.assertTrue
 
 /**
  * Exercises the migrated API on the **real Spring Boot runtime** — the application context boots on a
- * random port and a live HTTP round-trip via [org.springframework.test.web.reactive.server.WebTestClient] asserts the `/api` contract is unchanged
+ * random port and a live HTTP round-trip via [org.springframework.test.web.reactive.server.WebTestClient]
+ * asserts the `/api` contract is unchanged
  * from 007 (FR-001 / SC-001 / SC-005, Constitution II), plus actuator health (FR-002). The run store is
  * overridden with a seeded in-memory store so the assertions are deterministic.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RunApiContractIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     // A generous response timeout (well above WebTestClient's 5s default) so the concurrent-requests test

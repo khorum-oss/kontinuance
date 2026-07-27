@@ -16,7 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Unit-level checks for the 025 push seam: [org.khorum.oss.kontinuance.server.domain.stream.StreamMode] parsing, the [RunChangeNotifier] signal bus, and
+ * Unit-level checks for the 025 push seam: [org.khorum.oss.kontinuance.server.domain.stream.StreamMode] parsing,
+ * the [RunChangeNotifier] signal bus, and
  * the notifying store decorators. End-to-end push delivery through the SSE endpoints is covered by the
  * push ITs.
  */

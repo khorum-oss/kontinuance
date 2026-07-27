@@ -34,9 +34,9 @@ import org.springframework.stereotype.Component
 class RunStream(
     private val store: RunStore,
     private val notifier: RunChangeNotifier,
-    @param:Value($$"${kontinuance.stream.poll-interval-ms:1000}") private val pollIntervalMs: Long,
-    @param:Value($$"${kontinuance.stream.snapshot-limit:50}") private val snapshotLimit: Int,
-    @Value($$"${kontinuance.stream.mode:poll}") modeRaw: String,
+    @param:Value("\${kontinuance.stream.poll-interval-ms:1000}") private val pollIntervalMs: Long,
+    @param:Value("\${kontinuance.stream.snapshot-limit:50}") private val snapshotLimit: Int,
+    @Value("\${kontinuance.stream.mode:poll}") modeRaw: String,
 ) {
 
     private val mode = StreamMode.from(modeRaw)

@@ -28,7 +28,7 @@ import java.nio.file.Path
 @RestController
 class ConfigController(
     private val projects: ProjectStore,
-    @Value($$"${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
+    @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 

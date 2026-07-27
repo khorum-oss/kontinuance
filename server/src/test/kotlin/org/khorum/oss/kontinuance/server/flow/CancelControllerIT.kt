@@ -18,7 +18,7 @@ import org.springframework.test.web.reactive.server.WebTestClient
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CancelControllerIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     @TestConfiguration
