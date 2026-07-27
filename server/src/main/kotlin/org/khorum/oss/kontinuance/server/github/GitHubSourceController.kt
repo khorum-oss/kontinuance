@@ -2,16 +2,11 @@ package org.khorum.oss.kontinuance.server.github
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 import org.khorum.oss.kontinuance.github.config.EventSourceConfig
 import org.khorum.oss.kontinuance.github.health.HeartbeatState
+import org.khorum.oss.kontinuance.server.ErrorResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
@@ -20,17 +15,20 @@ import java.nio.file.Path
 import java.util.Properties
 
 /**
- * Read-only view of the GitHub event source (003) for the dashboard (035). The event source runs as a
+ * Read-only view of the GitHub event source (003) for the dashboard (035/036). The event source runs as a
  * separate `kontinuance-ci` CLI; this endpoint makes it *observable* by reading the same on-disk state:
  *
  * - its **config** YAML (`kontinuance.github.config`), loaded with the event source's own
  *   [EventSourceConfig] parser — the watched repositories, poll cadence, base URL, and the token env-var
  *   **name** (never a token value; the config never stores one);
  * - its **poll cursors** (`kontinuance.github.cursors`, default `~/.kontinuance/github-cursors.properties`) —
- *   each PR/branch key and the last commit SHA the poller has processed.
+ *   each PR/branch key and the last commit SHA the poller has processed;
+ * - its **liveness** (`kontinuance.github.heartbeat`, 036) — the last successful poll, its age, whether it
+ *   has gone stale, and the cycle count.
  *
  * When no config path is set (or the file is absent) it answers `{ "configured": false }`. It never starts,
- * stops, or reconfigures the event source — the CLI stays the runtime.
+ * stops, or reconfigures the event source — the CLI stays the runtime. Handlers return a typed DTO the
+ * Jackson codec serializes.
  */
 @RestController
 class GitHubSourceController(
@@ -45,49 +43,47 @@ class GitHubSourceController(
         ?: Path.of(System.getProperty("user.home"), ".kontinuance", "github-heartbeat.properties")
 
     @GetMapping("/api/source")
-    suspend fun source(): ResponseEntity<ByteArray> = withContext(Dispatchers.IO) {
+    suspend fun source(): ResponseEntity<*> = withContext(Dispatchers.IO) {
         val path = config?.takeIf { Files.isRegularFile(it) }
-            ?: return@withContext ok(buildJsonObject { put("configured", false) }.toString())
+            ?: return@withContext ResponseEntity.ok(SourceResponse(configured = false))
 
         val parsed = runCatching { EventSourceConfig.load(path) }
-            .getOrElse { return@withContext error(it.message ?: "could not read the event-source config") }
+            .getOrElse {
+                return@withContext ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorResponse(it.message ?: "could not read the event-source config"))
+            }
 
-        val json = buildJsonObject {
-            put("configured", true)
-            put("pollIntervalSeconds", parsed.pollIntervalSeconds)
-            put("baseUrl", parsed.baseUrl)
-            put("tokenEnv", parsed.tokenEnv) // the env-var NAME only — never a token value
-            putJsonArray("repositories") {
-                parsed.bindings.forEach { binding ->
-                    addJsonObject {
-                        put("slug", binding.repo.slug)
-                        put("prPipeline", binding.prPipeline.toString())
-                        binding.pushPipeline?.let { put("pushPipeline", it.toString()) }
-                        put("trackedBranch", binding.trackedBranch)
-                    }
-                }
-            }
-            putJsonArray("cursors") {
-                readCursors().forEach { (key, sha) ->
-                    addJsonObject {
-                        put("key", key)
-                        put("sha", sha)
-                    }
-                }
-            }
-            // Liveness (036): the last successful poll, its age, whether it has gone stale, and the cycle
-            // count. Absent when the poller has never written a heartbeat (liveness unknown).
-            HeartbeatState.read(heartbeat)?.let { hb ->
-                val ageSeconds = maxOf(0L, (System.currentTimeMillis() - hb.lastPolledMillis) / MILLIS_PER_SECOND)
-                putJsonObject("heartbeat") {
-                    put("lastPolledMillis", hb.lastPolledMillis)
-                    put("ageSeconds", ageSeconds)
-                    put("stale", ageSeconds > STALE_FACTOR * parsed.pollIntervalSeconds)
-                    put("cycles", hb.cycles)
-                }
-            }
-        }.toString()
-        ok(json)
+        ResponseEntity.ok(
+            SourceResponse(
+                configured = true,
+                pollIntervalSeconds = parsed.pollIntervalSeconds,
+                baseUrl = parsed.baseUrl,
+                tokenEnv = parsed.tokenEnv, // the env-var NAME only — never a token value
+                repositories = parsed.bindings.map { binding ->
+                    SourceRepo(
+                        slug = binding.repo.slug,
+                        prPipeline = binding.prPipeline.toString(),
+                        pushPipeline = binding.pushPipeline?.toString(),
+                        trackedBranch = binding.trackedBranch,
+                    )
+                },
+                cursors = readCursors().map { (key, sha) -> SourceCursor(key, sha) },
+                heartbeat = readHeartbeat(parsed.pollIntervalSeconds),
+            ),
+        )
+    }
+
+    // Liveness (036): the last successful poll, its age, whether it has gone stale, and the cycle count;
+    // null when the poller has never written a heartbeat (liveness unknown → omitted from the response).
+    private fun readHeartbeat(pollIntervalSeconds: Long): SourceHeartbeat? {
+        val state = HeartbeatState.read(heartbeat) ?: return null
+        val ageSeconds = maxOf(0L, (System.currentTimeMillis() - state.lastPolledMillis) / MILLIS_PER_SECOND)
+        return SourceHeartbeat(
+            lastPolledMillis = state.lastPolledMillis,
+            ageSeconds = ageSeconds,
+            stale = ageSeconds > STALE_FACTOR * pollIntervalSeconds,
+            cycles = state.cycles,
+        )
     }
 
     // Read the poller's cursor properties (key = last-seen SHA), sorted; empty when the file is absent.
@@ -98,15 +94,6 @@ class GitHubSourceController(
         return props.stringPropertyNames()
             .sorted()
             .mapNotNull { key -> props.getProperty(key)?.let { key to it } }
-    }
-
-    private fun ok(json: String): ResponseEntity<ByteArray> =
-        ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json.toByteArray())
-
-    private fun error(message: String): ResponseEntity<ByteArray> {
-        val body = buildJsonObject { put("error", message) }.toString().toByteArray()
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .contentType(MediaType.APPLICATION_JSON).body(body)
     }
 
     private companion object {

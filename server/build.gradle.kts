@@ -27,7 +27,9 @@ dependencies {
     implementation(project(":github"))
     implementation(rootProject.libs.spring.boot.starter.webflux)
     implementation(rootProject.libs.spring.boot.starter.actuator)
-    implementation(rootProject.libs.serialization.json)
+    // Jackson (already on the WebFlux classpath) is the JSON codec: controllers return typed DTOs and the
+    // Kotlin module binds request bodies + honors nullability.
+    implementation(rootProject.libs.jackson.module.kotlin)
     implementation(rootProject.libs.coroutines.core)
     // Bridges suspend @RestController handlers to Reactor Mono (Spring's CoroutinesUtils needs it).
     implementation(rootProject.libs.coroutines.reactor)

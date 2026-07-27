@@ -1,10 +1,6 @@
 package org.khorum.oss.kontinuance.server.projects
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
@@ -63,13 +59,8 @@ class ProjectStore(private val dir: Path) {
      */
     fun source(name: String): ProjectSource? {
         val file = resolve(name + SOURCE_SUFFIX).takeIf { Files.isRegularFile(it) } ?: return null
-        val source = runCatching {
-            val obj = Json.parseToJsonElement(file.readText()).jsonObject
-            ProjectSource(
-                repo = obj["repo"]?.jsonPrimitive?.content,
-                branch = obj["branch"]?.jsonPrimitive?.content,
-            )
-        }.getOrNull() ?: return null
+        val map = runCatching { JSON.readValue(file.readText(), Map::class.java) }.getOrNull() ?: return null
+        val source = ProjectSource(repo = map["repo"] as? String, branch = map["branch"] as? String)
         return source.takeIf { it.hasRepo }
     }
 
@@ -80,11 +71,11 @@ class ProjectStore(private val dir: Path) {
             file.deleteIfExists()
             return
         }
-        val json = buildJsonObject {
+        val payload = buildMap {
             put("repo", source.repo)
             source.branch?.takeIf { it.isNotBlank() }?.let { put("branch", it) }
-        }.toString()
-        file.writeText(json)
+        }
+        file.writeText(JSON.writeValueAsString(payload))
     }
 
     private fun resolve(child: String): Path = dir.resolve(child)
@@ -93,6 +84,10 @@ class ProjectStore(private val dir: Path) {
         const val SUFFIX = ".yml"
         private const val SOURCE_SUFFIX = ".meta.json"
         private const val ACTIVE = ".active"
+
+        // The source sidecar is a small internal `{repo, branch?}` file — a plain Jackson mapper (no Kotlin
+        // module needed for the map round-trip) keeps the server off kotlinx-serialization.
+        private val JSON: JsonMapper = JsonMapper.builder().build()
 
         /** A safe project name: letters, digits, and `. _ -`, 1–64 chars (never a path). */
         private val NAME = Regex("[A-Za-z0-9._-]{1,64}")

@@ -2,8 +2,6 @@ package org.khorum.oss.kontinuance.server.coverage
 
 import org.khorum.oss.kontinuance.server.stub.StubFixtures
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import java.nio.file.Path
@@ -22,8 +20,5 @@ class CoverageController(
     private val report: Path = Path.of(reportPath)
 
     @GetMapping("/api/coverage")
-    fun coverage(): ResponseEntity<ByteArray> {
-        val body = KoverCoverageReader.read(report) ?: StubFixtures.coverage()
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body.toByteArray())
-    }
+    fun coverage(): CoverageResponse = KoverCoverageReader.read(report) ?: StubFixtures.coverage()
 }

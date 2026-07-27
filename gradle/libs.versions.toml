@@ -20,6 +20,9 @@ coroutines-core = "1.10.0"
 coroutines-test = "1.10.0"
 snakeyaml-engine = "2.6"
 spring-boot = "4.1.0"
+# Jackson 3 (tools.jackson) — the JSON codec Spring Boot 4.1 WebFlux already ships; pinned to match the
+# Spring-managed version so adding the Kotlin module never diverges from the resolved graph.
+jackson = "3.1.4"
 
 [libraries]
 # Kotlin
@@ -64,6 +67,9 @@ snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "s
 spring-boot-starter-webflux = { module = "org.springframework.boot:spring-boot-starter-webflux", version.ref = "spring-boot" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator", version.ref = "spring-boot" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test", version.ref = "spring-boot" }
+# Kotlin support for the Jackson 3 codec (data-class @RequestBody binding + nullability). In the already-
+# trusted `tools.jackson` group, so no verification-metadata change.
+jackson-module-kotlin = { module = "tools.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

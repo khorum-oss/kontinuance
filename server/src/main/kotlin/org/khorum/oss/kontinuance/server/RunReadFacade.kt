@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.server
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.springframework.stereotype.Component
 
 /**
@@ -14,9 +15,9 @@ import org.springframework.stereotype.Component
 @Component
 class RunReadFacade(private val api: RunApi) {
 
-    suspend fun health(): ApiResponse = withContext(Dispatchers.IO) { api.health() }
+    suspend fun health(): StatusMessage = withContext(Dispatchers.IO) { api.health() }
 
-    suspend fun listRuns(limit: Int?): ApiResponse = withContext(Dispatchers.IO) { api.listRuns(limit) }
+    suspend fun listRuns(limit: Int?): RunsResponse = withContext(Dispatchers.IO) { api.listRuns(limit) }
 
-    suspend fun getRun(id: String): ApiResponse = withContext(Dispatchers.IO) { api.getRun(id) }
+    suspend fun getRun(id: String): RunRecord? = withContext(Dispatchers.IO) { api.getRun(id) }
 }

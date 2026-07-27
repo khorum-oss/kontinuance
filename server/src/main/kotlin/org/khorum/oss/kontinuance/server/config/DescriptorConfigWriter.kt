@@ -14,8 +14,8 @@ import java.nio.file.Path
 object DescriptorConfigWriter {
 
     sealed interface Result {
-        /** Validated and written; [json] is the refreshed `/api/config` body. */
-        data class Written(val json: String) : Result
+        /** Validated and written; [config] is the refreshed `/api/config` projection. */
+        data class Written(val config: ConfigResponse) : Result
 
         /** Rejected before any write; [message] explains why (the parser's location-tagged error). */
         data class Invalid(val message: String) : Result
@@ -28,7 +28,7 @@ object DescriptorConfigWriter {
         path.toAbsolutePath().parent?.let { Files.createDirectories(it) }
         Files.writeString(path, text)
         // The file now exists, so the reader always yields a projection.
-        val json = DescriptorConfigReader.read(path) ?: error("descriptor missing right after write")
-        return Result.Written(json)
+        val config = DescriptorConfigReader.read(path) ?: error("descriptor missing right after write")
+        return Result.Written(config)
     }
 }
