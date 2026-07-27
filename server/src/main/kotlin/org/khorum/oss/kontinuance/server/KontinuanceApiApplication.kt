@@ -6,8 +6,10 @@ import org.springframework.boot.runApplication
 /**
  * The Spring Boot application hosting the run-history read API (008). Replaces the 007 JDK
  * [com.sun.net.httpserver.HttpServer] launcher: the same `/api` contract is now served by a WebFlux
- * application with coroutine [RunController] handlers and actuator health, on the platform runtime the
- * constitution names. Configuration (store location, port) is bound in [ServerConfig] / `application.yml`.
+ * application with coroutine [org.khorum.oss.kontinuance.server.controller.RunController]
+ * handlers and actuator health, on the platform runtime the
+ * constitution names. Configuration (store location, port) is bound in
+ * [org.khorum.oss.kontinuance.server.config.ServerConfig] / `application.yml`.
  */
 @SpringBootApplication
 class KontinuanceApiApplication
