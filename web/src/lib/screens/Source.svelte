@@ -18,6 +18,11 @@
 	} = $props();
 
 	const shortSha = (sha?: string) => (sha ? sha.slice(0, 9) : '—');
+	function formatAge(seconds: number): string {
+		if (seconds < 60) return `${seconds}s`;
+		if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+		return `${Math.floor(seconds / 3600)}h`;
+	}
 </script>
 
 <div class="screen">
@@ -39,6 +44,20 @@
 	{:else if source}
 		<div class="head">
 			<span class="k-mono title">GITHUB EVENT SOURCE</span>
+			{#if source.heartbeat}
+				{@const hb = source.heartbeat}
+				<span class="live" class:stale={hb.stale}>
+					<span class="live-dot"></span>
+					<span class="k-mono">
+						{hb.stale ? 'STALE' : 'POLLING'} · last checked {formatAge(hb.ageSeconds)} ago · {hb.cycles} cycles
+					</span>
+				</span>
+			{:else}
+				<span class="live unknown">
+					<span class="live-dot"></span>
+					<span class="k-mono">LIVENESS UNKNOWN · no heartbeat yet</span>
+				</span>
+			{/if}
 			<span class="k-mono meta">
 				polls every {source.pollIntervalSeconds}s · {source.baseUrl} · token env <code>{source.tokenEnv}</code>
 			</span>
@@ -174,6 +193,29 @@
 	.meta {
 		font-size: 10px;
 		color: var(--k-faint);
+	}
+	.live {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 9.5px;
+		letter-spacing: 1px;
+		color: var(--k-ok);
+	}
+	.live.stale {
+		color: var(--k-fail);
+	}
+	.live.unknown {
+		color: var(--k-muted-4);
+	}
+	.live-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: currentColor;
+	}
+	.live:not(.stale):not(.unknown) .live-dot {
+		animation: kpulsesoft 3.6s ease-in-out infinite;
 	}
 	.section {
 		margin-bottom: 26px;

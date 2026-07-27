@@ -6,6 +6,8 @@ import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.github.client.RepoRef
 import org.khorum.oss.kontinuance.github.client.RestGitHubClient
+import org.khorum.oss.kontinuance.github.health.Heartbeat
+import org.khorum.oss.kontinuance.github.health.NoOpHeartbeat
 import org.khorum.oss.kontinuance.github.poll.InMemoryCursorStore
 import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
@@ -132,13 +134,32 @@ class EventSourceIT {
         }
     }
 
-    private fun eventSource(server: FakeGitHubServer, prPipeline: Path): EventSource {
+    @Test
+    fun `a successful poll records a liveness heartbeat`(@TempDir dir: Path) = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/pulls", body = pullsBody())
+            server.on("POST", "/repos/.+/statuses/.+", status = 201, body = "{}")
+            var beats = 0
+            val source = eventSource(server, descriptor(dir, "pr.yaml", "true"), heartbeat = { beats++ })
+
+            source.pollAndRun()
+
+            assertEquals(1, beats, "a completed poll should beat the heartbeat once")
+        }
+    }
+
+    private fun eventSource(
+        server: FakeGitHubServer,
+        prPipeline: Path,
+        heartbeat: Heartbeat = NoOpHeartbeat,
+    ): EventSource {
         val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
         val binding = RepositoryBinding(repo, prPipeline)
         return EventSource(
             poller = Poller(client, listOf(binding), InMemoryCursorStore()),
             resolver = TriggerResolver(listOf(binding)),
             reporter = RunReporter(client),
+            heartbeat = heartbeat,
         )
     }
 }

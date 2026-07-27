@@ -152,6 +152,13 @@ export interface SourceCursor {
 	key: string;
 	sha: string;
 }
+// Liveness of the poller (036): present once it has completed a poll; absent means "unknown".
+export interface SourceHeartbeat {
+	lastPolledMillis: number;
+	ageSeconds: number;
+	stale: boolean;
+	cycles: number;
+}
 export interface SourceStatus {
 	configured: boolean;
 	pollIntervalSeconds?: number;
@@ -159,6 +166,7 @@ export interface SourceStatus {
 	tokenEnv?: string;
 	repositories?: SourceRepo[];
 	cursors?: SourceCursor[];
+	heartbeat?: SourceHeartbeat;
 }
 
 export interface PlanSummary {

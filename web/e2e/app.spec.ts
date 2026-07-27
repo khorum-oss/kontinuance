@@ -348,9 +348,11 @@ test.describe('deploy screen', () => {
 		await page.goto('/deploy');
 		await enterApp(page);
 
-		// SOURCE node + a node per real stage
-		await expect(page.getByText('SOURCE')).toBeVisible();
-		await expect(page.getByText('TEST', { exact: true })).toBeVisible();
+		// SOURCE node + a node per real stage (scoped to the deploy graph — "SOURCE" is also a sidebar
+		// nav item (035) and the project picker's "SET SOURCE" (033), so an unscoped match is ambiguous)
+		const graph = page.locator('.nodes');
+		await expect(graph.getByText('SOURCE')).toBeVisible();
+		await expect(graph.getByText('TEST', { exact: true })).toBeVisible();
 		// no artifact registry — honest empty manifest
 		await expect(page.getByText('ARTIFACT MANIFEST')).toBeVisible();
 		await expect(page.getByText(/no artifacts tracked/)).toBeVisible();
@@ -404,6 +406,8 @@ test.describe('source screen', () => {
 		await enterApp(page);
 
 		await expect(page.getByText('GITHUB EVENT SOURCE')).toBeVisible();
+		// liveness heartbeat (036): polling, with the cycle count
+		await expect(page.getByText(/POLLING · last checked .* ago · 137 cycles/)).toBeVisible();
 		// watched repo + its poll cursor
 		await expect(page.getByText('khorum-oss/relikquary', { exact: true }).first()).toBeVisible();
 		await expect(page.getByText('khorum-oss/relikquary#pr-42')).toBeVisible();

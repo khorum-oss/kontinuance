@@ -4,6 +4,9 @@ import kotlinx.coroutines.runBlocking
 import org.khorum.oss.kontinuance.github.EventSource
 import org.khorum.oss.kontinuance.github.client.RestGitHubClient
 import org.khorum.oss.kontinuance.github.config.EventSourceConfig
+import org.khorum.oss.kontinuance.github.health.FileHeartbeat
+import org.khorum.oss.kontinuance.github.health.Heartbeat
+import org.khorum.oss.kontinuance.github.health.NoOpHeartbeat
 import org.khorum.oss.kontinuance.github.poll.CursorStore
 import org.khorum.oss.kontinuance.github.poll.FileCursorStore
 import org.khorum.oss.kontinuance.github.poll.Poller
@@ -30,6 +33,7 @@ fun eventSourceFrom(
     config: EventSourceConfig,
     cursors: CursorStore,
     runStore: RunStore = NoOpRunStore,
+    heartbeat: Heartbeat = NoOpHeartbeat,
     env: (String) -> String? = System::getenv,
 ): EventSource {
     val token = env(config.tokenEnv)?.takeIf { it.isNotBlank() }
@@ -40,6 +44,7 @@ fun eventSourceFrom(
         resolver = TriggerResolver(config.bindings),
         reporter = RunReporter(client),
         runStore = runStore,
+        heartbeat = heartbeat,
     )
 }
 
@@ -50,8 +55,9 @@ fun main(args: Array<String>) {
     val stateDir = Path.of(System.getProperty("user.home"), ".kontinuance")
     val cursors = FileCursorStore(stateDir.resolve("github-cursors.properties"))
     val runStore = FileRunStore(stateDir.resolve("runs"))
+    val heartbeat = FileHeartbeat(stateDir.resolve("github-heartbeat.properties"))
     val source = try {
-        eventSourceFrom(config, cursors, runStore)
+        eventSourceFrom(config, cursors, runStore, heartbeat)
     } catch (e: IllegalStateException) {
         fail(e.message)
     }

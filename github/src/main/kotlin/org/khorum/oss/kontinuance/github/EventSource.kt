@@ -8,6 +8,8 @@ import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
 import org.khorum.oss.kontinuance.github.client.RepoRef
+import org.khorum.oss.kontinuance.github.health.Heartbeat
+import org.khorum.oss.kontinuance.github.health.NoOpHeartbeat
 import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.trigger.TriggerEvent
@@ -31,7 +33,11 @@ import java.time.Instant
  * @param engine the 001 engine (default in-process engine).
  * @param baseSecrets the underlying secret source for pipeline steps (env by default); `KONTINUANCE_SHA`
  *   is overlaid per run from the event.
+ * @param heartbeat records a liveness signal after each successful poll (036); no-op by default.
  */
+// Each parameter is an independently-injectable collaborator with a sensible default (test seams); grouping
+// them into a holder would only obscure the wiring.
+@Suppress("LongParameterList")
 class EventSource(
     private val poller: Poller,
     private val resolver: TriggerResolver,
@@ -39,14 +45,21 @@ class EventSource(
     private val engine: PipelineEngine = PipelineEngine.default(),
     private val baseSecrets: SecretSource = EnvSecretSource(),
     private val runStore: RunStore = NoOpRunStore,
+    private val heartbeat: Heartbeat = NoOpHeartbeat,
 ) {
 
     /**
      * Runs one poll cycle: for each new event with a configured pipeline, posts `pending`, runs the
      * pipeline, and posts the terminal status. Returns the runs started this cycle. Events for
-     * unconfigured repos/refs are skipped silently (no status posted).
+     * unconfigured repos/refs are skipped silently (no status posted). Records the [heartbeat] as soon as
+     * the poll of GitHub succeeds (before running the triggered pipelines), so it means "last checked
+     * GitHub" and a failing poll (which throws) does not refresh it.
      */
-    suspend fun pollAndRun(): List<Run> = poller.poll().mapNotNull { runAndReport(it) }
+    suspend fun pollAndRun(): List<Run> {
+        val events = poller.poll()
+        heartbeat.beat()
+        return events.mapNotNull { runAndReport(it) }
+    }
 
     /**
      * Manually (re-)triggers a run for [repo]@[sha] without a GitHub event (US3): runs the repo's

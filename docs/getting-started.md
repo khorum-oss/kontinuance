@@ -106,11 +106,13 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as
    external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster), and
    **Source** (035 — a read-only view of the GitHub **event source**: the repositories it watches, its poll
-   cadence, the last commit it processed per PR/branch, and the runs it triggered). The event source itself
-   runs as the separate `kontinuance-ci` CLI (003); point the server at its config with
-   `kontinuance.github.config` (and, if it differs from the default `~/.kontinuance/github-cursors.properties`,
-   its cursor file with `kontinuance.github.cursors`) to watch it here. Only the token env-var **name** is
-   shown, never a token value.
+   cadence, the last commit it processed per PR/branch, and the runs it triggered, plus a **liveness**
+   indicator (036) showing whether it is polling, how long ago it last checked GitHub, and its poll-cycle
+   count — or a **stale** state when the heartbeat has gone quiet). The event source itself runs as the
+   separate `kontinuance-ci` CLI (003); point the server at its config with `kontinuance.github.config` (its
+   cursor and heartbeat files default under `~/.kontinuance/` and can be overridden with
+   `kontinuance.github.cursors` / `kontinuance.github.heartbeat`) to watch it here. Only the token env-var
+   **name** is shown, never a token value.
 
 > **Live updates (025):** the runs list and the run log-tail stream over SSE. By default the server
 > re-reads on a timer (`kontinuance.stream.mode=poll`). Set `kontinuance.stream.mode=push` to have

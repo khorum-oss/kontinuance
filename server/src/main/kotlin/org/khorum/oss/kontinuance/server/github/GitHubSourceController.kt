@@ -6,7 +6,9 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.khorum.oss.kontinuance.github.config.EventSourceConfig
+import org.khorum.oss.kontinuance.github.health.HeartbeatState
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -34,10 +36,13 @@ import java.util.Properties
 class GitHubSourceController(
     @param:Value("\${kontinuance.github.config:#{null}}") configPath: String?,
     @param:Value("\${kontinuance.github.cursors:#{null}}") cursorsPath: String?,
+    @param:Value("\${kontinuance.github.heartbeat:#{null}}") heartbeatPath: String?,
 ) {
     private val config: Path? = configPath?.let { Path.of(it) }
     private val cursors: Path = cursorsPath?.let { Path.of(it) }
         ?: Path.of(System.getProperty("user.home"), ".kontinuance", "github-cursors.properties")
+    private val heartbeat: Path = heartbeatPath?.let { Path.of(it) }
+        ?: Path.of(System.getProperty("user.home"), ".kontinuance", "github-heartbeat.properties")
 
     @GetMapping("/api/source")
     suspend fun source(): ResponseEntity<ByteArray> = withContext(Dispatchers.IO) {
@@ -70,6 +75,17 @@ class GitHubSourceController(
                     }
                 }
             }
+            // Liveness (036): the last successful poll, its age, whether it has gone stale, and the cycle
+            // count. Absent when the poller has never written a heartbeat (liveness unknown).
+            HeartbeatState.read(heartbeat)?.let { hb ->
+                val ageSeconds = maxOf(0L, (System.currentTimeMillis() - hb.lastPolledMillis) / MILLIS_PER_SECOND)
+                putJsonObject("heartbeat") {
+                    put("lastPolledMillis", hb.lastPolledMillis)
+                    put("ageSeconds", ageSeconds)
+                    put("stale", ageSeconds > STALE_FACTOR * parsed.pollIntervalSeconds)
+                    put("cycles", hb.cycles)
+                }
+            }
         }.toString()
         ok(json)
     }
@@ -91,5 +107,12 @@ class GitHubSourceController(
         val body = buildJsonObject { put("error", message) }.toString().toByteArray()
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .contentType(MediaType.APPLICATION_JSON).body(body)
+    }
+
+    private companion object {
+        private const val MILLIS_PER_SECOND = 1000L
+        // A heartbeat older than this many poll intervals is "stale" — one missed poll is jitter, several
+        // is a problem.
+        private const val STALE_FACTOR = 3L
     }
 }
