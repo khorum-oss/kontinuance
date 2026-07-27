@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
 	import { runStream } from '$lib/api/live';
-	import { mergeNewestFirst, toRunView, type RunView } from '$lib/api/present';
+	import { filterRuns, mergeNewestFirst, toRunView, type RunView } from '$lib/api/present';
 	import type { RunRecord } from '$lib/api/types';
 	import Runs from '$lib/screens/Runs.svelte';
 
@@ -10,15 +10,31 @@
 	const byId = new Map<string, RunRecord>();
 
 	let runs = $state<RunView[]>([]);
+	let total = $state(0);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let degraded = $state(false);
 	let triggering = $state(false);
 	let triggerError = $state<string | null>(null);
 
+	// Runs-list filters (037) — a projection over the live set; byId stays the untouched source of truth.
+	let query = $state('');
+	let statusFilter = $state('all');
+	let triggerFilter = $state('all');
+
 	function render() {
-		runs = mergeNewestFirst(byId.values()).map((r) => toRunView(r));
+		const all = mergeNewestFirst(byId.values());
+		total = all.length;
+		runs = filterRuns(all, { query, status: statusFilter, trigger: triggerFilter }).map((r) => toRunView(r));
 	}
+
+	// Re-project when a filter changes (byId is untouched, so clearing restores the full list instantly).
+	$effect(() => {
+		query;
+		statusFilter;
+		triggerFilter;
+		render();
+	});
 
 	async function load() {
 		loading = true;
@@ -68,6 +84,10 @@
 
 <Runs
 	{runs}
+	{total}
+	{query}
+	status={statusFilter}
+	trigger={triggerFilter}
 	{loading}
 	{error}
 	{degraded}
@@ -76,4 +96,7 @@
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
 	ontrigger={trigger}
+	onquery={(v) => (query = v)}
+	onstatus={(v) => (statusFilter = v)}
+	ontriggerfilter={(v) => (triggerFilter = v)}
 />
