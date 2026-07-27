@@ -1,7 +1,5 @@
 package org.khorum.oss.kontinuance.server.projects
 
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Value
@@ -164,7 +162,7 @@ class ProjectControllerIT(
 
         client.post().uri("/api/projects/svc/source")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(buildJsonObject { put("repo", "https://example.test/svc"); put("branch", "dev") }.toString())
+            .bodyValue(SourceRequest("https://example.test/svc", "dev"))
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -181,20 +179,15 @@ class ProjectControllerIT(
     fun `POST source for an unknown project is a 404`() {
         client.post().uri("/api/projects/nope/source")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(buildJsonObject { put("repo", "https://example.test/x") }.toString())
+            .bodyValue(SourceRequest("https://example.test/x"))
             .exchange()
             .expectStatus().isNotFound
             .expectBody()
             .jsonPath("$.error").exists()
     }
 
-    private fun createBody(name: String, text: String, repo: String? = null, branch: String? = null): String =
-        buildJsonObject {
-            put("name", name)
-            put("text", text)
-            repo?.let { put("repo", it) }
-            branch?.let { put("branch", it) }
-        }.toString()
+    private fun createBody(name: String, text: String, repo: String? = null, branch: String? = null) =
+        CreateProjectRequest(name = name, text = text, repo = repo, branch = branch)
 
     companion object {
         private val storeDir: Path = Files.createTempDirectory("knt-projects-store-")

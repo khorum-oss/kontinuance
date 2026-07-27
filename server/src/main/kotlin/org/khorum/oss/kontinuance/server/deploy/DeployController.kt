@@ -1,15 +1,8 @@
 package org.khorum.oss.kontinuance.server.deploy
 
-import kotlinx.serialization.json.JsonArrayBuilder
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 import org.khorum.oss.kontinuance.persistence.RunRecord
+import org.khorum.oss.kontinuance.persistence.StageRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -28,41 +21,29 @@ import org.springframework.web.bind.annotation.RestController
 class DeployController(private val store: RunStore) {
 
     @GetMapping("/api/deploy")
-    fun deploy(): ResponseEntity<ByteArray> {
-        val run = store.recent(1).firstOrNull()
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(render(run).toByteArray())
-    }
+    fun deploy(): DeployResponse = render(store.recent(1).firstOrNull())
 
-    private fun render(run: RunRecord?): String = buildJsonObject {
-        putJsonArray("nodes") {
+    private fun render(run: RunRecord?): DeployResponse {
+        val nodes = buildList {
             if (run != null) {
-                node("source", "SOURCE", run.repo ?: run.pipeline, "synced", sourceMeta(run))
+                add(DeployNode("source", "SOURCE", run.repo ?: run.pipeline, "synced", sourceMeta(run)))
                 run.stages.forEachIndexed { i, stage ->
                     val steps = if (stage.steps.size == 1) "1 step" else "${stage.steps.size} steps"
-                    node("stage-$i", stage.name.uppercase(), steps, state(stage.status), stepMeta(stage))
+                    add(DeployNode("stage-$i", stage.name.uppercase(), steps, state(stage.status), stepMeta(stage)))
                 }
             }
         }
+        val done = run?.stages?.count { it.status.startsWith("Success", ignoreCase = true) } ?: 0
+        val total = run?.stages?.size ?: 0
+        val environment = DeployEnvironment(
+            podsReady = if (run == null) "—" else "$done/$total",
+            syncRevision = run?.sha?.take(SHA_LEN) ?: "—",
+            health = run?.let { state(it.status).uppercase() } ?: "—",
+            meta = if (run == null) EMPTY_META else EXTERNAL_META,
+        )
         // Kontinuance runs no artifact registry (publishing is a pipeline step) — nothing to list here.
-        putJsonArray("artifacts") { }
-        putJsonObject("environment") {
-            val done = run?.stages?.count { it.status.startsWith("Success", ignoreCase = true) } ?: 0
-            val total = run?.stages?.size ?: 0
-            put("podsReady", if (run == null) "—" else "$done/$total")
-            put("syncRevision", run?.sha?.take(SHA_LEN) ?: "—")
-            put("health", run?.let { state(it.status).uppercase() } ?: "—")
-            put("meta", if (run == null) EMPTY_META else EXTERNAL_META)
-        }
-    }.toString()
-
-    private fun JsonArrayBuilder.node(id: String, label: String, title: String, status: String, meta: String) =
-        addJsonObject {
-            put("id", id)
-            put("label", label)
-            put("title", title)
-            put("status", status)
-            put("meta", meta)
-        }
+        return DeployResponse(nodes = nodes, artifacts = emptyList(), environment = environment)
+    }
 
     private companion object {
         const val SHA_LEN = 7
@@ -79,7 +60,7 @@ class DeployController(private val store: RunStore) {
                 run.trigger?.let { "trigger $it" },
             ).joinToString("\n").ifEmpty { run.pipeline }
 
-        fun stepMeta(stage: org.khorum.oss.kontinuance.persistence.StageRecord): String =
+        fun stepMeta(stage: StageRecord): String =
             stage.steps.joinToString("\n") { "${it.name} — ${state(it.status)}" }.ifEmpty { "no steps" }
 
         /** Map an engine status to the deploy-state vocabulary the UI colors (synced/progressing/failed/…). */

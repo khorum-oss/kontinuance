@@ -8,6 +8,7 @@ import org.springframework.web.server.ServerWebExchange
 import org.springframework.web.server.WebFilter
 import org.springframework.web.server.WebFilterChain
 import reactor.core.publisher.Mono
+import tools.jackson.databind.ObjectMapper
 
 /**
  * The single authentication choke point (016). A [WebFilter] runs before handler mapping for **every**
@@ -24,6 +25,7 @@ import reactor.core.publisher.Mono
 class AuthWebFilter(
     private val credentials: AuthCredentials,
     private val sessions: SessionStore,
+    private val mapper: ObjectMapper,
 ) : WebFilter, Ordered {
 
     override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
@@ -50,7 +52,8 @@ class AuthWebFilter(
         val response = exchange.response
         response.statusCode = HttpStatus.UNAUTHORIZED
         response.headers.contentType = MediaType.APPLICATION_JSON
-        val bytes = AuthJson.body(authenticated = false, authRequired = true, error = "authentication required")
+        val body = SessionResponse(authenticated = false, authRequired = true, error = "authentication required")
+        val bytes = mapper.writeValueAsBytes(body)
         return response.writeWith(Mono.just(response.bufferFactory().wrap(bytes)))
     }
 

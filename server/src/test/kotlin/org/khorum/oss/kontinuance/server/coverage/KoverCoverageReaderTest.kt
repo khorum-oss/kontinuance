@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -42,23 +43,36 @@ class KoverCoverageReaderTest {
         val file = dir.resolve("report.xml")
         Files.writeString(file, sample)
 
-        val json = KoverCoverageReader.read(file)
-        requireNotNull(json)
+        val coverage = requireNotNull(KoverCoverageReader.read(file))
 
-        assertTrue(json.contains("\"tool\":\"kover\""))
-        assertTrue(json.contains("\"pct\":\"85.0%\"") && json.contains("\"covered\":170") && json.contains("\"total\":200"))
-        assertTrue(json.contains("\"pct\":\"65.0%\"") && json.contains("\"total\":40"))
-        assertTrue(json.contains("\"classes\":3"))
-        // engine: line 90/100 → 90, branch 16/20 → 80, missed 10
-        assertTrue(json.contains("\"name\":\"engine\"") && json.contains("\"linePct\":90") && json.contains("\"branchPct\":80"))
-        // server: line 80/100 → 80, branch 10/20 → 50, missed 20
-        assertTrue(json.contains("\"name\":\"server\"") && json.contains("\"linePct\":80") && json.contains("\"branchPct\":50"))
+        assertEquals("kover", coverage.tool)
+        assertEquals("85.0%", coverage.line.pct)
+        assertEquals(170, coverage.line.covered)
+        assertEquals(200, coverage.line.total)
+        assertEquals("65.0%", coverage.branch.pct)
+        assertEquals(40, coverage.branch.total)
+        assertEquals(3, coverage.classes)
+
+        val engine = coverage.modules.first { it.name == "engine" }
+        assertEquals(90, engine.linePct)
+        assertEquals(80, engine.branchPct)
+        assertEquals(10, engine.missed)
+
+        val server = coverage.modules.first { it.name == "server" }
+        assertEquals(80, server.linePct)
+        assertEquals(50, server.branchPct)
+        assertEquals(20, server.missed)
+
         // per-class breakdown (031): class display name is the path after the module, dot-joined
-        assertTrue(json.contains("\"name\":\"model.Foo\""), "engine class Foo is listed by display name")
-        assertTrue(json.contains("\"name\":\"model.Bar\""), "engine class Bar is listed by display name")
-        assertTrue(json.contains("\"name\":\"Baz\""), "server class Baz is listed")
-        // Foo: line 9/10 → 90; Bar: line 81/90 → 90; both engine classes present with their own coverage
-        assertTrue(json.contains("\"name\":\"model.Foo\",\"linePct\":90,\"branchPct\":100,\"missed\":1"))
+        val engineClasses = requireNotNull(engine.classes)
+        assertTrue(engineClasses.any { it.name == "model.Foo" }, "engine class Foo listed by display name")
+        assertTrue(engineClasses.any { it.name == "model.Bar" }, "engine class Bar listed by display name")
+        assertTrue(requireNotNull(server.classes).any { it.name == "Baz" }, "server class Baz is listed")
+
+        val foo = engineClasses.first { it.name == "model.Foo" }
+        assertEquals(90, foo.linePct)
+        assertEquals(100, foo.branchPct)
+        assertEquals(1, foo.missed)
     }
 
     @Test
@@ -66,9 +80,10 @@ class KoverCoverageReaderTest {
         val file = dir.resolve("report.xml")
         Files.writeString(file, sample)
 
-        val json = requireNotNull(KoverCoverageReader.read(file))
+        val coverage = requireNotNull(KoverCoverageReader.read(file))
+        val engineClasses = requireNotNull(coverage.modules.first { it.name == "engine" }.classes).map { it.name }
         // Bar (missed 9) must appear before Foo (missed 1) in the engine module's classes array.
-        assertTrue(json.indexOf("model.Bar") < json.indexOf("model.Foo"), "most-missed class comes first")
+        assertTrue(engineClasses.indexOf("model.Bar") < engineClasses.indexOf("model.Foo"), "most-missed first")
     }
 
     @Test

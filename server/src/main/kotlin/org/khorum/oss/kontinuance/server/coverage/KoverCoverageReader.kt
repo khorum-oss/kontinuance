@@ -1,12 +1,5 @@
 package org.khorum.oss.kontinuance.server.coverage
 
-import kotlinx.serialization.json.JsonArrayBuilder
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.addJsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import java.nio.file.Files
@@ -15,9 +8,9 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Parses a Kover coverage report (JaCoCo XML format, e.g. `build/reports/kover/report.xml`) into the
- * `/api/coverage` contract shape (see specs/009-web-ui/contracts/stub-api.md). Modules are derived from
- * the package name segment after `kontinuance` (the repo's module packages are `…kontinuance.<module>`),
- * so the aggregated report yields per-module line/branch coverage. Returns `null` when the report is
+ * `/api/coverage` contract shape ([CoverageResponse]). Modules are derived from the package name segment
+ * after `kontinuance` (the repo's module packages are `…kontinuance.<module>`), so the aggregated report
+ * yields per-module line/branch coverage plus a per-class breakdown. Returns `null` when the report is
  * absent or unparseable, so the controller can fall back to fixture data.
  *
  * No new dependency: the JDK DOM parser is used with external entities disabled (XXE-safe).
@@ -43,12 +36,12 @@ object KoverCoverageReader {
         }
     }
 
-    fun read(path: Path): String? {
+    fun read(path: Path): CoverageResponse? {
         if (!Files.isRegularFile(path)) return null
         return runCatching { parse(path) }.getOrNull()
     }
 
-    private fun parse(path: Path): String {
+    private fun parse(path: Path): CoverageResponse {
         val factory = DocumentBuilderFactory.newInstance().apply {
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
             isExpandEntityReferences = false
@@ -78,45 +71,35 @@ object KoverCoverageReader {
         report.counter("LINE")?.let { totalLine = it }
         report.counter("BRANCH")?.let { totalBranch = it }
 
-        return buildJsonObject {
-            put("tool", "kover")
-            metric("line", totalLine)
-            metric("branch", totalBranch)
-            put("classes", classes)
-            putJsonArray("modules") {
-                modules.entries.sortedByDescending { it.value.line.total }.forEach { (name, m) ->
-                    addModule(name, m)
-                }
-            }
-        }.toString()
+        return CoverageResponse(
+            tool = "kover",
+            line = metric(totalLine),
+            branch = metric(totalBranch),
+            classes = classes,
+            modules = modules.entries
+                .sortedByDescending { it.value.line.total }
+                .map { (name, m) -> module(name, m) },
+        )
     }
 
-    private fun JsonObjectBuilder.metric(key: String, c: Counter) =
-        putJsonObject(key) {
-            put("pct", fmt(c.pct()))
-            put("covered", c.covered)
-            put("total", c.total)
-        }
+    private fun metric(c: Counter): CoverageMetric = CoverageMetric(fmt(c.pct()), c.covered, c.total)
 
-    private fun JsonArrayBuilder.addModule(name: String, m: Mod) =
-        addJsonObject {
-            put("name", name)
-            put("kind", "module")
-            put("linePct", Math.round(m.line.pct()).toInt())
-            put("branchPct", Math.round(m.branch.pct()).toInt())
-            put("missed", m.line.missed)
-            // Per-class breakdown, worst-covered first (most missed lines), for the UI drilldown (031).
-            putJsonArray("classes") {
-                m.classes.sortedByDescending { it.line.missed }.forEach { c ->
-                    addJsonObject {
-                        put("name", c.name)
-                        put("linePct", Math.round(c.line.pct()).toInt())
-                        put("branchPct", Math.round(c.branch.pct()).toInt())
-                        put("missed", c.line.missed)
-                    }
-                }
-            }
-        }
+    private fun module(name: String, m: Mod): CoverageModule = CoverageModule(
+        name = name,
+        kind = "module",
+        linePct = Math.round(m.line.pct()).toInt(),
+        branchPct = Math.round(m.branch.pct()).toInt(),
+        missed = m.line.missed,
+        // Per-class breakdown, worst-covered first (most missed lines), for the UI drilldown (031).
+        classes = m.classes.sortedByDescending { it.line.missed }.map { c ->
+            CoverageClass(
+                name = c.name,
+                linePct = Math.round(c.line.pct()).toInt(),
+                branchPct = Math.round(c.branch.pct()).toInt(),
+                missed = c.line.missed,
+            )
+        },
+    )
 
     /** A class's display name: the path after `kontinuance/<module>/`, dot-joined (e.g. `model.Step`). */
     private fun classDisplayName(fullName: String, module: String): String {

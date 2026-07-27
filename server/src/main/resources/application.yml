@@ -1,6 +1,11 @@
 spring:
   application:
     name: kontinuance-api
+  # JSON codec (Jackson): omit null properties so responses keep the "absent when unset" shape the UI
+  # expects (e.g. a run's repo/sha, an unconfigured source's fields). Jackson 3 already writes java.time
+  # values as ISO-8601 strings by default, so no date-format override is needed.
+  jackson:
+    default-property-inclusion: non_null
 
 # The read API binds loopback:8077 by default (matching the retired 007 launcher). Override with
 # SERVER_ADDRESS / SERVER_PORT (Spring relaxed binding) when exposing on a private network.

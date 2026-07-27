@@ -1,7 +1,5 @@
 package org.khorum.oss.kontinuance.server.config
 
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Value
@@ -36,7 +34,7 @@ class ConfigWriteIT(
     fun `a valid edit is validated, persisted, and echoed with a refreshed plan`() {
         client.put().uri("/api/config")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(bodyWith(TWO_STAGES))
+            .bodyValue(ConfigUpdateRequest(TWO_STAGES))
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -50,7 +48,7 @@ class ConfigWriteIT(
     fun `an invalid edit is rejected and the file is left unchanged`() {
         client.put().uri("/api/config")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(bodyWith("pipeline:\n  bogusKey: true\n"))
+            .bodyValue(ConfigUpdateRequest("pipeline:\n  bogusKey: true\n"))
             .exchange()
             .expectStatus().isBadRequest
             .expectBody()
@@ -69,8 +67,6 @@ class ConfigWriteIT(
 
         assertEquals(ONE_STAGE, Files.readString(descriptorFile))
     }
-
-    private fun bodyWith(text: String): String = buildJsonObject { put("text", text) }.toString()
 
     companion object {
         private val descriptorFile: Path = Files.createTempFile("knt-config-write-", ".yml")
