@@ -255,6 +255,29 @@ test.describe('runs screen', () => {
 		await expect(page.getByText('no runs recorded yet')).toBeVisible();
 	});
 
+	test('filters the runs list by status and search, with a count and a no-match state', async ({ page }) => {
+		await mockApi(page); // #KX-2046 Running, #KX-2045 Success, #KX-2044 Failed (sha 77aa310aa)
+		await page.goto('/');
+		await enterApp(page);
+		await expect(page.getByText('#KX-2044')).toBeVisible();
+
+		// status filter → only the failed run, with a visible/total count
+		await page.getByLabel('filter by status').selectOption('failed');
+		await expect(page.getByText('#KX-2044')).toBeVisible();
+		await expect(page.getByText('#KX-2046')).toHaveCount(0);
+		await expect(page.getByText('showing 1 of 3')).toBeVisible();
+
+		// reset status, then search by commit → only the matching run
+		await page.getByLabel('filter by status').selectOption('all');
+		await page.getByLabel('filter runs').fill('77aa310');
+		await expect(page.getByText('#KX-2044')).toBeVisible();
+		await expect(page.getByText('#KX-2045')).toHaveCount(0);
+
+		// an over-filtered search shows the no-match state (distinct from "no runs recorded yet")
+		await page.getByLabel('filter runs').fill('zzz-no-such-run');
+		await expect(page.getByText('no runs match the current filters')).toBeVisible();
+	});
+
 	test('a run pushed over the live stream appears without a reload', async ({ page }) => {
 		const pushed = {
 			id: '#KX-2099',

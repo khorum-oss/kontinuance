@@ -78,6 +78,33 @@ export function runSortKey(r: RunRecord): string {
 	return r.endedAt ?? r.startedAt ?? '';
 }
 
+// ----- runs list filtering (037) -----
+
+/** The runs-list filter criteria: a free-text query plus status/trigger facets ("all" = no facet). */
+export interface RunFilter {
+	query: string;
+	status: string; // 'all' | canonical Status
+	trigger: string; // 'all' | 'manual' | 'push' | 'pull_request'
+}
+
+/** True when [r] matches every active criterion in [f] (status by canonical status; query a case-insensitive
+ * substring over id/pipeline/repo/sha; a blank query matches all). Pure. */
+export function matchesRunFilter(r: RunRecord, f: RunFilter): boolean {
+	if (f.status !== 'all' && normalizeStatus(r.status) !== f.status) return false;
+	if (f.trigger !== 'all' && (r.trigger ?? '').toLowerCase() !== f.trigger) return false;
+	const q = f.query.trim().toLowerCase();
+	if (q) {
+		const hay = [r.id, r.pipeline, r.repo, r.sha].filter(Boolean).join(' ').toLowerCase();
+		if (!hay.includes(q)) return false;
+	}
+	return true;
+}
+
+/** Narrow [records] to those matching [f], preserving order. Pure. */
+export function filterRuns(records: RunRecord[], f: RunFilter): RunRecord[] {
+	return records.filter((r) => matchesRunFilter(r, f));
+}
+
 /** Merge records by id (later wins) and return them newest-first. */
 export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
 	const byId = new Map<string, RunRecord>();

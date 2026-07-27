@@ -91,7 +91,10 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    fetched and checked out as that commit; anything else is a branch/tag). A project with no source runs the
    descriptor exactly as written, and a project-triggered run records its repo in the runs list.
 4. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
-   pipeline; the new run appears immediately.
+   pipeline; the new run appears immediately. **Filter and search the list (037):** narrow it by **status**
+   or **trigger** (manual / push / pull-request) and **search** by run id, pipeline, repo, or commit — the
+   controls narrow the live list in place (a count shows how many of the total are visible; clearing them
+   restores the full list instantly).
 5. **Open a run.** The run detail shows its **real step output** — the secret-masked, `[step] `-prefixed
    lines the pipeline produced — as a **live tail** (023): each line streams in over
    `GET /api/runs/{id}/logs/stream` (Server-Sent Events) as it is recorded, and the stream ends when the run

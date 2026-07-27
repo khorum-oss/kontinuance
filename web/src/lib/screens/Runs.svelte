@@ -4,6 +4,10 @@
 
 	let {
 		runs = [],
+		total = 0,
+		query = '',
+		status = 'all',
+		trigger = 'all',
 		loading = false,
 		error = null,
 		degraded = false,
@@ -11,9 +15,16 @@
 		triggerError = null,
 		onopen,
 		onretry,
-		ontrigger
+		ontrigger,
+		onquery,
+		onstatus,
+		ontriggerfilter
 	}: {
 		runs?: RunView[];
+		total?: number;
+		query?: string;
+		status?: string;
+		trigger?: string;
 		loading?: boolean;
 		error?: string | null;
 		degraded?: boolean;
@@ -22,7 +33,14 @@
 		onopen?: (id: string) => void;
 		onretry?: () => void;
 		ontrigger?: () => void;
+		onquery?: (v: string) => void;
+		onstatus?: (v: string) => void;
+		ontriggerfilter?: (v: string) => void;
 	} = $props();
+
+	const STATUSES = ['all', 'running', 'success', 'failed', 'waiting', 'cancelled', 'timedout'];
+	const TRIGGERS = ['all', 'manual', 'push', 'pull_request'];
+	const filtering = $derived(query.trim() !== '' || status !== 'all' || trigger !== 'all');
 </script>
 
 <div class="screen">
@@ -41,6 +59,41 @@
 		{#if triggerError}
 			<span class="k-mono terror">{triggerError}</span>
 		{/if}
+
+		<div class="filters">
+			<input
+				class="k-mono search"
+				type="search"
+				aria-label="filter runs"
+				placeholder="search id, pipeline, repo, commit"
+				spellcheck="false"
+				value={query}
+				oninput={(e) => onquery?.((e.currentTarget as HTMLInputElement).value)}
+			/>
+			<select
+				class="k-mono facet"
+				aria-label="filter by status"
+				value={status}
+				onchange={(e) => onstatus?.((e.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each STATUSES as s (s)}
+					<option value={s}>{s === 'all' ? 'all status' : s}</option>
+				{/each}
+			</select>
+			<select
+				class="k-mono facet"
+				aria-label="filter by trigger"
+				value={trigger}
+				onchange={(e) => ontriggerfilter?.((e.currentTarget as HTMLSelectElement).value)}
+			>
+				{#each TRIGGERS as t (t)}
+					<option value={t}>{t === 'all' ? 'all triggers' : t}</option>
+				{/each}
+			</select>
+			{#if filtering}
+				<span class="k-mono count">showing {runs.length} of {total}</span>
+			{/if}
+		</div>
 	</div>
 
 	<div class="head k-mono">
@@ -56,7 +109,7 @@
 			<button class="k-mono retry" onclick={() => onretry?.()}>RETRY</button>
 		</div>
 	{:else if runs.length === 0}
-		<div class="note k-mono">no runs recorded yet</div>
+		<div class="note k-mono">{filtering ? 'no runs match the current filters' : 'no runs recorded yet'}</div>
 	{:else}
 		<div class="rows">
 			{#each runs as r (r.id)}
@@ -96,6 +149,43 @@
 	.terror {
 		font-size: 10px;
 		color: var(--k-fail);
+	}
+	.filters {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-left: auto;
+	}
+	.search {
+		width: 230px;
+		padding: 8px 12px;
+		background: var(--k-surface-2);
+		border: 1px solid var(--k-border);
+		border-radius: 4px;
+		color: var(--k-text);
+		font-size: 10.5px;
+		outline: none;
+	}
+	.search:focus {
+		border-color: rgba(94, 234, 212, 0.55);
+	}
+	.facet {
+		padding: 8px 10px;
+		background: var(--k-surface-2);
+		border: 1px solid var(--k-border);
+		border-radius: 4px;
+		color: var(--k-text);
+		font-size: 10px;
+		cursor: pointer;
+		outline: none;
+	}
+	.facet:focus {
+		border-color: rgba(94, 234, 212, 0.55);
+	}
+	.count {
+		font-size: 9.5px;
+		letter-spacing: 1px;
+		color: var(--k-faint);
 	}
 	.head {
 		display: grid;

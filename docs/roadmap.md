@@ -139,6 +139,8 @@ module's own parser — and its poll-cursor file, showing the watched repos, cad
 PR/branch, and the runs it triggered; the token env-var name only, never a value), and **event-source
 liveness** (036 — the `kontinuance-ci` CLI writes a heartbeat file after each successful poll; the server
 stamps its age + a stale flag onto `/api/source` and the Source screen shows polling / stale / unknown with
-the time since the last poll and the cycle count). Remaining: a **cross-process** notify (DB `LISTEN`/broker)
-behind the `streamTriggers` seam, descriptor locking, event-source **control** (start/stop/live checks), and
-the Kubernetes runner backend behind the `StepSandbox` seam.
+the time since the last poll and the cycle count), and **runs-list filters & search** (037 — a client-side
+projection over the live run set: status/trigger facets + a free-text search over id/pipeline/repo/commit,
+with a visible/total count and an honest "no runs match" state; no API change). Remaining: a **cross-process**
+notify (DB `LISTEN`/broker) behind the `streamTriggers` seam, descriptor locking, event-source **control**
+(start/stop/live checks), and the Kubernetes runner backend behind the `StepSandbox` seam.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeNewestFirst, runMessage, runRef, toRunView } from './present';
+import { filterRuns, mergeNewestFirst, runMessage, runRef, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -78,5 +78,50 @@ describe('mergeNewestFirst', () => {
 			{ ...base, id: '#live', status: 'Running', startedAt: '2026-07-17T00:05:00Z' }
 		]);
 		expect(merged[0].id).toBe('#live');
+	});
+});
+
+describe('filterRuns', () => {
+	const runs: RunRecord[] = [
+		{ id: '#KX-1', pipeline: 'svc-a', status: 'Success', repo: 'khorum-oss/a', sha: 'a3f19c2ff', trigger: 'manual' },
+		{ id: '#KX-2', pipeline: 'svc-b', status: 'Failed', repo: 'khorum-oss/b', sha: '77aa310aa', trigger: 'PULL_REQUEST' },
+		{ id: '#KX-3', pipeline: 'svc-a', status: 'Running', repo: 'khorum-oss/a', sha: '9b02d1e00', trigger: 'PUSH' }
+	];
+	const noFilter = { query: '', status: 'all', trigger: 'all' };
+
+	it('returns everything with no active criteria', () => {
+		expect(filterRuns(runs, noFilter).map((r) => r.id)).toEqual(['#KX-1', '#KX-2', '#KX-3']);
+	});
+
+	it('filters by canonical status', () => {
+		expect(filterRuns(runs, { ...noFilter, status: 'failed' }).map((r) => r.id)).toEqual(['#KX-2']);
+	});
+
+	it('filters by trigger, case-insensitively', () => {
+		expect(filterRuns(runs, { ...noFilter, trigger: 'push' }).map((r) => r.id)).toEqual(['#KX-3']);
+		expect(filterRuns(runs, { ...noFilter, trigger: 'pull_request' }).map((r) => r.id)).toEqual(['#KX-2']);
+	});
+
+	it('searches id, pipeline, repo, and commit (case-insensitive substring)', () => {
+		expect(filterRuns(runs, { ...noFilter, query: '77aa310' }).map((r) => r.id)).toEqual(['#KX-2']);
+		expect(filterRuns(runs, { ...noFilter, query: 'SVC-A' }).map((r) => r.id)).toEqual(['#KX-1', '#KX-3']);
+		expect(filterRuns(runs, { ...noFilter, query: 'kx-2' }).map((r) => r.id)).toEqual(['#KX-2']);
+	});
+
+	it('composes filters with AND', () => {
+		expect(filterRuns(runs, { query: 'svc-a', status: 'running', trigger: 'push' }).map((r) => r.id)).toEqual([
+			'#KX-3'
+		]);
+		expect(filterRuns(runs, { query: 'svc-a', status: 'failed', trigger: 'all' })).toEqual([]);
+	});
+
+	it('treats a blank/whitespace query as matching everything', () => {
+		expect(filterRuns(runs, { ...noFilter, query: '   ' })).toHaveLength(3);
+	});
+
+	it('matches a run missing repo/sha when the query is empty', () => {
+		const bare: RunRecord = { id: '#KX-9', pipeline: 'p', status: 'Success' };
+		expect(filterRuns([bare], noFilter)).toHaveLength(1);
+		expect(filterRuns([bare], { ...noFilter, query: 'p' })).toHaveLength(1);
 	});
 });
