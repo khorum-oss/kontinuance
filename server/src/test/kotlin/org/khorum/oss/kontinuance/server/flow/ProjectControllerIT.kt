@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProjectControllerIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     private val client: WebTestClient

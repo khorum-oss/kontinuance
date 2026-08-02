@@ -1,15 +1,9 @@
 package org.khorum.oss.kontinuance.server.flow.auth
 
 import org.junit.jupiter.api.Test
-import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
-import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.suite.IntegrationTest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Primary
-import org.springframework.test.web.reactive.server.WebTestClient
 
 /**
  * Open mode (016 / US2): with **no** credentials configured, the API stays reachable without a session, so

@@ -10,7 +10,8 @@ import kotlin.test.assertNull
 
 /**
  * Unit-tests the suspending [RunReadFacade] in isolation: each suspend method returns the same typed value
- * as the underlying [org.khorum.oss.kontinuance.server.domain.RunApi], exercising the `withContext(Dispatchers.IO)` offload boundary (FR-003 /
+ * as the underlying [org.khorum.oss.kontinuance.server.domain.RunApi], exercising the `withContext(Dispatchers.IO)`
+ * offload boundary (FR-003 /
  * SC-003) without a running server. No duplicated read logic — the facade only offloads (FR-004 / SC-006).
  */
 class RunReadFacadeTest {

@@ -19,7 +19,7 @@ import java.util.Properties
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class GitHubSourceControllerIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     private val client: WebTestClient

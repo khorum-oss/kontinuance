@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.server
+package org.khorum.oss.kontinuance.server.flow
 
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Value
@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
     ],
 )
 class StubEndpointsIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     private val client: WebTestClient =

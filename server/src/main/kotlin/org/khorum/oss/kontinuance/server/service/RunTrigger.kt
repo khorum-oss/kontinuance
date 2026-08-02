@@ -24,7 +24,7 @@ class RunTrigger(
     private val store: RunStore,
     private val launcher: RunLauncher,
     private val projects: ProjectStore,
-    @Value($$"${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
+    @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 

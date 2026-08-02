@@ -28,7 +28,7 @@ class RunApprovals(
     private val store: RunStore,
     private val gate: ServerApprovalGate,
     private val launcher: RunLauncher,
-    @Value($$"${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
+    @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 

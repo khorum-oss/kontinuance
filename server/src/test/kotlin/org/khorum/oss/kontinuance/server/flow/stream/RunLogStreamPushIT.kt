@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.server.flow
+package org.khorum.oss.kontinuance.server.flow.stream
 
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
 )
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 class RunLogStreamPushIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
     private val logs: RunLogStore,
 ) {
 

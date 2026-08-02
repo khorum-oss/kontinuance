@@ -16,7 +16,7 @@ import java.nio.file.Path
  */
 @RestController
 class CoverageController(
-    @Value($$"${kontinuance.coverage.report:build/reports/kover/report.xml}") reportPath: String,
+    @Value("\${kontinuance.coverage.report:build/reports/kover/report.xml}") reportPath: String,
 ) {
     private val report: Path = Path.of(reportPath)
 

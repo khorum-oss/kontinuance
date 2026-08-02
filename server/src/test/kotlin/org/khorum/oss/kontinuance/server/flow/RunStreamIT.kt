@@ -1,4 +1,4 @@
-package org.khorum.oss.kontinuance.server
+package org.khorum.oss.kontinuance.server.flow
 
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
     properties = ["kontinuance.stream.poll-interval-ms=100"],
 )
 class RunStreamIT(
-    @param:Value($$"${local.server.port}") private val port: Int,
+    @param:Value("\${local.server.port}") private val port: Int,
 ) {
 
     @TestConfiguration
