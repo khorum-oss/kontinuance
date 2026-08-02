@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.store.SessionStore
+import org.khorum.oss.kontinuance.server.suite.IntegrationTest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -23,18 +24,8 @@ import org.springframework.test.web.reactive.server.returnResult
     properties = ["kontinuance.auth.username=operator", "kontinuance.auth.password=s3cret"],
 )
 class AuthIT(
-    @param:Value("\${local.server.port}") private val port: Int,
-) {
-
-    @TestConfiguration
-    class EmptyStore {
-        @Bean
-        @Primary
-        fun store(): RunStore = InMemoryRunStore()
-    }
-
-    private val client: WebTestClient =
-        WebTestClient.bindToServer().baseUrl("http://localhost:$port").build()
+    @param:Value($$"${local.server.port}") private val port: Int,
+) : IntegrationTest(port) {
 
     @Test
     fun `a protected endpoint is rejected without a session, but health is public`() {

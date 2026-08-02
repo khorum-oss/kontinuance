@@ -3,6 +3,7 @@ package org.khorum.oss.kontinuance.server.flow.auth
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.suite.IntegrationTest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -18,18 +19,7 @@ import org.springframework.test.web.reactive.server.WebTestClient
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthOpenModeIT(
     @param:Value($$"${local.server.port}") private val port: Int,
-) {
-
-    @TestConfiguration
-    class EmptyStore {
-        @Bean
-        @Primary
-        fun store(): RunStore = InMemoryRunStore()
-    }
-
-    private val client: WebTestClient =
-        WebTestClient.bindToServer().baseUrl("http://localhost:$port").build()
-
+) : IntegrationTest(port) {
     @Test
     fun `open mode allows a protected endpoint without a session`() {
         client.get().uri("/api/runs").exchange().expectStatus().isOk
