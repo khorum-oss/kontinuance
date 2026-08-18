@@ -44,4 +44,9 @@ class ProjectResolverTest {
     fun `resolves to none for a trailing-slash repo`() {
         assertEquals(null, ProjectResolver.resolve(record(repo = "khorum-oss/")))
     }
+
+    @Test
+    fun `an invalid explicit project resolves to none and does not fall back to the repo`() {
+        assertEquals(null, ProjectResolver.resolve(record(project = "../escape", repo = "khorum-oss/relikquary")))
+    }
 }
