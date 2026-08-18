@@ -34,7 +34,7 @@ object PipelineDescriptor {
         LoadSettings.builder().setAllowDuplicateKeys(false).build(),
     )
 
-    private val PIPELINE_KEYS = setOf("name", "concurrency", "stages")
+    private val PIPELINE_KEYS = setOf("name", "concurrency", "stages", "project")
     private val STAGE_KEYS = setOf("name", "steps")
     private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
     // `image` here is a STEP-level runner image (isolation) — distinct from the nested docker.run `image`.
@@ -66,10 +66,11 @@ object PipelineDescriptor {
 
         val name = asString(requireKey(pipelineMap, "name", "pipeline"), "pipeline.name")
         val concurrency = pipelineMap["concurrency"]?.let { asInt(it, "pipeline.concurrency") } ?: 1
+        val project = pipelineMap["project"]?.let { asString(it, "pipeline.project") }
         val stages = asListOrEmpty(pipelineMap["stages"], "pipeline.stages")
             .mapIndexed { i, raw -> parseStage(raw, "pipeline.stages[$i]") }
 
-        return construct("pipeline") { Pipeline(name, stages, concurrency) }
+        return construct("pipeline") { Pipeline(name, stages, concurrency, project) }
     }
 
     private fun parseStage(raw: Any?, path: String): Stage {
