@@ -3,11 +3,13 @@ package org.khorum.oss.kontinuance.server.controller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
+import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.domain.ErrorResponse
 import org.khorum.oss.kontinuance.server.domain.project.ActiveProject
 import org.khorum.oss.kontinuance.server.domain.project.CreateProjectRequest
 import org.khorum.oss.kontinuance.server.domain.project.CreatedProject
 import org.khorum.oss.kontinuance.server.domain.project.ProjectDto
+import org.khorum.oss.kontinuance.server.domain.project.ProjectResolver
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSourceResponse
 import org.khorum.oss.kontinuance.server.domain.project.ProjectsResponse
@@ -40,22 +42,61 @@ import java.nio.file.Path
 @RestController
 class ProjectController(
     private val store: ProjectStore,
+    private val runs: RunStore,
     @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
+    @Value("\${kontinuance.projects.derive-limit:500}") private val deriveLimit: Int,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 
     @GetMapping("/api/projects")
     suspend fun list(): ProjectsResponse = withContext(Dispatchers.IO) {
         seedIfEmpty()
-        val active = store.activeName()
+        val stats = deriveStats()
+        val registered = store.list()
+        val names = (registered + stats.keys).distinct().sorted()
+        val active = store.activeName()?.takeIf { it in names }
         ProjectsResponse(
             active = active,
-            projects = store.list().map { name ->
+            projects = names.map { name ->
                 val src = store.source(name)
-                ProjectDto(name = name, active = name == active, repo = src?.repo, branch = src?.branch)
+                val stat = stats[name]
+                ProjectDto(
+                    name = name,
+                    active = name == active,
+                    repo = src?.repo,
+                    branch = src?.branch,
+                    derived = name !in registered,
+                    runnable = name in registered,
+                    runCount = stat?.count ?: 0,
+                    lastStatus = stat?.status,
+                    lastRunAt = stat?.at,
+                )
             },
         )
     }
+
+    /**
+     * Project statistics folded out of the most recent [deriveLimit] runs. Recomputed on every listing
+     * — derived projects are a projection over run history, never rows in the project store, so an
+     * entry cannot outlive the runs that produced it.
+     */
+    private fun deriveStats(): Map<String, ProjectStat> {
+        val stats = LinkedHashMap<String, ProjectStat>()
+        // recent() is newest-first, so the first record seen for a name is its latest run. This method
+        // relies on that ordering; if RunStore's contract ever changes, this must be re-derived.
+        for (record in runs.recent(deriveLimit)) {
+            val name = ProjectResolver.resolve(record) ?: continue
+            val existing = stats[name]
+            stats[name] = if (existing == null) {
+                ProjectStat(count = 1, status = record.status, at = record.endedAt?.toString())
+            } else {
+                existing.copy(count = existing.count + 1)
+            }
+        }
+        return stats
+    }
+
+    private data class ProjectStat(val count: Int, val status: String?, val at: String?)
 
     @PostMapping("/api/projects")
     suspend fun create(@RequestBody(required = false) request: CreateProjectRequest?): ResponseEntity<*> {
