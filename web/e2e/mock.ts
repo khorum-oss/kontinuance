@@ -273,9 +273,20 @@ export async function mockConfig(page: Page): Promise<void> {
  * in-memory so the add + reload flow reflects the new project.
  */
 export async function mockProjects(page: Page): Promise<void> {
-	const projects: { name: string; active: boolean; repo?: string; branch?: string }[] = [
-		{ name: 'kontinuance-service', active: true },
-		{ name: 'infra-charts', active: false }
+	const projects: {
+		name: string;
+		active: boolean;
+		repo?: string;
+		branch?: string;
+		derived?: boolean;
+		runnable?: boolean;
+		runCount?: number;
+		lastStatus?: string;
+	}[] = [
+		{ name: 'kontinuance-service', active: true, runnable: true },
+		{ name: 'infra-charts', active: false, runnable: true },
+		// A project discovered from run history alone (039): builds, but no registered descriptor.
+		{ name: 'relikquary', active: false, derived: true, runnable: false, runCount: 12, lastStatus: 'Success' }
 	];
 	await page.route(/\/api\/projects\/[^/?]+\/activate$/, (route) => {
 		const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').slice(-2)[0]);

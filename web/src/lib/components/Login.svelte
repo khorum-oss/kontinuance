@@ -288,6 +288,17 @@
 												{:else if p.repo}{p.repo}{p.branch ? ` · ${p.branch}` : ''}
 												{:else}no source · runs the descriptor as-is{/if}
 											</span>
+											{#if p.derived}
+												<span
+													class="k-mono badge badge-derived"
+													title="discovered from run history — no descriptor registered"
+												>
+													DERIVED
+												</span>
+											{/if}
+											{#if p.runCount}
+												<span class="k-mono meta">{p.runCount} runs · last {p.lastStatus ?? '—'}</span>
+											{/if}
 										</span>
 									</span>
 									<span class="badges">
@@ -757,6 +768,14 @@
 	.badge.cfg {
 		color: var(--k-ok);
 		border-color: rgba(52, 211, 153, 0.35);
+	}
+	.badge-derived {
+		border-color: var(--k-muted);
+		color: var(--k-muted);
+	}
+	.meta {
+		color: var(--k-muted);
+		font-size: 0.75rem;
 	}
 	.ws-foot {
 		flex: none;
