@@ -288,14 +288,6 @@
 												{:else if p.repo}{p.repo}{p.branch ? ` · ${p.branch}` : ''}
 												{:else}no source · runs the descriptor as-is{/if}
 											</span>
-											{#if p.derived}
-												<span
-													class="k-mono badge badge-derived"
-													title="discovered from run history — no descriptor registered"
-												>
-													DERIVED
-												</span>
-											{/if}
 											{#if p.runCount}
 												<span class="k-mono meta">{p.runCount} runs · last {p.lastStatus ?? '—'}</span>
 											{/if}
@@ -303,6 +295,14 @@
 									</span>
 									<span class="badges">
 										<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
+										{#if p.derived}
+											<span
+												class="k-mono badge badge-derived"
+												title="discovered from run history — no descriptor registered"
+											>
+												DERIVED
+											</span>
+										{/if}
 									</span>
 								</button>
 								<div class="src-foot">
