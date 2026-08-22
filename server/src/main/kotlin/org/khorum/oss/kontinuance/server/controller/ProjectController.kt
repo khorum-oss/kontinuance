@@ -122,16 +122,27 @@ class ProjectController(
     }
 
     @PostMapping("/api/projects/{name}/activate")
-    suspend fun activate(@PathVariable name: String): ResponseEntity<*> {
-        val text = withContext(Dispatchers.IO) { store.get(name) }
-            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse("no such project: $name"))
-        withContext(Dispatchers.IO) {
+    suspend fun activate(@PathVariable name: String): ResponseEntity<*> = withContext(Dispatchers.IO) {
+        val text = store.get(name)
+        // A derived project (039) has runs but no stored descriptor: it can be made active — which
+        // scopes the dashboard to it — but there is nothing to write as the live descriptor, and
+        // overwriting the current one with an unrelated project's pipeline would be a footgun.
+        if (text == null && !ProjectStore.isValidName(name)) {
+            return@withContext notFound(name)
+        }
+        if (text == null && name !in deriveStats().keys) {
+            return@withContext notFound(name)
+        }
+        if (text != null) {
             descriptor.toAbsolutePath().parent?.let { Files.createDirectories(it) }
             Files.writeString(descriptor, text)
-            store.setActive(name)
         }
-        return ResponseEntity.ok(ActiveProject(name))
+        store.setActive(name)
+        ResponseEntity.ok(ActiveProject(name))
     }
+
+    private fun notFound(name: String): ResponseEntity<*> =
+        ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse("no such project: $name"))
 
     @PostMapping("/api/projects/{name}/source")
     suspend fun setSource(
@@ -152,9 +163,14 @@ class ProjectController(
         )
     }
 
-    /** On first use, register the current descriptor file as `default` and activate it. */
+    /**
+     * On first use, register the current descriptor file as `default` and activate it. Skipped once
+     * anything is active — not just once a project is registered — because (039) activating a derived
+     * project sets an active pointer without ever registering it in the store; without this check, the
+     * next listing would see an "empty" store and clobber that pointer back to `default`.
+     */
     private fun seedIfEmpty() {
-        if (store.list().isNotEmpty()) return
+        if (store.list().isNotEmpty() || store.activeName() != null) return
         if (!Files.isRegularFile(descriptor)) return
         val text = Files.readString(descriptor)
         runCatching { PipelineDescriptor.parse(text) }.getOrNull() ?: return
