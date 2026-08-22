@@ -286,6 +286,7 @@
 											<span class="k-mono rdesc">
 												{#if selecting === p.name}activating…
 												{:else if p.repo}{p.repo}{p.branch ? ` · ${p.branch}` : ''}
+												{:else if p.runnable === false}from run history · no descriptor registered
 												{:else}no source · runs the descriptor as-is{/if}
 											</span>
 											{#if p.runCount}
@@ -294,7 +295,9 @@
 										</span>
 									</span>
 									<span class="badges">
-										<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
+										{#if p.active || p.runnable !== false}
+											<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
+										{/if}
 										{#if p.derived}
 											<span
 												class="k-mono badge badge-derived"
