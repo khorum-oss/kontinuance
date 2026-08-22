@@ -123,6 +123,13 @@ class ProjectController(
 
     @PostMapping("/api/projects/{name}/activate")
     suspend fun activate(@PathVariable name: String): ResponseEntity<*> = withContext(Dispatchers.IO) {
+        // Seed first, exactly as list() does: if this is the very first request against a fresh server
+        // (empty store, nothing active yet) and it happens to be an activate call for a derived project,
+        // seeding still needs to run — otherwise the widened seedIfEmpty guard below (activeName() !=
+        // null once we setActive(name)) would permanently block `default` from ever being registered.
+        // Ordering is benign: seeding registers `default` and marks it active, then this call's own
+        // store.setActive(name) below overwrites the active pointer to the requested project.
+        seedIfEmpty()
         val text = store.get(name)
         // A derived project (039) has runs but no stored descriptor: it can be made active — which
         // scopes the dashboard to it — but there is nothing to write as the live descriptor, and

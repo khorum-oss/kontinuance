@@ -112,4 +112,25 @@ class ProjectControllerDerivedTest {
 
         assertEquals(null, subject.list().active)
     }
+
+    @Test
+    fun `activating a derived project as the very first call still seeds default`(@TempDir dir: Path) = runTest {
+        val runs = InMemoryRunStore()
+        runs.record(RunRecord(id = "r1", pipeline = "relikquary-pr", status = "Success", repo = "khorum-oss/relikquary"))
+        // Genuinely fresh state: no `.active` file, empty projects dir — controller() only writes the
+        // live descriptor to disk, it never touches the projects dir or the active pointer.
+        val subject = controller(dir, runs)
+
+        // The FIRST call against this controller is activate(), not list() — exactly the direct-API-call
+        // path the widened seedIfEmpty guard could permanently starve of seeding if activate() didn't
+        // seed for itself.
+        val response = subject.activate("relikquary")
+        assertEquals(200, response.statusCode.value())
+
+        val listed = subject.list()
+        assertEquals("relikquary", listed.active)
+        val default = listed.projects.singleOrNull { it.name == "default" }
+        assertTrue(default != null, "default should have been seeded from the on-disk descriptor")
+        assertTrue(default?.derived == false, "default should be registered, not merely derived")
+    }
 }
