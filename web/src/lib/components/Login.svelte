@@ -63,6 +63,10 @@
 		projectsError = null;
 		try {
 			projects = (await api.getProjects()).projects;
+			// a project can go from runnable to derived-only (or disappear) on reload — don't leave the
+			// source editor open against one that no longer offers a source to edit (039)
+			const editing = projects.find((p) => p.name === sourceEditing);
+			if (sourceEditing && (!editing || editing.runnable === false)) sourceEditing = null;
 		} catch (e) {
 			projectsError = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
@@ -125,6 +129,7 @@
 	}
 
 	function toggleSource(p: Project) {
+		if (p.runnable === false) return;
 		sourceError = null;
 		if (sourceEditing === p.name) {
 			sourceEditing = null;
@@ -308,12 +313,14 @@
 										{/if}
 									</span>
 								</button>
-								<div class="src-foot">
-									<button class="k-mono link src-toggle" onclick={() => toggleSource(p)}>
-										{sourceEditing === p.name ? '✕ CLOSE' : p.repo ? 'EDIT SOURCE' : 'SET SOURCE'}
-									</button>
-								</div>
-								{#if sourceEditing === p.name}
+								{#if p.runnable !== false}
+									<div class="src-foot">
+										<button class="k-mono link src-toggle" onclick={() => toggleSource(p)}>
+											{sourceEditing === p.name ? '✕ CLOSE' : p.repo ? 'EDIT SOURCE' : 'SET SOURCE'}
+										</button>
+									</div>
+								{/if}
+								{#if p.runnable !== false && sourceEditing === p.name}
 									<div class="src-edit">
 										<input
 											class="k-mono field"

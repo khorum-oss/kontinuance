@@ -23,4 +23,10 @@ test('badges a derived project and shows its run count in the picker', async ({ 
 	// a registered, non-active project is still selectable and must still say so
 	const registeredRow = page.locator('.repo', { hasText: 'infra-charts' });
 	await expect(registeredRow.getByText('AVAILABLE')).toBeVisible();
+
+	// a derived project has no registered descriptor, so setting a source would 404 — don't offer it
+	await expect(row.getByText('SET SOURCE')).toHaveCount(0);
+	await expect(row.getByText('EDIT SOURCE')).toHaveCount(0);
+	// a registered project keeps its source control
+	await expect(registeredRow.getByText('SET SOURCE')).toBeVisible();
 });
