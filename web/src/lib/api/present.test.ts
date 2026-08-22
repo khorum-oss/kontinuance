@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterRuns, mergeNewestFirst, runMessage, runRef, toRunView } from './present';
+import { filterRuns, matchesRunFilter, mergeNewestFirst, runMessage, runRef, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -123,5 +123,41 @@ describe('filterRuns', () => {
 		const bare: RunRecord = { id: '#KX-9', pipeline: 'p', status: 'Success' };
 		expect(filterRuns([bare], noFilter)).toHaveLength(1);
 		expect(filterRuns([bare], { ...noFilter, query: 'p' })).toHaveLength(1);
+	});
+});
+
+describe('matchesRunFilter project scoping', () => {
+	const base = { id: 'r1', pipeline: 'relikquary-pr', status: 'Success' };
+	const all = { query: '', status: 'all', trigger: 'all', project: 'all' };
+
+	it('matches every run when the project filter is all', () => {
+		expect(matchesRunFilter({ ...base, repo: 'khorum-oss/relikquary' }, all)).toBe(true);
+	});
+
+	it('matches on the explicit project', () => {
+		const r = { ...base, project: 'relikquary', repo: 'khorum-oss/other' };
+		expect(matchesRunFilter(r, { ...all, project: 'relikquary' })).toBe(true);
+		expect(matchesRunFilter(r, { ...all, project: 'other' })).toBe(false);
+	});
+
+	it('falls back to the repository short name', () => {
+		const r = { ...base, repo: 'khorum-oss/relikquary' };
+		expect(matchesRunFilter(r, { ...all, project: 'relikquary' })).toBe(true);
+	});
+
+	it('excludes a run that resolves to no project when one is selected', () => {
+		expect(matchesRunFilter(base, { ...all, project: 'relikquary' })).toBe(false);
+	});
+
+	it('composes with the status filter', () => {
+		const r = { ...base, status: 'Failed', repo: 'khorum-oss/relikquary' };
+		expect(matchesRunFilter(r, { ...all, project: 'relikquary', status: 'success' })).toBe(false);
+	});
+
+	it('treats a missing project key as matching every run (project is optional)', () => {
+		const r = { ...base, repo: 'khorum-oss/relikquary' };
+		const filterWithoutProjectKey = { query: '', status: 'all', trigger: 'all' };
+		expect(matchesRunFilter(r, filterWithoutProjectKey)).toBe(true);
+		expect(matchesRunFilter(base, filterWithoutProjectKey)).toBe(true);
 	});
 });

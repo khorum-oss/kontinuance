@@ -12,6 +12,7 @@ export interface RunRecord {
 	repo?: string;
 	sha?: string;
 	trigger?: string;
+	project?: string;
 }
 
 export interface RunsResponse {
