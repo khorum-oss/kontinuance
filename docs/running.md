@@ -119,8 +119,11 @@ pipeline:
 ```
 
 When absent, the project is inferred from the run's repository (the segment after the final `/`), so an
-existing history needs no change. A name must match `[A-Za-z0-9._-]{1,64}` and be non-blank when present;
-one that does not match is treated as no project rather than being rewritten.
+existing history needs no change. A blank `project:` (e.g. `project: "  "`) is rejected when the descriptor
+is parsed — the whole pipeline fails to load, loudly, with a `DescriptorException`. A non-blank name that
+does not match `[A-Za-z0-9._-]{1,64}` parses fine but resolves to **no project** at run time — it is never
+rewritten or sanitized into something that does match. This is the quiet failure: a pipeline with a typo'd
+project name (a stray `/` or space) runs normally, but its runs never group under the project you expected.
 
 Projects with runs but no registered descriptor appear in the dashboard as **derived** — visible and
 selectable, but not runnable until a descriptor is registered under the same name. Derived projects are
