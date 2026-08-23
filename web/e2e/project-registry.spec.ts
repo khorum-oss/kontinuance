@@ -30,3 +30,17 @@ test('badges a derived project and shows its run count in the picker', async ({ 
 	// a registered project keeps its source control
 	await expect(registeredRow.getByText('SET SOURCE')).toBeVisible();
 });
+
+test('selecting a project scopes the runs list and all projects restores it', async ({ page }) => {
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('relikquary', { exact: true }).click();
+
+	// sampleRuns belong to `kontinuance`, so scoping to `relikquary` empties the list honestly.
+	await expect(page.getByText(/no runs match/i)).toBeVisible();
+
+	await page.getByRole('combobox').filter({ hasText: 'ALL PROJECTS' }).selectOption('all');
+	await expect(page.getByText('#KX-2046')).toBeVisible();
+});

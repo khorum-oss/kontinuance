@@ -8,6 +8,8 @@
 		query = '',
 		status = 'all',
 		trigger = 'all',
+		project = 'all',
+		projects = [],
 		loading = false,
 		error = null,
 		degraded = false,
@@ -18,13 +20,16 @@
 		ontrigger,
 		onquery,
 		onstatus,
-		ontriggerfilter
+		ontriggerfilter,
+		onproject
 	}: {
 		runs?: RunView[];
 		total?: number;
 		query?: string;
 		status?: string;
 		trigger?: string;
+		project?: string;
+		projects?: string[];
 		loading?: boolean;
 		error?: string | null;
 		degraded?: boolean;
@@ -36,11 +41,14 @@
 		onquery?: (v: string) => void;
 		onstatus?: (v: string) => void;
 		ontriggerfilter?: (v: string) => void;
+		onproject?: (v: string) => void;
 	} = $props();
 
 	const STATUSES = ['all', 'running', 'success', 'failed', 'waiting', 'cancelled', 'timedout'];
 	const TRIGGERS = ['all', 'manual', 'push', 'pull_request'];
-	const filtering = $derived(query.trim() !== '' || status !== 'all' || trigger !== 'all');
+	const filtering = $derived(
+		query.trim() !== '' || status !== 'all' || trigger !== 'all' || project !== 'all'
+	);
 </script>
 
 <div class="screen">
@@ -88,6 +96,17 @@
 			>
 				{#each TRIGGERS as t (t)}
 					<option value={t}>{t === 'all' ? 'all triggers' : t}</option>
+				{/each}
+			</select>
+			<select
+				class="k-mono facet"
+				aria-label="filter by project"
+				value={project}
+				onchange={(e) => onproject?.((e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="all">ALL PROJECTS</option>
+				{#each projects as p (p)}
+					<option value={p}>{p}</option>
 				{/each}
 			</select>
 			{#if filtering}

@@ -1,10 +1,15 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api, ApiError } from '$lib/api/client';
 	import { runStream } from '$lib/api/live';
-	import { filterRuns, mergeNewestFirst, toRunView, type RunView } from '$lib/api/present';
+	import { filterRuns, mergeNewestFirst, runProject, toRunView, type RunView } from '$lib/api/present';
 	import type { RunRecord } from '$lib/api/types';
 	import Runs from '$lib/screens/Runs.svelte';
+
+	// The project activated in the entry picker (039), read from the layout via context — see
+	// +layout.svelte for why this isn't a prop.
+	const activeProject = getContext<{ current: string }>('activeProject');
 
 	// Records keyed by id, seeded by the initial fetch and kept live by the SSE stream.
 	const byId = new Map<string, RunRecord>();
@@ -21,11 +26,23 @@
 	let query = $state('');
 	let statusFilter = $state('all');
 	let triggerFilter = $state('all');
+	// Seeded from the picker's activation (039) so choosing a project lands on a scoped list; 'all' is the
+	// explicit escape hatch back to the unscoped view.
+	let projectFilter = $state(activeProject?.current ?? 'all');
+	// Options for the project facet: every project actually represented in the loaded runs, derived (not
+	// the full project registry) so the list never offers a scope that would trivially empty the table.
+	let projectOptions = $state<string[]>([]);
 
 	function render() {
 		const all = mergeNewestFirst(byId.values());
 		total = all.length;
-		runs = filterRuns(all, { query, status: statusFilter, trigger: triggerFilter }).map((r) => toRunView(r));
+		projectOptions = [...new Set(all.map(runProject).filter((p): p is string => p !== null))].sort();
+		runs = filterRuns(all, {
+			query,
+			status: statusFilter,
+			trigger: triggerFilter,
+			project: projectFilter
+		}).map((r) => toRunView(r));
 	}
 
 	// Re-project when a filter changes (byId is untouched, so clearing restores the full list instantly).
@@ -33,6 +50,7 @@
 		query;
 		statusFilter;
 		triggerFilter;
+		projectFilter;
 		render();
 	});
 
@@ -88,6 +106,8 @@
 	{query}
 	status={statusFilter}
 	trigger={triggerFilter}
+	project={projectFilter}
+	projects={projectOptions}
 	{loading}
 	{error}
 	{degraded}
@@ -99,4 +119,5 @@
 	onquery={(v) => (query = v)}
 	onstatus={(v) => (statusFilter = v)}
 	ontriggerfilter={(v) => (triggerFilter = v)}
+	onproject={(v) => (projectFilter = v)}
 />
