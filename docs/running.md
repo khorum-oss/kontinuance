@@ -108,6 +108,42 @@ so keep to these rules:
   shared workspace).
 - The condition key is **`when:`** (not `condition:`).
 
+### `project:` (optional)
+
+Names the project a pipeline belongs to, grouping several pipelines under one entry in the dashboard:
+
+```yaml
+pipeline:
+  name: "relikquary-pr"
+  project: "relikquary"
+```
+
+When absent, the project is inferred from the run's repository (the segment after the final `/`), so an
+existing history needs no change. A name must match `[A-Za-z0-9._-]{1,64}` and be non-blank when present;
+one that does not match is treated as no project rather than being rewritten.
+
+Projects with runs but no registered descriptor appear in the dashboard as **derived** — visible and
+selectable, but not runnable until a descriptor is registered under the same name. Derived projects are
+computed from the most recent `kontinuance.projects.derive-limit` runs (default 500); a project whose runs
+have all aged past that window stops being listed.
+
+**Scoping matches the run's *resolved* project, not the registered project's name.** If a project is
+registered under a name that differs from its runs' repository short name, selecting it in the dashboard
+shows zero runs — every run resolved to a different (derived) project. For example, a project registered
+as `kontinuance-service` whose runs come from repo `khorum-oss/kontinuance` has those runs resolve to
+`kontinuance` (the repo's short name), not `kontinuance-service`; selecting `kontinuance-service` in the
+picker then shows no runs. The fix is to declare `project: kontinuance-service` in that pipeline's
+descriptor, so future runs resolve to the registered name:
+
+```yaml
+pipeline:
+  name: "kontinuance-ci"
+  project: "kontinuance-service"   # matches the registered project name, not the repo's short name
+```
+
+If you select a project and its runs list is unexpectedly empty, check for exactly this mismatch before
+assuming a bug.
+
 ### Manual-approval gates
 
 An `approval:` step pauses the run until an operator approves or rejects it from the run's detail view.
