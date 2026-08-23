@@ -68,11 +68,6 @@
 		>
 			{triggering ? 'STARTING…' : 'RUN PIPELINE'}
 		</button>
-		{#if !runnable}
-			<p class="k-mono hint">
-				No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
-			</p>
-		{/if}
 		{#if triggerError}
 			<span class="k-mono terror">{triggerError}</span>
 		{/if}
@@ -123,6 +118,11 @@
 			{/if}
 		</div>
 	</div>
+	{#if !runnable}
+		<p class="k-mono hint">
+			No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
+		</p>
+	{/if}
 
 	<div class="head k-mono">
 		<span></span><span>RUN</span><span>REF</span><span>COMMIT</span><span>PROGRESS</span><span>TIME</span
@@ -166,6 +166,8 @@
 		border-radius: 4px;
 		padding: 9px 20px;
 		cursor: pointer;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.trigger:hover:not(:disabled) {
 		background: rgba(94, 234, 212, 0.08);
@@ -181,7 +183,7 @@
 	.hint {
 		font-size: 10px;
 		color: var(--k-muted);
-		margin: 0;
+		margin: -6px 0 16px;
 	}
 	.filters {
 		display: flex;
@@ -219,6 +221,8 @@
 		font-size: 9.5px;
 		letter-spacing: 1px;
 		color: var(--k-faint);
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.head {
 		display: grid;

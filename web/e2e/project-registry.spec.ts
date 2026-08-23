@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi, mockAuth, mockProjects, mockStream } from './mock';
+import { enterApp, mockApi, mockAuth, mockProjects, mockStream, sampleRuns } from './mock';
 
 test.beforeEach(async ({ page }) => {
 	await mockAuth(page);
@@ -77,4 +77,34 @@ test('enables the trigger for a registered project', async ({ page }) => {
 	await page.getByText('kontinuance-service', { exact: true }).click();
 
 	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+});
+
+test('disables the trigger when scope changes via the project dropdown, not only via the picker', async ({
+	page
+}) => {
+	// A run that resolves to `relikquary` so the run-derived project select actually offers it as an
+	// option — sampleRuns alone only resolve to `kontinuance` (see the other tests in this file).
+	const relikquaryRun = {
+		id: '#RQ-9001',
+		pipeline: 'relikquary',
+		status: 'Success',
+		repo: 'khorum-oss/relikquary',
+		sha: 'deadfeed01',
+		startedAt: '2026-07-17T00:00:00Z',
+		endedAt: '2026-07-17T00:03:00Z'
+	};
+	const runs = [...sampleRuns, relikquaryRun];
+	await mockApi(page, runs);
+	await mockStream(page, runs);
+
+	await page.goto('/');
+	await enterApp(page);
+
+	// Enabled first: proves the later disable comes from the scope change, not from being disabled all along.
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+
+	await page.getByLabel('filter by project').selectOption('relikquary');
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
+	await expect(page.getByText(/no descriptor registered for relikquary/i)).toBeVisible();
 });
