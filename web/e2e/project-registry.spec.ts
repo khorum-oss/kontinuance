@@ -44,3 +44,16 @@ test('selecting a project scopes the runs list and all projects restores it', as
 	await page.getByRole('combobox').filter({ hasText: 'ALL PROJECTS' }).selectOption('all');
 	await expect(page.getByText('#KX-2046')).toBeVisible();
 });
+
+test('the project select names its scope even when that scope has zero matching runs', async ({ page }) => {
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('relikquary', { exact: true }).click();
+
+	// relikquary matches zero loaded runs (sampleRuns resolve to `kontinuance`), so its option would be
+	// absent from the run-derived list unless the active scope is unioned in — without that, the browser
+	// renders the <select> blank instead of naming the filter actually being applied.
+	await expect(page.getByLabel('filter by project')).toHaveValue('relikquary');
+});

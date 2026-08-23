@@ -30,13 +30,17 @@
 	// explicit escape hatch back to the unscoped view.
 	let projectFilter = $state(activeProject?.current ?? 'all');
 	// Options for the project facet: every project actually represented in the loaded runs, derived (not
-	// the full project registry) so the list never offers a scope that would trivially empty the table.
+	// the full project registry) so the list never offers a scope that would trivially empty the table —
+	// plus the currently-active scope even when it matches zero loaded runs (e.g. a picker selection with
+	// no history yet), so the <select> always has an <option> for its own value and never renders blank.
 	let projectOptions = $state<string[]>([]);
 
 	function render() {
 		const all = mergeNewestFirst(byId.values());
 		total = all.length;
-		projectOptions = [...new Set(all.map(runProject).filter((p): p is string => p !== null))].sort();
+		const derived = all.map(runProject).filter((p): p is string => p !== null);
+		const withActiveScope = projectFilter === 'all' ? derived : [...derived, projectFilter];
+		projectOptions = [...new Set(withActiveScope)].sort();
 		runs = filterRuns(all, {
 			query,
 			status: statusFilter,
