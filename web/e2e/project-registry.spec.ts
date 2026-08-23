@@ -57,3 +57,24 @@ test('the project select names its scope even when that scope has zero matching 
 	// renders the <select> blank instead of naming the filter actually being applied.
 	await expect(page.getByLabel('filter by project')).toHaveValue('relikquary');
 });
+
+test('disables the trigger for a project with no descriptor and explains why', async ({ page }) => {
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('relikquary', { exact: true }).click();
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
+	await expect(page.getByText(/no descriptor registered for relikquary/i)).toBeVisible();
+});
+
+test('enables the trigger for a registered project', async ({ page }) => {
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('kontinuance-service', { exact: true }).click();
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+});

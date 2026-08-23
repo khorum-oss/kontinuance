@@ -15,6 +15,8 @@
 		degraded = false,
 		triggering = false,
 		triggerError = null,
+		runnable = true,
+		projectName = '',
 		onopen,
 		onretry,
 		ontrigger,
@@ -35,6 +37,8 @@
 		degraded?: boolean;
 		triggering?: boolean;
 		triggerError?: string | null;
+		runnable?: boolean;
+		projectName?: string;
 		onopen?: (id: string) => void;
 		onretry?: () => void;
 		ontrigger?: () => void;
@@ -59,11 +63,16 @@
 	<div class="bar">
 		<button
 			class="k-mono trigger"
-			disabled={triggering}
+			disabled={triggering || !runnable}
 			onclick={() => ontrigger?.()}
 		>
 			{triggering ? 'STARTING…' : 'RUN PIPELINE'}
 		</button>
+		{#if !runnable}
+			<p class="k-mono hint">
+				No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
+			</p>
+		{/if}
 		{#if triggerError}
 			<span class="k-mono terror">{triggerError}</span>
 		{/if}
@@ -168,6 +177,11 @@
 	.terror {
 		font-size: 10px;
 		color: var(--k-fail);
+	}
+	.hint {
+		font-size: 10px;
+		color: var(--k-muted);
+		margin: 0;
 	}
 	.filters {
 		display: flex;

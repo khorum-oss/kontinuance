@@ -4,7 +4,7 @@
 	import { api, ApiError } from '$lib/api/client';
 	import { runStream } from '$lib/api/live';
 	import { filterRuns, mergeNewestFirst, runProject, toRunView, type RunView } from '$lib/api/present';
-	import type { RunRecord } from '$lib/api/types';
+	import type { Project, RunRecord } from '$lib/api/types';
 	import Runs from '$lib/screens/Runs.svelte';
 
 	// The project activated in the entry picker (039), read from the layout via context — see
@@ -34,6 +34,16 @@
 	// plus the currently-active scope even when it matches zero loaded runs (e.g. a picker selection with
 	// no history yet), so the <select> always has an <option> for its own value and never renders blank.
 	let projectOptions = $state<string[]>([]);
+
+	// The registered project list (032/039), fetched once so the trigger control can tell a registered
+	// project (runnable) from a derived one (no descriptor — nothing for RUN PIPELINE to run). Reactive to
+	// `projectFilter` below so the dropdown, not just the entry picker, keeps this correct.
+	let projectsList = $state<Project[]>([]);
+	// Unscoped view keeps today's behavior (trigger always enabled); a scope not yet in the loaded list
+	// (e.g. still fetching) also defaults permissive rather than punishing a load race with a false negative.
+	const activeProjectEntry = $derived(projectsList.find((p) => p.name === projectFilter));
+	const runnable = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.runnable ?? true));
+	const projectName = $derived(projectFilter === 'all' ? '' : projectFilter);
 
 	function render() {
 		const all = mergeNewestFirst(byId.values());
@@ -91,6 +101,15 @@
 		load();
 	});
 
+	// Best-effort: a failed fetch here shouldn't block the runs list — `runnable` just stays permissive
+	// (see the default above) until it succeeds.
+	$effect(() => {
+		api
+			.getProjects()
+			.then((body) => (projectsList = body.projects))
+			.catch(() => {});
+	});
+
 	// Live updates: merge streamed records and reflect the connection's degraded state.
 	$effect(() => {
 		const unsubscribe = runStream().subscribe((s) => {
@@ -117,6 +136,8 @@
 	{degraded}
 	{triggering}
 	{triggerError}
+	{runnable}
+	{projectName}
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
 	ontrigger={trigger}
