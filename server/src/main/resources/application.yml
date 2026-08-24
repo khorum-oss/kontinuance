@@ -18,9 +18,13 @@ kontinuance:
   # Authentication (016): set BOTH to enforce a login gate on the API; leave empty (default) to run open
   # (loopback/dev) — the server logs a warning at startup when unauthenticated. Supply via
   # KONTINUANCE_AUTH_USERNAME / KONTINUANCE_AUTH_PASSWORD (never commit secret values).
+  # Setting only ONE of the two is a startup failure: a partially-applied secret would otherwise serve the
+  # API unauthenticated while looking protected. Set `required` (KONTINUANCE_AUTH_REQUIRED) on any
+  # deployment that must never run open — then missing credentials fail startup instead of opening the API.
   auth:
     username: ${KONTINUANCE_AUTH_USERNAME:}
     password: ${KONTINUANCE_AUTH_PASSWORD:}
+    required: ${KONTINUANCE_AUTH_REQUIRED:false}
   store: ${user.home}/.kontinuance/runs
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.

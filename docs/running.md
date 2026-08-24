@@ -47,7 +47,8 @@ All server settings use Spring's relaxed binding — set them as JVM properties 
 | `server.address` | `SERVER_ADDRESS` | `127.0.0.1` | Bind address. Loopback by default — see [Authentication](#authentication). |
 | `server.port` | `SERVER_PORT` | `8077` | Listen port. |
 | `kontinuance.auth.username` | `KONTINUANCE_AUTH_USERNAME` | _(unset)_ | Operator login name. Set **with** the password to enforce authentication; see [Authentication](#authentication). |
-| `kontinuance.auth.password` | `KONTINUANCE_AUTH_PASSWORD` | _(unset)_ | Operator password. Never commit the value. Both must be set to enforce auth; unset ⇒ open mode + startup warning. |
+| `kontinuance.auth.password` | `KONTINUANCE_AUTH_PASSWORD` | _(unset)_ | Operator password. Never commit the value. Both must be set to enforce auth; both unset ⇒ open mode + startup warning; **only one set ⇒ startup failure**. |
+| `kontinuance.auth.required` | `KONTINUANCE_AUTH_REQUIRED` | `false` | Assert that authentication is mandatory: missing credentials become a startup failure instead of open mode. Set it on any deployment that must never run open. |
 | `kontinuance.store` | `KONTINUANCE_STORE` | `~/.kontinuance/runs` | Directory of run history (the file-backed run store). |
 | `kontinuance.config.descriptor` | `KONTINUANCE_CONFIG_DESCRIPTOR` | `kontinuance.yml` | Pipeline descriptor loaded for `/api/config` and for triggered/resumed runs. |
 | `kontinuance.coverage.report` | `KONTINUANCE_COVERAGE_REPORT` | `build/reports/kover/report.xml` | Kover XML surfaced by the coverage screen. |
@@ -188,9 +189,19 @@ WebSocket — then requires a valid session. Public paths stay open in both mode
   HttpOnly `KSESSION` cookie; subsequent calls carry it. `GET /api/auth/me` reports the signed-in user and
   whether auth is required; `POST /api/auth/logout` ends the session.
 - Credentials are compared in constant time; a wrong username and a wrong password are indistinguishable.
-- **When the two variables are unset the server runs open** (unauthenticated) and logs a warning at startup.
+- **When both variables are unset the server runs open** (unauthenticated) and logs a warning at startup.
   The loopback bind (`127.0.0.1`) remains the safe default for open mode — the service is not
   network-reachable until you change `SERVER_ADDRESS` or front it with a proxy.
+- **Setting only one of the two is a startup failure.** The server refuses to start rather than falling back
+  to open mode, because a half-applied secret is indistinguishable from a deliberately open deployment: the
+  API would serve every request unauthenticated while appearing configured. The failure names the missing
+  property and never echoes a configured value.
+- **`KONTINUANCE_AUTH_REQUIRED=true` makes credentials mandatory.** With it set, missing credentials are a
+  startup failure instead of open mode. Set it on any deployment that must never run open — it is the guard
+  for a secret that mounts empty or fails to populate *either* variable, which the half-set check alone
+  cannot catch. Because the check runs during bean initialization, the process exits before the web server
+  binds a port, so a misconfigured deployment can never serve an unauthenticated request. Under Kubernetes
+  that surfaces as a crash-looping pod rather than a silently open API.
 
 Sessions are in-memory and single-instance: they do not survive a restart and are not shared across
 instances (consistent with [durability](#durability-only-paused-runs-survive-a-restart)). For a stronger
