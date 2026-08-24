@@ -108,3 +108,40 @@ test('disables the trigger when scope changes via the project dropdown, not only
 	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
 	await expect(page.getByText(/no descriptor registered for relikquary/i)).toBeVisible();
 });
+
+test('disables the trigger for a registered-but-not-active project scoped via the dropdown', async ({
+	page
+}) => {
+	// A run that resolves to `infra-charts` so the run-derived project select offers it as an option
+	// alongside `kontinuance-service` — sampleRuns alone only resolve to `kontinuance`.
+	const infraChartsRun = {
+		id: '#IC-5001',
+		pipeline: 'infra-charts',
+		status: 'Success',
+		repo: 'khorum-oss/infra-charts',
+		sha: 'feed1234ab',
+		startedAt: '2026-07-17T00:00:00Z',
+		endedAt: '2026-07-17T00:03:00Z'
+	};
+	const runs = [...sampleRuns, infraChartsRun];
+	await mockApi(page, runs);
+	await mockStream(page, runs);
+
+	await page.goto('/');
+	await enterApp(page);
+
+	// Enabled first: lands on kontinuance-service, which is both runnable AND the server's active project.
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+
+	// infra-charts is registered (runnable) but NOT the active project — switching scope to it must
+	// disable the trigger with a reason distinct from "no descriptor registered".
+	await page.getByLabel('filter by project').selectOption('infra-charts');
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
+	await expect(page.getByText(/infra-charts is not the active project/i)).toBeVisible();
+	await expect(page.getByText(/no descriptor registered/i)).toHaveCount(0);
+
+	// Enabled again: 'all' is the unscoped escape hatch and must not regress to disabled.
+	await page.getByLabel('filter by project').selectOption('all');
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+});

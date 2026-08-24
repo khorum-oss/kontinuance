@@ -17,6 +17,7 @@
 		triggerError = null,
 		runnable = true,
 		projectName = '',
+		notActiveReason = false,
 		onopen,
 		onretry,
 		ontrigger,
@@ -39,6 +40,7 @@
 		triggerError?: string | null;
 		runnable?: boolean;
 		projectName?: string;
+		notActiveReason?: boolean;
 		onopen?: (id: string) => void;
 		onretry?: () => void;
 		ontrigger?: () => void;
@@ -118,7 +120,12 @@
 			{/if}
 		</div>
 	</div>
-	{#if !runnable}
+	{#if !runnable && notActiveReason}
+		<p class="k-mono hint">
+			{projectName || 'this project'} is not the active project — selecting it from the entry screen
+			would make it active and let you run it from here.
+		</p>
+	{:else if !runnable}
 		<p class="k-mono hint">
 			No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
 		</p>

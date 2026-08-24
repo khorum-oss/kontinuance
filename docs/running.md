@@ -147,6 +147,14 @@ pipeline:
 If you select a project and its runs list is unexpectedly empty, check for exactly this mismatch before
 assuming a bug.
 
+**A second, distinct cause: the dashboard's run window is smaller than the derivation window.** The server
+derives projects (and their run counts) from the most recent `kontinuance.projects.derive-limit` runs
+(default 500), but the dashboard only loads the most recent 100 runs for the runs list. On a busy store, the
+project picker can advertise a project with a healthy run count while its scoped runs list is empty —
+not because of a name mismatch, but because that project's runs simply fall outside the browser's smaller
+100-run window. Compare the project's `runCount` from `GET /api/projects` against how far back its runs sit
+in `GET /api/runs`: if the mismatch above doesn't explain it, this is likely the culprit.
+
 ### Manual-approval gates
 
 An `approval:` step pauses the run until an operator approves or rejects it from the run's detail view.

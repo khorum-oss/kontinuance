@@ -7,6 +7,7 @@ import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Path
+import java.time.Instant
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.assertEquals
@@ -37,6 +38,39 @@ class ProjectControllerDerivedTest {
         assertTrue(!listed.runnable)
         assertEquals(1, listed.runCount)
         assertEquals("Success", listed.lastStatus)
+    }
+
+    @Test
+    fun `aggregates stats across multiple runs for the same project, newest wins`(@TempDir dir: Path) = runTest {
+        val runs = InMemoryRunStore()
+        // Older run recorded FIRST: InMemoryRunStore.recent() returns newest-first as reverse insertion
+        // order, so recording older-then-newer makes the newer run the first one deriveStats() sees for
+        // this project — exactly the ordering deriveStats()'s "first seen == latest" comment relies on.
+        // Statuses are deliberately different so an oldest-vs-newest bug is unambiguous.
+        runs.record(
+            RunRecord(
+                id = "r1",
+                pipeline = "relikquary-pr",
+                status = "Failed",
+                repo = "khorum-oss/relikquary",
+                endedAt = Instant.parse("2026-08-01T00:00:00Z"),
+            ),
+        )
+        runs.record(
+            RunRecord(
+                id = "r2",
+                pipeline = "relikquary-pr",
+                status = "Success",
+                repo = "khorum-oss/relikquary",
+                endedAt = Instant.parse("2026-08-02T00:00:00Z"),
+            ),
+        )
+
+        val listed = controller(dir, runs).list().projects.single { it.name == "relikquary" }
+
+        assertEquals(2, listed.runCount)
+        assertEquals("Success", listed.lastStatus)
+        assertEquals("2026-08-02T00:00:00Z", listed.lastRunAt)
     }
 
     @Test

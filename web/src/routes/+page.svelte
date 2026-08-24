@@ -42,8 +42,17 @@
 	// Unscoped view keeps today's behavior (trigger always enabled); a scope not yet in the loaded list
 	// (e.g. still fetching) also defaults permissive rather than punishing a load race with a false negative.
 	const activeProjectEntry = $derived(projectsList.find((p) => p.name === projectFilter));
-	const runnable = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.runnable ?? true));
+	const scopedRunnable = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.runnable ?? true));
+	// The server's currently-active project (the one RUN PIPELINE actually runs) — a project can be
+	// `runnable` (has a descriptor) without being the one the server would run right now. Same fail-open
+	// default as above: while the projects list hasn't loaded, don't punish the race with a false negative.
+	const scopedActive = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.active ?? true));
+	// Gate the trigger on BOTH: a scope with no descriptor can't run at all, and a scope that isn't the
+	// server's active project would run a DIFFERENT project's pipeline than the one on screen (039 footgun).
+	const runnable = $derived(scopedRunnable && scopedActive);
 	const projectName = $derived(projectFilter === 'all' ? '' : projectFilter);
+	// Distinguishes the two disabled reasons so the hint names the right one.
+	const notActiveReason = $derived(scopedRunnable && !scopedActive);
 
 	function render() {
 		const all = mergeNewestFirst(byId.values());
@@ -138,6 +147,7 @@
 	{triggerError}
 	{runnable}
 	{projectName}
+	{notActiveReason}
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
 	ontrigger={trigger}

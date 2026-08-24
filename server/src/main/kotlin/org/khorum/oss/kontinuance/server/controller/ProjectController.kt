@@ -130,13 +130,15 @@ class ProjectController(
         // Ordering is benign: seeding registers `default` and marks it active, then this call's own
         // store.setActive(name) below overwrites the active pointer to the requested project.
         seedIfEmpty()
+        // Validate the name before it ever reaches the filesystem (store.get resolves it straight into a
+        // path) — this guard is what keeps store.get from being handed an unsafe name, so it must run first.
+        if (!ProjectStore.isValidName(name)) {
+            return@withContext notFound(name)
+        }
         val text = store.get(name)
         // A derived project (039) has runs but no stored descriptor: it can be made active — which
         // scopes the dashboard to it — but there is nothing to write as the live descriptor, and
         // overwriting the current one with an unrelated project's pipeline would be a footgun.
-        if (text == null && !ProjectStore.isValidName(name)) {
-            return@withContext notFound(name)
-        }
         if (text == null && name !in deriveStats().keys) {
             return@withContext notFound(name)
         }
