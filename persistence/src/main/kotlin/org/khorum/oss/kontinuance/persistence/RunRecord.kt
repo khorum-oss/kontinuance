@@ -14,6 +14,9 @@ import java.time.Instant
  * values (FR-009; the engine guarantees `Failed.reason` carries no unmasked secrets). Optional CI
  * context (repo/sha/trigger) is present for runs started by the event source. Serialized as flat JSON
  * via the runtime API (no compiler plugin, no new dependency).
+ *
+ * `project` is the owning project declared by the pipeline (039); when absent the reader infers it
+ * from `repo`, so records written before the field existed still resolve to a project.
  */
 data class RunRecord(
     val id: String,
@@ -26,6 +29,7 @@ data class RunRecord(
     val repo: String? = null,
     val sha: String? = null,
     val trigger: String? = null,
+    val project: String? = null,
     val stages: List<StageRecord> = emptyList(),
 ) {
 
@@ -41,6 +45,7 @@ data class RunRecord(
         repo?.let { put("repo", it) }
         sha?.let { put("sha", it) }
         trigger?.let { put("trigger", it) }
+        project?.let { put("project", it) }
         putStages(stages)
     }.toString()
 
@@ -72,6 +77,7 @@ data class RunRecord(
                 repo = repo,
                 sha = sha,
                 trigger = trigger,
+                project = run.pipeline.project,
                 stages = run.stageRuns.map { stage ->
                     StageRecord(
                         name = stage.name,
@@ -105,6 +111,7 @@ data class RunRecord(
                 repo = str("repo"),
                 sha = str("sha"),
                 trigger = str("trigger"),
+                project = str("project"),
                 stages = parseStages(obj),
             )
         }

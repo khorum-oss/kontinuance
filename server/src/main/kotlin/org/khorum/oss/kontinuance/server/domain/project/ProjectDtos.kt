@@ -6,7 +6,22 @@ package org.khorum.oss.kontinuance.server.domain.project
  */
 data class ProjectsResponse(val active: String?, val projects: List<ProjectDto>)
 
-data class ProjectDto(val name: String, val active: Boolean, val repo: String? = null, val branch: String? = null)
+/**
+ * A project on the wire. `derived` marks an entry computed from run history rather than a registered
+ * descriptor (039); `runnable` is false exactly when there is no stored descriptor to run. The run
+ * statistics come from the derivation window and are `0`/`null` for a project with no recorded runs.
+ */
+data class ProjectDto(
+    val name: String,
+    val active: Boolean,
+    val repo: String? = null,
+    val branch: String? = null,
+    val derived: Boolean = false,
+    val runnable: Boolean = true,
+    val runCount: Int = 0,
+    val lastStatus: String? = null,
+    val lastRunAt: String? = null,
+)
 
 /** `POST /api/projects` body: a new project's name + descriptor + optional source. */
 data class CreateProjectRequest(

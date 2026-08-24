@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, setContext } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { api } from '$lib/api/client';
@@ -27,6 +27,17 @@
 	type View = 'loading' | 'signin' | 'project' | 'app';
 	let view = $state<View>('loading');
 	let session = $state<Session>({ authenticated: false, authRequired: false });
+
+	// The project activated in the picker (039): the runs list reads this as its initial scope.
+	// 'all' means unscoped — the default before anything has been picked.
+	let activeProject = $state('all');
+	// Exposed via context (not a prop) because it flows to `children()`, which SvelteKit renders without
+	// a prop channel of its own; a getter keeps the read reactive across the context boundary.
+	setContext('activeProject', {
+		get current() {
+			return activeProject;
+		}
+	});
 
 	const requireSignIn = $derived(session.authRequired && !session.authenticated);
 	const operator = $derived(session.username ?? 'operator');
@@ -107,7 +118,10 @@
 		{requireSignIn}
 		operator={session.username ?? ''}
 		onauthenticated={onAuthenticated}
-		oncomplete={() => (view = 'app')}
+		oncomplete={(name) => {
+			activeProject = name;
+			view = 'app';
+		}}
 		onsignout={onSignOut}
 	/>
 {:else if view === 'app'}

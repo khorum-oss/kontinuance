@@ -63,6 +63,10 @@
 		projectsError = null;
 		try {
 			projects = (await api.getProjects()).projects;
+			// a project can go from runnable to derived-only (or disappear) on reload — don't leave the
+			// source editor open against one that no longer offers a source to edit (039)
+			const editing = projects.find((p) => p.name === sourceEditing);
+			if (sourceEditing && (!editing || editing.runnable === false)) sourceEditing = null;
 		} catch (e) {
 			projectsError = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
@@ -125,6 +129,7 @@
 	}
 
 	function toggleSource(p: Project) {
+		if (p.runnable === false) return;
 		sourceError = null;
 		if (sourceEditing === p.name) {
 			sourceEditing = null;
@@ -286,20 +291,36 @@
 											<span class="k-mono rdesc">
 												{#if selecting === p.name}activating…
 												{:else if p.repo}{p.repo}{p.branch ? ` · ${p.branch}` : ''}
+												{:else if p.runnable === false}from run history · no descriptor registered
 												{:else}no source · runs the descriptor as-is{/if}
 											</span>
+											{#if p.runCount}
+												<span class="k-mono meta">{p.runCount} runs · last {p.lastStatus ?? '—'}</span>
+											{/if}
 										</span>
 									</span>
 									<span class="badges">
-										<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
+										{#if p.active || p.runnable !== false}
+											<span class="k-mono badge" class:cfg={p.active}>{p.active ? 'ACTIVE' : 'AVAILABLE'}</span>
+										{/if}
+										{#if p.derived}
+											<span
+												class="k-mono badge badge-derived"
+												title="discovered from run history — no descriptor registered"
+											>
+												DERIVED
+											</span>
+										{/if}
 									</span>
 								</button>
-								<div class="src-foot">
-									<button class="k-mono link src-toggle" onclick={() => toggleSource(p)}>
-										{sourceEditing === p.name ? '✕ CLOSE' : p.repo ? 'EDIT SOURCE' : 'SET SOURCE'}
-									</button>
-								</div>
-								{#if sourceEditing === p.name}
+								{#if p.runnable !== false}
+									<div class="src-foot">
+										<button class="k-mono link src-toggle" onclick={() => toggleSource(p)}>
+											{sourceEditing === p.name ? '✕ CLOSE' : p.repo ? 'EDIT SOURCE' : 'SET SOURCE'}
+										</button>
+									</div>
+								{/if}
+								{#if p.runnable !== false && sourceEditing === p.name}
 									<div class="src-edit">
 										<input
 											class="k-mono field"
@@ -757,6 +778,14 @@
 	.badge.cfg {
 		color: var(--k-ok);
 		border-color: rgba(52, 211, 153, 0.35);
+	}
+	.badge-derived {
+		border-color: var(--k-muted);
+		color: var(--k-muted);
+	}
+	.meta {
+		color: var(--k-muted);
+		font-size: 0.75rem;
 	}
 	.ws-foot {
 		flex: none;

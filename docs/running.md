@@ -108,6 +108,53 @@ so keep to these rules:
   shared workspace).
 - The condition key is **`when:`** (not `condition:`).
 
+### `project:` (optional)
+
+Names the project a pipeline belongs to, grouping several pipelines under one entry in the dashboard:
+
+```yaml
+pipeline:
+  name: "relikquary-pr"
+  project: "relikquary"
+```
+
+When absent, the project is inferred from the run's repository (the segment after the final `/`), so an
+existing history needs no change. A blank `project:` (e.g. `project: "  "`) is rejected when the descriptor
+is parsed — the whole pipeline fails to load, loudly, with a `DescriptorException`. A non-blank name that
+does not match `[A-Za-z0-9._-]{1,64}` parses fine but resolves to **no project** at run time — it is never
+rewritten or sanitized into something that does match. This is the quiet failure: a pipeline with a typo'd
+project name (a stray `/` or space) runs normally, but its runs never group under the project you expected.
+
+Projects with runs but no registered descriptor appear in the dashboard as **derived** — visible and
+selectable, but not runnable until a descriptor is registered under the same name. Derived projects are
+computed from the most recent `kontinuance.projects.derive-limit` runs (default 500); a project whose runs
+have all aged past that window stops being listed.
+
+**Scoping matches the run's *resolved* project, not the registered project's name.** If a project is
+registered under a name that differs from its runs' repository short name, selecting it in the dashboard
+shows zero runs — every run resolved to a different (derived) project. For example, a project registered
+as `kontinuance-service` whose runs come from repo `khorum-oss/kontinuance` has those runs resolve to
+`kontinuance` (the repo's short name), not `kontinuance-service`; selecting `kontinuance-service` in the
+picker then shows no runs. The fix is to declare `project: kontinuance-service` in that pipeline's
+descriptor, so future runs resolve to the registered name:
+
+```yaml
+pipeline:
+  name: "kontinuance-ci"
+  project: "kontinuance-service"   # matches the registered project name, not the repo's short name
+```
+
+If you select a project and its runs list is unexpectedly empty, check for exactly this mismatch before
+assuming a bug.
+
+**A second, distinct cause: the dashboard's run window is smaller than the derivation window.** The server
+derives projects (and their run counts) from the most recent `kontinuance.projects.derive-limit` runs
+(default 500), but the dashboard only loads the most recent 100 runs for the runs list. On a busy store, the
+project picker can advertise a project with a healthy run count while its scoped runs list is empty —
+not because of a name mismatch, but because that project's runs simply fall outside the browser's smaller
+100-run window. Compare the project's `runCount` from `GET /api/projects` against how far back its runs sit
+in `GET /api/runs`: if the mismatch above doesn't explain it, this is likely the culprit.
+
 ### Manual-approval gates
 
 An `approval:` step pauses the run until an operator approves or rejects it from the run's detail view.

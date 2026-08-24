@@ -16,6 +16,9 @@ import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.D
  * @param name non-empty; unique within a run request.
  * @param stages ordered; may be empty (an empty pipeline completes [PipelineStatus.Success]).
  * @param concurrency the maximum number of simultaneously RUNNING steps (K); must be >= 1.
+ * @param project optional owning project name; groups several pipelines (a PR gate, a delivery
+ *   pipeline, a promotion) under one project in the dashboard. When `null` the project is inferred
+ *   from the run's repository. Must be non-blank when present.
  */
 @GeneratedDsl
 @RootDsl(name = "pipeline", alias = "")
@@ -26,11 +29,15 @@ data class Pipeline(
     val stages: List<Stage> = emptyList(),
     @DefaultValue("1")
     val concurrency: Int = 1,
+    val project: String? = null,
 ) {
     init {
         require(name.isNotBlank()) { "pipeline name must be non-empty" }
         require(concurrency >= 1) { "pipeline '$name' concurrency must be >= 1, was $concurrency" }
         val duplicates = stages.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys
         require(duplicates.isEmpty()) { "duplicate stage names in pipeline '$name': $duplicates" }
+        project?.let {
+            require(it.isNotBlank()) { "pipeline '$name' project must be non-blank when set" }
+        }
     }
 }

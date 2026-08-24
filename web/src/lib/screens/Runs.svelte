@@ -8,39 +8,53 @@
 		query = '',
 		status = 'all',
 		trigger = 'all',
+		project = 'all',
+		projects = [],
 		loading = false,
 		error = null,
 		degraded = false,
 		triggering = false,
 		triggerError = null,
+		runnable = true,
+		projectName = '',
+		notActiveReason = false,
 		onopen,
 		onretry,
 		ontrigger,
 		onquery,
 		onstatus,
-		ontriggerfilter
+		ontriggerfilter,
+		onproject
 	}: {
 		runs?: RunView[];
 		total?: number;
 		query?: string;
 		status?: string;
 		trigger?: string;
+		project?: string;
+		projects?: string[];
 		loading?: boolean;
 		error?: string | null;
 		degraded?: boolean;
 		triggering?: boolean;
 		triggerError?: string | null;
+		runnable?: boolean;
+		projectName?: string;
+		notActiveReason?: boolean;
 		onopen?: (id: string) => void;
 		onretry?: () => void;
 		ontrigger?: () => void;
 		onquery?: (v: string) => void;
 		onstatus?: (v: string) => void;
 		ontriggerfilter?: (v: string) => void;
+		onproject?: (v: string) => void;
 	} = $props();
 
 	const STATUSES = ['all', 'running', 'success', 'failed', 'waiting', 'cancelled', 'timedout'];
 	const TRIGGERS = ['all', 'manual', 'push', 'pull_request'];
-	const filtering = $derived(query.trim() !== '' || status !== 'all' || trigger !== 'all');
+	const filtering = $derived(
+		query.trim() !== '' || status !== 'all' || trigger !== 'all' || project !== 'all'
+	);
 </script>
 
 <div class="screen">
@@ -51,7 +65,7 @@
 	<div class="bar">
 		<button
 			class="k-mono trigger"
-			disabled={triggering}
+			disabled={triggering || !runnable}
 			onclick={() => ontrigger?.()}
 		>
 			{triggering ? 'STARTING…' : 'RUN PIPELINE'}
@@ -90,11 +104,32 @@
 					<option value={t}>{t === 'all' ? 'all triggers' : t}</option>
 				{/each}
 			</select>
+			<select
+				class="k-mono facet"
+				aria-label="filter by project"
+				value={project}
+				onchange={(e) => onproject?.((e.currentTarget as HTMLSelectElement).value)}
+			>
+				<option value="all">ALL PROJECTS</option>
+				{#each projects as p (p)}
+					<option value={p}>{p}</option>
+				{/each}
+			</select>
 			{#if filtering}
 				<span class="k-mono count">showing {runs.length} of {total}</span>
 			{/if}
 		</div>
 	</div>
+	{#if !runnable && notActiveReason}
+		<p class="k-mono hint">
+			{projectName || 'this project'} is not the active project — selecting it from the entry screen
+			would make it active and let you run it from here.
+		</p>
+	{:else if !runnable}
+		<p class="k-mono hint">
+			No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
+		</p>
+	{/if}
 
 	<div class="head k-mono">
 		<span></span><span>RUN</span><span>REF</span><span>COMMIT</span><span>PROGRESS</span><span>TIME</span
@@ -138,6 +173,8 @@
 		border-radius: 4px;
 		padding: 9px 20px;
 		cursor: pointer;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.trigger:hover:not(:disabled) {
 		background: rgba(94, 234, 212, 0.08);
@@ -149,6 +186,11 @@
 	.terror {
 		font-size: 10px;
 		color: var(--k-fail);
+	}
+	.hint {
+		font-size: 10px;
+		color: var(--k-muted);
+		margin: -6px 0 16px;
 	}
 	.filters {
 		display: flex;
@@ -186,6 +228,8 @@
 		font-size: 9.5px;
 		letter-spacing: 1px;
 		color: var(--k-faint);
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.head {
 		display: grid;

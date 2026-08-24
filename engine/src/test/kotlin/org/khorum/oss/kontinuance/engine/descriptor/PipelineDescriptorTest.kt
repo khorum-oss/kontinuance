@@ -115,4 +115,52 @@ class PipelineDescriptorTest {
         """.trimIndent()
         assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
     }
+
+    @Test
+    fun `parses the optional project name`() {
+        val yaml = """
+            pipeline:
+              name: "relikquary-pr"
+              project: "relikquary"
+              stages: []
+        """.trimIndent()
+
+        assertEquals("relikquary", PipelineDescriptor.parse(yaml).project)
+    }
+
+    @Test
+    fun `project is null when the key is absent`() {
+        val yaml = """
+            pipeline:
+              name: "relikquary-pr"
+              stages: []
+        """.trimIndent()
+
+        assertEquals(null, PipelineDescriptor.parse(yaml).project)
+    }
+
+    @Test
+    fun `still rejects an unknown top-level pipeline key`() {
+        val yaml = """
+            pipeline:
+              name: "relikquary-pr"
+              projekt: "relikquary"
+              stages: []
+        """.trimIndent()
+
+        val error = assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
+        assertTrue(error.message!!.contains("projekt"))
+    }
+
+    @Test
+    fun `rejects a blank project name`() {
+        val yaml = """
+            pipeline:
+              name: "relikquary-pr"
+              project: "  "
+              stages: []
+        """.trimIndent()
+
+        assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
+    }
 }

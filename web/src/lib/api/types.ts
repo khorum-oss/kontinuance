@@ -12,6 +12,7 @@ export interface RunRecord {
 	repo?: string;
 	sha?: string;
 	trigger?: string;
+	project?: string;
 }
 
 export interface RunsResponse {
@@ -130,11 +131,18 @@ export interface Coverage {
 
 // A named pipeline descriptor the server stores and can run (032). `active` marks the one in effect.
 // `repo`/`branch` are the project's optional source (033): when set, a run of the project checks them out.
+// `derived` marks a project computed from run history rather than a registered descriptor (039);
+// `runnable` is false exactly when there is no descriptor to run.
 export interface Project {
 	name: string;
 	active: boolean;
 	repo?: string;
 	branch?: string;
+	derived?: boolean;
+	runnable?: boolean;
+	runCount?: number;
+	lastStatus?: string;
+	lastRunAt?: string;
 }
 export interface ProjectsResponse {
 	active: string | null;

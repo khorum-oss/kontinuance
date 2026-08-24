@@ -80,11 +80,23 @@ export function runSortKey(r: RunRecord): string {
 
 // ----- runs list filtering (037) -----
 
-/** The runs-list filter criteria: a free-text query plus status/trigger facets ("all" = no facet). */
+/** The runs-list filter criteria: a free-text query plus status/trigger/project facets ("all" = no facet).
+ * `project` is optional — callers that don't scope by project (e.g. the run stream merge point before
+ * this feature is wired in) can omit it entirely; that is equivalent to `'all'`. */
 export interface RunFilter {
 	query: string;
 	status: string; // 'all' | canonical Status
 	trigger: string; // 'all' | 'manual' | 'push' | 'pull_request'
+	project?: string; // 'all' | project name | undefined (== 'all')
+}
+
+/** The project a run belongs to — the browser mirror of the server's resolution rule (039):
+ * the explicit project, else the repository's short name, else none. Pure. */
+export function runProject(r: RunRecord): string | null {
+	const explicit = r.project?.trim();
+	if (explicit) return explicit;
+	const fromRepo = r.repo?.split('/').pop()?.trim();
+	return fromRepo || null;
 }
 
 /** True when [r] matches every active criterion in [f] (status by canonical status; query a case-insensitive
@@ -92,6 +104,8 @@ export interface RunFilter {
 export function matchesRunFilter(r: RunRecord, f: RunFilter): boolean {
 	if (f.status !== 'all' && normalizeStatus(r.status) !== f.status) return false;
 	if (f.trigger !== 'all' && (r.trigger ?? '').toLowerCase() !== f.trigger) return false;
+	const project = f.project ?? 'all';
+	if (project !== 'all' && runProject(r) !== project) return false;
 	const q = f.query.trim().toLowerCase();
 	if (q) {
 		const hay = [r.id, r.pipeline, r.repo, r.sha].filter(Boolean).join(' ').toLowerCase();

@@ -9,9 +9,11 @@
          <trust group="gradle"/>
          <trust group="io.github.microutils"/>
          <trust group="org.apache" name="apache" version="17"/>
+         <trust group="org.apache" name="apache" version="33"/>
          <trust group="org.apiguardian"/>
          <trust group="org.checkerframework"/>
          <trust group="org.eclipse.ee4j" name="project" version="1.0.5"/>
+         <trust group="org.eclipse.ee4j" name="project" version="1.0.9"/>
          <trust group="org.hamcrest"/>
          <trust group="org.jspecify"/>
          <trust group="org.objenesis"/>
