@@ -169,3 +169,20 @@ test('sizes the runs fetch from the window the server derived its counts over', 
 	await enterApp(page);
 	await expect.poll(() => runsUrl).toContain('limit=7');
 });
+
+test('a scope with zero loaded runs stays selectable after switching to all projects', async ({ page }) => {
+	// One-way door: the facet used to offer only run-derived names plus the CURRENT scope, so switching
+	// away from a zero-run project dropped it from the list and the only way back was EXIT -> picker.
+	await page.goto('/');
+	await enterApp(page);
+	const facet = page.getByLabel('filter by project');
+
+	await facet.selectOption('relikquary'); // derived, no loaded runs
+	await expect(facet).toHaveValue('relikquary');
+
+	await facet.selectOption('all');
+	await expect(facet).toHaveValue('all');
+
+	await facet.selectOption('relikquary');
+	await expect(facet).toHaveValue('relikquary');
+});

@@ -60,9 +60,16 @@
 	function render() {
 		const all = mergeNewestFirst(byId.values());
 		total = all.length;
+		// Facet options come from three sources, each covering a gap the others leave:
+		//   - projects represented in the loaded runs, so a project with history is always offered;
+		//   - every project the server knows about, so switching away from a scope never removes it from
+		//     the dropdown (that one-way door used to strand you until EXIT → picker);
+		//   - the current scope itself, so the <select> always has an <option> for its own value even if
+		//     the projects fetch failed and the runs carry no trace of it.
 		const derived = all.map(runProject).filter((p): p is string => p !== null);
-		const withActiveScope = projectFilter === 'all' ? derived : [...derived, projectFilter];
-		projectOptions = [...new Set(withActiveScope)].sort();
+		const known = projectsList.map((p) => p.name);
+		const current = projectFilter === 'all' ? [] : [projectFilter];
+		projectOptions = [...new Set([...derived, ...known, ...current])].sort();
 		runs = filterRuns(all, {
 			query,
 			status: statusFilter,
