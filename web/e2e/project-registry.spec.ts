@@ -145,3 +145,27 @@ test('disables the trigger for a registered-but-not-active project scoped via th
 	await page.getByLabel('filter by project').selectOption('all');
 	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
 });
+
+test('sizes the runs fetch from the window the server derived its counts over', async ({ page }) => {
+	// The picker's run counts come from a server-side window; the runs list must load that SAME window, or
+	// a count can advertise more runs than the list is able to show. Asserting on the request the browser
+	// actually makes is what pins the two together — a hardcoded limit here would silently drift again.
+	let runsUrl = '';
+	await page.route('**/api/projects', (route) =>
+		route.fulfill({
+			json: {
+				active: 'kontinuance-service',
+				runWindow: 7,
+				projects: [{ name: 'kontinuance-service', active: true, runnable: true }]
+			}
+		})
+	);
+	await page.route('**/api/runs?*', (route) => {
+		runsUrl = route.request().url();
+		return route.fulfill({ json: { runs: [] } });
+	});
+
+	await page.goto('/');
+	await enterApp(page);
+	await expect.poll(() => runsUrl).toContain('limit=7');
+});

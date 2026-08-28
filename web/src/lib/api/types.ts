@@ -144,9 +144,12 @@ export interface Project {
 	lastStatus?: string;
 	lastRunAt?: string;
 }
+// `runWindow` is how many of the most recent runs the project statistics above were computed over. Load the
+// same window for the runs list, or a picker count can advertise more runs than the list is able to show.
 export interface ProjectsResponse {
 	active: string | null;
 	projects: Project[];
+	runWindow?: number;
 }
 
 // The GitHub event source (035), read-only. When `configured` is false the rest is absent.

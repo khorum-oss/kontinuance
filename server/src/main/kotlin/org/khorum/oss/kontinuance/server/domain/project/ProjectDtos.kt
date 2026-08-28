@@ -3,8 +3,12 @@ package org.khorum.oss.kontinuance.server.domain.project
 /**
  * `/api/projects` DTOs (032/033), serialized by Jackson. `repo`/`branch` are the project's optional source
  * (null → omitted on the wire).
+ *
+ * `runWindow` is the number of most-recent runs the project statistics below were computed over. It makes
+ * the counts self-describing, and lets a client load the *same* window so a picker count can never
+ * advertise more runs than the client is able to show.
  */
-data class ProjectsResponse(val active: String?, val projects: List<ProjectDto>)
+data class ProjectsResponse(val active: String?, val projects: List<ProjectDto>, val runWindow: Int)
 
 /**
  * A project on the wire. `derived` marks an entry computed from run history rather than a registered

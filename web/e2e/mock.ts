@@ -330,7 +330,9 @@ export async function mockProjects(page: Page): Promise<void> {
 			return route.fulfill({ json: { name } });
 		}
 		const active = projects.find((p) => p.active)?.name ?? null;
-		return route.fulfill({ json: { active, projects } });
+		// `runWindow` mirrors the real server: the window its run counts were derived over, which the
+		// dashboard loads for the runs list so counts and list can never disagree.
+		return route.fulfill({ json: { active, projects, runWindow: 500 } });
 	});
 }
 

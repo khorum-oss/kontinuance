@@ -31,7 +31,12 @@ class RunApi(
     private fun effectiveLimit(limit: Int?): Int =
         (limit?.takeIf { it > 0 } ?: defaultLimit).coerceAtMost(maxLimit)
 
-    private companion object {
+    /**
+     * [MAX_LIMIT] is part of this API's contract, not an internal detail: anything deriving a window over
+     * run history has to stay within what a list response can actually serve, or it advertises runs no
+     * client could load. Shared rather than duplicated so the two can never drift.
+     */
+    internal companion object {
         const val DEFAULT_LIMIT = 50
         const val MAX_LIMIT = 500
     }

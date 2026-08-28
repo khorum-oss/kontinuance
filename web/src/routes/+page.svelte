@@ -39,6 +39,9 @@
 	// project (runnable) from a derived one (no descriptor — nothing for RUN PIPELINE to run). Reactive to
 	// `projectFilter` below so the dropdown, not just the entry picker, keeps this correct.
 	let projectsList = $state<Project[]>([]);
+	// The window the server derived its project run-counts over; the runs fetch matches it (see `init`).
+	// Undefined until the projects call returns, in which case the server applies its own list default.
+	let runWindow = $state<number | undefined>(undefined);
 	// Unscoped view keeps today's behavior (trigger always enabled); a scope not yet in the loaded list
 	// (e.g. still fetching) also defaults permissive rather than punishing a load race with a false negative.
 	const activeProjectEntry = $derived(projectsList.find((p) => p.name === projectFilter));
@@ -81,7 +84,7 @@
 		loading = true;
 		error = null;
 		try {
-			for (const r of await api.listRuns(100)) byId.set(r.id, r);
+			for (const r of await api.listRuns(runWindow)) byId.set(r.id, r);
 			render();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : (e as Error).message;
@@ -106,17 +109,23 @@
 		}
 	}
 
-	$effect(() => {
-		load();
-	});
+	// Projects first, then runs: the projects response carries the window its run counts were computed
+	// over, and the runs list loads exactly that window so a count can never advertise more runs than the
+	// list can show. A failed projects fetch must NOT block the runs list — `runnable` stays permissive
+	// (see the default above) and the runs fetch falls back to the server's own default window.
+	async function init() {
+		try {
+			const body = await api.getProjects();
+			projectsList = body.projects;
+			runWindow = body.runWindow;
+		} catch {
+			// best-effort; the runs load below still happens
+		}
+		await load();
+	}
 
-	// Best-effort: a failed fetch here shouldn't block the runs list — `runnable` just stays permissive
-	// (see the default above) until it succeeds.
 	$effect(() => {
-		api
-			.getProjects()
-			.then((body) => (projectsList = body.projects))
-			.catch(() => {});
+		void init();
 	});
 
 	// Live updates: merge streamed records and reflect the connection's degraded state.
