@@ -38,7 +38,7 @@ test('selecting a project scopes the runs list and all projects restores it', as
 	await page.getByText('SIGN IN', { exact: true }).click();
 	await page.getByText('relikquary', { exact: true }).click();
 
-	// sampleRuns belong to `kontinuance`, so scoping to `relikquary` empties the list honestly.
+	// sampleRuns belong to `kontinuance-service`, so scoping to `relikquary` empties the list honestly.
 	await expect(page.getByText(/no runs match/i)).toBeVisible();
 
 	await page.getByRole('combobox').filter({ hasText: 'ALL PROJECTS' }).selectOption('all');
@@ -52,7 +52,7 @@ test('the project select names its scope even when that scope has zero matching 
 	await page.getByText('SIGN IN', { exact: true }).click();
 	await page.getByText('relikquary', { exact: true }).click();
 
-	// relikquary matches zero loaded runs (sampleRuns resolve to `kontinuance`), so its option would be
+	// relikquary matches zero loaded runs (sampleRuns belong to `kontinuance-service`), so its option would be
 	// absent from the run-derived list unless the active scope is unioned in — without that, the browser
 	// renders the <select> blank instead of naming the filter actually being applied.
 	await expect(page.getByLabel('filter by project')).toHaveValue('relikquary');
@@ -82,8 +82,8 @@ test('enables the trigger for a registered project', async ({ page }) => {
 test('disables the trigger when scope changes via the project dropdown, not only via the picker', async ({
 	page
 }) => {
-	// A run that resolves to `relikquary` so the run-derived project select actually offers it as an
-	// option — sampleRuns alone only resolve to `kontinuance` (see the other tests in this file).
+	// A run that resolves to `relikquary` so the runs list has one under that scope — sampleRuns all
+	// belong to `kontinuance-service`.
 	const relikquaryRun = {
 		id: '#RQ-9001',
 		pipeline: 'relikquary',
@@ -112,8 +112,8 @@ test('disables the trigger when scope changes via the project dropdown, not only
 test('disables the trigger for a registered-but-not-active project scoped via the dropdown', async ({
 	page
 }) => {
-	// A run that resolves to `infra-charts` so the run-derived project select offers it as an option
-	// alongside `kontinuance-service` — sampleRuns alone only resolve to `kontinuance`.
+	// A run that resolves to `infra-charts` so the runs list has one under that scope alongside
+	// `kontinuance-service` — sampleRuns all belong to the latter.
 	const infraChartsRun = {
 		id: '#IC-5001',
 		pipeline: 'infra-charts',
@@ -185,4 +185,27 @@ test('a scope with zero loaded runs stays selectable after switching to all proj
 
 	await facet.selectOption('relikquary');
 	await expect(facet).toHaveValue('relikquary');
+});
+
+test('a registered project whose runs resolve elsewhere shows an empty scoped list', async ({ page }) => {
+	// The sharp edge, covered deliberately rather than ambiently: scoping matches a run's RESOLVED project.
+	// A project registered under a name that differs from its runs' repository short name therefore shows
+	// zero runs — the runs resolved to a different (derived) project. Declaring `project:` in the pipeline
+	// descriptor is the fix, which is exactly what the rest of this suite's fixtures now demonstrate.
+	const unnamedRuns = sampleRuns.map(({ project: _project, ...run }) => run);
+	await page.route('**/api/runs?*', (route) => route.fulfill({ json: { runs: unnamedRuns } }));
+	await page.route('**/api/runs/stream', (route) =>
+		route.fulfill({ contentType: 'text/event-stream', body: '' })
+	);
+
+	await page.goto('/');
+	await enterApp(page); // activates `kontinuance-service`
+
+	// The runs resolved to `kontinuance` (their repo), not the activated `kontinuance-service`.
+	await expect(page.getByText(/no runs match/i)).toBeVisible();
+	await expect(page.getByLabel('filter by project')).toHaveValue('kontinuance-service');
+
+	// ...and they are reachable under the name they actually resolved to.
+	await page.getByLabel('filter by project').selectOption('kontinuance');
+	await expect(page.getByText('#KX-2046')).toBeVisible();
 });

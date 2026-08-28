@@ -2,12 +2,20 @@ import type { Page } from '@playwright/test';
 
 // Wire-shape run records the UI's client understands. Kept here (not imported from src) so the E2E
 // suite exercises the real network boundary with realistic payloads.
+//
+// These carry an explicit `project` matching the registered project `kontinuance-service`, so the suite's
+// baseline is a CORRECTLY configured deployment: entering the app lands on a project whose runs are
+// actually visible. Without it they would resolve to `kontinuance` (their repo's short name) — a different
+// project from the one activated — and every test would have to widen the scope back out before it could
+// see anything. That mismatch is a real sharp edge, but it belongs in its own test, not in the baseline
+// every other test inherits.
 export const sampleRuns = [
 	{
 		id: '#KX-2046',
 		pipeline: 'kontinuance-service',
 		status: 'Running',
 		repo: 'khorum-oss/kontinuance',
+		project: 'kontinuance-service',
 		sha: 'a3f19c2ff',
 		startedAt: '2026-07-17T00:00:00Z'
 	},
@@ -16,6 +24,7 @@ export const sampleRuns = [
 		pipeline: 'kontinuance-service',
 		status: 'Success',
 		repo: 'khorum-oss/kontinuance',
+		project: 'kontinuance-service',
 		sha: '9b02d1e00',
 		startedAt: '2026-07-17T00:00:00Z',
 		endedAt: '2026-07-17T00:05:01Z'
@@ -27,6 +36,7 @@ export const sampleRuns = [
 		failingStep: 'integration tests',
 		reason: '2 failed',
 		repo: 'khorum-oss/kontinuance',
+		project: 'kontinuance-service',
 		sha: '77aa310aa',
 		startedAt: '2026-07-17T00:00:00Z',
 		endedAt: '2026-07-17T00:02:47Z'
@@ -70,6 +80,7 @@ const startedRun = {
 	pipeline: 'kontinuance-service',
 	status: 'Running',
 	repo: 'khorum-oss/kontinuance',
+	project: 'kontinuance-service',
 	sha: 'deadbeef1a',
 	startedAt: '2026-07-17T00:10:00Z'
 };
@@ -122,6 +133,7 @@ export async function mockWaitingRun(page: Page, id = 'run-approve-1'): Promise<
 				pipeline: 'kontinuance-service',
 				status: approved ? 'Success' : 'WaitingOnApproval',
 				repo: 'khorum-oss/kontinuance',
+				project: 'kontinuance-service',
 				sha: 'c0ffee12',
 				startedAt: '2026-07-17T00:00:00Z'
 			}
@@ -147,6 +159,7 @@ export async function mockCancelableRun(page: Page, id = 'run-cancel-1'): Promis
 				pipeline: 'kontinuance-service',
 				status: canceled ? 'Cancelled' : 'Running',
 				repo: 'khorum-oss/kontinuance',
+				project: 'kontinuance-service',
 				sha: 'abc123de1',
 				startedAt: '2026-07-17T00:00:00Z'
 			}
