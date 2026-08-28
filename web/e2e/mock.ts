@@ -299,7 +299,15 @@ export async function mockProjects(page: Page): Promise<void> {
 		{ name: 'kontinuance-service', active: true, runnable: true },
 		{ name: 'infra-charts', active: false, runnable: true },
 		// A project discovered from run history alone (039): builds, but no registered descriptor.
-		{ name: 'relikquary', active: false, derived: true, runnable: false, runCount: 12, lastStatus: 'Success' }
+		{
+			name: 'relikquary',
+			active: false,
+			derived: true,
+			runnable: false,
+			runCount: 12,
+			lastStatus: 'Success',
+			lastRunAt: '2026-07-17T00:00:00Z'
+		}
 	];
 	await page.route(/\/api\/projects\/[^/?]+\/activate$/, (route) => {
 		const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').slice(-2)[0]);

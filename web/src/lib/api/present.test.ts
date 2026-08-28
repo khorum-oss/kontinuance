@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { filterRuns, matchesRunFilter, mergeNewestFirst, runMessage, runRef, toRunView } from './present';
+import {
+	filterRuns,
+	lastRunAge,
+	matchesRunFilter,
+	mergeNewestFirst,
+	runMessage,
+	runRef,
+	toRunView
+} from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -159,5 +167,23 @@ describe('matchesRunFilter project scoping', () => {
 		const filterWithoutProjectKey = { query: '', status: 'all', trigger: 'all' };
 		expect(matchesRunFilter(r, filterWithoutProjectKey)).toBe(true);
 		expect(matchesRunFilter(base, filterWithoutProjectKey)).toBe(true);
+	});
+});
+
+describe('lastRunAge', () => {
+	const now = Date.parse('2026-07-17T12:00:00Z');
+
+	it('formats how long ago the last run finished', () => {
+		expect(lastRunAge('2026-07-17T10:00:00Z', now)).toBe('2h');
+	});
+
+	it('is an em dash when there is no last-run timestamp', () => {
+		// A project whose newest run is still in progress has no end time yet — say so rather than
+		// rendering a blank or, worse, an age computed from nothing.
+		expect(lastRunAge(undefined, now)).toBe('—');
+	});
+
+	it('is an em dash for an unparseable timestamp', () => {
+		expect(lastRunAge('not-a-date', now)).toBe('—');
 	});
 });

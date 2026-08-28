@@ -16,7 +16,9 @@ test('badges a derived project and shows its run count in the picker', async ({ 
 
 	const row = page.locator('.repo', { hasText: 'relikquary' });
 	await expect(row.getByText('DERIVED')).toBeVisible();
-	await expect(row.getByText(/12 runs/)).toBeVisible();
+	// count, last status, and how long ago it ran — the age is relative to now, so match its shape
+	// rather than a fixed string that would rot as the fixture date recedes.
+	await expect(row.getByText(/12 runs · last Success · \d+[smhd]/)).toBeVisible();
 
 	// a derived project has no registered descriptor, so it cannot be run — AVAILABLE would be a lie
 	await expect(row.getByText('AVAILABLE')).toHaveCount(0);
