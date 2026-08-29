@@ -120,11 +120,18 @@ pipeline:
 ```
 
 When absent, the project is inferred from the run's repository (the segment after the final `/`), so an
-existing history needs no change. A blank `project:` (e.g. `project: "  "`) is rejected when the descriptor
-is parsed — the whole pipeline fails to load, loudly, with a `DescriptorException`. A non-blank name that
-does not match `[A-Za-z0-9._-]{1,64}` parses fine but resolves to **no project** at run time — it is never
-rewritten or sanitized into something that does match. This is the quiet failure: a pipeline with a typo'd
-project name (a stray `/` or space) runs normally, but its runs never group under the project you expected.
+existing history needs no change.
+
+A `project:` you declare must be letters, digits, and `. _ -`, 1–64 characters. Anything else — blank, a
+stray space, a `/` — is rejected when the descriptor is parsed: the whole pipeline fails to load with a
+`DescriptorException` naming the offending value. A malformed name is never rewritten or sanitized into
+something that does match, because a name that silently became a *different* name would attribute runs to a
+project you did not choose.
+
+The inferred fallback is the one case that stays quiet. A repository name is not under the same constraint
+(GitHub allows characters a project name does not), so a run whose repo short name fails the rule resolves
+to **no project** rather than failing the run. Such a run stays visible in the unscoped list and simply
+never groups under a project — declaring `project:` explicitly is the fix.
 
 Projects with runs but no registered descriptor appear in the dashboard as **derived** — visible and
 selectable, but not runnable until a descriptor is registered under the same name. Derived projects are

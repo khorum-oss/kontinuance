@@ -163,4 +163,39 @@ class PipelineDescriptorTest {
 
         assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
     }
+
+    private fun descriptorWithProject(project: String) = """
+        pipeline:
+          name: "relikquary-pr"
+          project: "$project"
+          stages: []
+    """.trimIndent()
+
+    @Test
+    fun `rejects a project name that is not a safe slug`() {
+        // Previously this parsed fine and then resolved to NO project at run time, so the pipeline ran
+        // normally while its runs quietly grouped under nothing. Failing here makes the typo visible.
+        val error = assertFailsWith<DescriptorException> {
+            PipelineDescriptor.parse(descriptorWithProject("../escape"))
+        }
+
+        assertTrue(error.message!!.contains("project"))
+    }
+
+    @Test
+    fun `rejects a project name containing a space`() {
+        assertFailsWith<DescriptorException> { PipelineDescriptor.parse(descriptorWithProject("my project")) }
+    }
+
+    @Test
+    fun `rejects a project name longer than 64 characters`() {
+        assertFailsWith<DescriptorException> { PipelineDescriptor.parse(descriptorWithProject("a".repeat(65))) }
+    }
+
+    @Test
+    fun `accepts dots dashes and underscores in a project name`() {
+        val parsed = PipelineDescriptor.parse(descriptorWithProject("my.project_name-1"))
+
+        assertEquals("my.project_name-1", parsed.project)
+    }
 }
