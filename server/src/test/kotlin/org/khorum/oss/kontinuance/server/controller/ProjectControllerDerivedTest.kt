@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
+import org.khorum.oss.kontinuance.server.domain.RunApi
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Path
 import java.time.Instant
@@ -25,6 +26,45 @@ class ProjectControllerDerivedTest {
         val descriptor = dir.resolve("kontinuance.yml")
         descriptor.writeText(descriptorText)
         return ProjectController(ProjectStore(dir.resolve("projects")), runs, descriptor.toString(), 500)
+    }
+
+    @Test
+    fun `reports the window its run counts were computed over`(@TempDir dir: Path) = runTest {
+        assertEquals(500, controller(dir, InMemoryRunStore()).list().runWindow)
+    }
+
+    @Test
+    fun `clamps the reported window to what the runs endpoint can serve`(@TempDir dir: Path) = runTest {
+        // A derive window wider than the runs endpoint's cap would let the picker advertise runs the
+        // dashboard could never load, however many it asked for — the count and the list would disagree
+        // with no way for the operator to reconcile them.
+        val descriptor = dir.resolve("kontinuance.yml")
+        descriptor.writeText(descriptorText)
+        val subject = ProjectController(
+            ProjectStore(dir.resolve("projects")),
+            InMemoryRunStore(),
+            descriptor.toString(),
+            RunApi.MAX_LIMIT * 10,
+        )
+
+        assertEquals(RunApi.MAX_LIMIT, subject.list().runWindow)
+    }
+
+    @Test
+    fun `derives only within the clamped window`(@TempDir dir: Path) = runTest {
+        // The reported window must be the one actually used, or it is just a decorative number.
+        val runs = InMemoryRunStore()
+        repeat(3) { i ->
+            runs.record(RunRecord(id = "r$i", pipeline = "p", status = "Success", repo = "khorum-oss/demo"))
+        }
+        val descriptor = dir.resolve("kontinuance.yml")
+        descriptor.writeText(descriptorText)
+        val subject = ProjectController(ProjectStore(dir.resolve("projects")), runs, descriptor.toString(), 2)
+
+        val listed = subject.list()
+
+        assertEquals(2, listed.runWindow)
+        assertEquals(2, listed.projects.single { it.name == "demo" }.runCount)
     }
 
     @Test

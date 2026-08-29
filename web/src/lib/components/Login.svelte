@@ -9,6 +9,7 @@
 	// and Config screen use it — then enters mission control.
 	import { onMount, untrack } from 'svelte';
 	import { api, ApiError } from '$lib/api/client';
+	import { lastRunAge } from '$lib/api/present';
 	import type { Project } from '$lib/api/types';
 
 	let {
@@ -295,7 +296,9 @@
 												{:else}no source · runs the descriptor as-is{/if}
 											</span>
 											{#if p.runCount}
-												<span class="k-mono meta">{p.runCount} runs · last {p.lastStatus ?? '—'}</span>
+												<span class="k-mono meta">
+													{p.runCount} runs · last {p.lastStatus ?? '—'} · {lastRunAge(p.lastRunAt)}
+												</span>
 											{/if}
 										</span>
 									</span>

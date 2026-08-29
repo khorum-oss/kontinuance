@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.domain.ErrorResponse
+import org.khorum.oss.kontinuance.server.domain.RunApi
 import org.khorum.oss.kontinuance.server.domain.project.ActiveProject
 import org.khorum.oss.kontinuance.server.domain.project.CreateProjectRequest
 import org.khorum.oss.kontinuance.server.domain.project.CreatedProject
@@ -48,6 +49,14 @@ class ProjectController(
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 
+    /**
+     * The window statistics are actually derived over, clamped to what `/api/runs` will serve. Without the
+     * clamp a wider `derive-limit` would count runs no client could ever load, so the picker's counts and
+     * the runs list would disagree with no way for the operator to reconcile them. Reported on the wire so
+     * a client can load exactly this many runs.
+     */
+    private val runWindow: Int = deriveLimit.coerceAtMost(RunApi.MAX_LIMIT)
+
     @GetMapping("/api/projects")
     suspend fun list(): ProjectsResponse = withContext(Dispatchers.IO) {
         seedIfEmpty()
@@ -72,6 +81,7 @@ class ProjectController(
                     lastRunAt = stat?.at,
                 )
             },
+            runWindow = runWindow,
         )
     }
 
@@ -84,7 +94,7 @@ class ProjectController(
         val stats = LinkedHashMap<String, ProjectStat>()
         // recent() is newest-first, so the first record seen for a name is its latest run. This method
         // relies on that ordering; if RunStore's contract ever changes, this must be re-derived.
-        for (record in runs.recent(deriveLimit)) {
+        for (record in runs.recent(runWindow)) {
             val name = ProjectResolver.resolve(record) ?: continue
             val existing = stats[name]
             stats[name] = if (existing == null) {

@@ -73,6 +73,17 @@ function fmtAge(fromMs: number, nowMs: number): string {
 	return `${Math.floor(h / 24)}d`;
 }
 
+/**
+ * How long ago a project's most recent run finished, for the entry picker. Absent or unparseable input
+ * renders an em dash rather than a blank or a nonsense age — a project whose newest run is still in
+ * progress legitimately has no end time yet. [nowMs] lets callers/tests pin "now". Pure.
+ */
+export function lastRunAge(lastRunAt: string | undefined, nowMs: number = Date.now()): string {
+	if (!lastRunAt) return '—';
+	const at = Date.parse(lastRunAt);
+	return Number.isFinite(at) ? fmtAge(at, nowMs) : '—';
+}
+
 /** Sort key for newest-first ordering: latest activity (end, else start). */
 export function runSortKey(r: RunRecord): string {
 	return r.endedAt ?? r.startedAt ?? '';

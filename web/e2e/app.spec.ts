@@ -184,9 +184,6 @@ test.describe('runs screen', () => {
 		await mockApi(page);
 		await page.goto('/');
 		await enterApp(page);
-		// enterApp() activates `kontinuance-service`, which now scopes the list (039); sampleRuns resolve
-		// to the derived project `kontinuance` (from their repo), so widen back out to see them all.
-		await page.getByLabel('filter by project').selectOption('all');
 
 		for (const run of sampleRuns) {
 			await expect(page.getByText(run.id, { exact: true })).toBeVisible();
@@ -199,8 +196,6 @@ test.describe('runs screen', () => {
 		await mockCoverage(page);
 		await page.goto('/');
 		await enterApp(page);
-		// see the note in the previous test — widen scope back to `all` to find the sample runs.
-		await page.getByLabel('filter by project').selectOption('all');
 
 		await page.getByText('#KX-2045', { exact: true }).click();
 		await expect(page).toHaveURL(/\/runs\/%23KX-2045$/);
@@ -256,9 +251,6 @@ test.describe('runs screen', () => {
 		await mockApi(page, []);
 		await page.goto('/');
 		await enterApp(page);
-		// with zero runs the active-project scope from enterApp() doesn't matter for what's shown, but it
-		// does flip the "filtering" flag and thus the empty-state copy — widen back out for the plain case.
-		await page.getByLabel('filter by project').selectOption('all');
 
 		await expect(page.getByText('no runs recorded yet')).toBeVisible();
 	});
@@ -267,8 +259,6 @@ test.describe('runs screen', () => {
 		await mockApi(page); // #KX-2046 Running, #KX-2045 Success, #KX-2044 Failed (sha 77aa310aa)
 		await page.goto('/');
 		await enterApp(page);
-		// see the note above — widen scope back to `all` before exercising the other facets.
-		await page.getByLabel('filter by project').selectOption('all');
 		await expect(page.getByText('#KX-2044')).toBeVisible();
 
 		// status filter → only the failed run, with a visible/total count
@@ -294,6 +284,7 @@ test.describe('runs screen', () => {
 			pipeline: 'kontinuance-service',
 			status: 'Running',
 			repo: 'khorum-oss/kontinuance',
+			project: 'kontinuance-service',
 			sha: 'deadbee11',
 			startedAt: '2026-07-17T02:00:00Z'
 		};
@@ -301,8 +292,6 @@ test.describe('runs screen', () => {
 		await mockStream(page, [...sampleRuns, pushed]); // stream also carries the new run
 		await page.goto('/');
 		await enterApp(page);
-		// see the note above — widen scope back to `all` (`pushed` also resolves to `kontinuance`).
-		await page.getByLabel('filter by project').selectOption('all');
 
 		await expect(page.getByText('#KX-2099', { exact: true })).toBeVisible();
 	});
@@ -311,8 +300,6 @@ test.describe('runs screen', () => {
 		await mockApi(page);
 		await page.goto('/');
 		await enterApp(page);
-		// see the note above — widen scope back to `all` (the triggered run also resolves to `kontinuance`).
-		await page.getByLabel('filter by project').selectOption('all');
 
 		await expect(page.getByText('#KX-2100', { exact: true })).toHaveCount(0);
 		await page.getByRole('button', { name: 'RUN PIPELINE' }).click();

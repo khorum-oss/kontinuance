@@ -144,7 +144,12 @@
 			<button class="k-mono retry" onclick={() => onretry?.()}>RETRY</button>
 		</div>
 	{:else if runs.length === 0}
-		<div class="note k-mono">{filtering ? 'no runs match the current filters' : 'no runs recorded yet'}</div>
+		<!-- An empty STORE reads "no runs recorded yet" even with a filter applied: saying "no runs match"
+		     when there is nothing to match invites the operator to go loosening filters that were never the
+		     reason the list is empty. Only a filter that actually excluded something says so. -->
+		<div class="note k-mono">
+			{filtering && total > 0 ? 'no runs match the current filters' : 'no runs recorded yet'}
+		</div>
 	{:else}
 		<div class="rows">
 			{#each runs as r (r.id)}
