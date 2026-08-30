@@ -223,75 +223,92 @@ config surface are in [running.md](./running.md); runnable examples are in
 
 ---
 
-## Verifying a local build
+## Trying it locally
 
-Two things are awkward to check by clicking around, because both depend on state that normally takes real
-builds to accumulate. Each takes a couple of minutes with the server alone — no UI, no cluster.
+A fresh install has no run history, so the dashboard opens empty and there is nothing to explore. This
+section gets you a populated instance in a few minutes so you can click through it — no cluster, no real
+builds, no waiting on CI.
 
-The commands below were run as written against a from-source server; the outputs are the real ones.
+Everything below was run as written; the outputs and screenshots are the real ones.
 
-### Seeing projects appear from run history
+### 1. Give it some history
 
-A project shows up in the dashboard on its own once runs exist for it. You do not need real builds to see
-that: the run store is one JSON file per run, so seed it directly.
+Projects appear in the dashboard on their own, derived from runs. You do not need real builds for that —
+the run store is one JSON file per run, so write a few directly.
 
 ```bash
-mkdir -p /tmp/kontinuance-demo/runs
+mkdir -p /tmp/kontinuance-demo/runs && cd /tmp/kontinuance-demo/runs
 
-# a run with NO project field — resolves from its repo's short name
-cat > /tmp/kontinuance-demo/runs/r1.json <<'JSON'
-{"id":"r1","pipeline":"relikquary-pr","status":"Success","startedAt":"2026-08-29T10:00:00Z",
- "endedAt":"2026-08-29T10:14:00Z","repo":"khorum-oss/relikquary","sha":"4926ac4f","trigger":"PULL_REQUEST"}
+# Three runs from one repository, across TWO different pipelines, none naming a project.
+cat > a1.json <<'JSON'
+{"id":"#RQ-1043","pipeline":"relikquary-pr","status":"Success","startedAt":"2026-08-30T13:00:00Z","endedAt":"2026-08-30T13:14:00Z","repo":"khorum-oss/relikquary","sha":"4926ac4f7","trigger":"PULL_REQUEST"}
+JSON
+cat > a2.json <<'JSON'
+{"id":"#RQ-1042","pipeline":"relikquary-pr","status":"Failed","failingStep":"backend build-test","reason":"2 tests failed","startedAt":"2026-08-29T09:00:00Z","endedAt":"2026-08-29T09:11:00Z","repo":"khorum-oss/relikquary","sha":"77aa310bb","trigger":"PULL_REQUEST"}
+JSON
+cat > a3.json <<'JSON'
+{"id":"#RQ-1041","pipeline":"relikquary-cd-stage","status":"Success","startedAt":"2026-08-27T20:00:00Z","endedAt":"2026-08-27T20:06:00Z","repo":"khorum-oss/relikquary","sha":"9b02d1e33","trigger":"PUSH"}
 JSON
 
-# a run declaring one explicitly
-cat > /tmp/kontinuance-demo/runs/r2.json <<'JSON'
-{"id":"r2","pipeline":"nightly","status":"Failed","startedAt":"2026-08-29T11:00:00Z",
- "endedAt":"2026-08-29T11:02:00Z","repo":"khorum-oss/other","sha":"deadbeef","trigger":"PUSH",
- "project":"demo-app"}
+# ...and one that names its project explicitly.
+cat > b1.json <<'JSON'
+{"id":"#DA-207","pipeline":"nightly","status":"Success","startedAt":"2026-08-30T08:00:00Z","endedAt":"2026-08-30T08:02:00Z","repo":"khorum-oss/other","sha":"deadbeef1","trigger":"PUSH","project":"demo-app"}
 JSON
 ```
 
-Start the server against that store and ask it what projects it knows about:
+> Listing is newest-first by **file modification time**, so freshly written files all look equally recent.
+> To make the ordering match the timestamps inside them:
+> `touch -t 202608301300 a1.json && touch -t 202608290900 a2.json && touch -t 202608272000 a3.json`
+
+### 2. Start both halves
+
+Two terminals, from the repository root:
 
 ```bash
+# terminal 1 — the server, pointed at the store you just seeded
 KONTINUANCE_CONFIG_DESCRIPTOR="$(pwd)/deploy/kontinuance.yml" \
 KONTINUANCE_STORE=/tmp/kontinuance-demo/runs \
   ./gradlew :server:run
 
-curl -s localhost:8077/api/projects | python3 -m json.tool
+# terminal 2 — the UI (proxies /api and /ws to the server)
+pnpm --dir web dev
 ```
 
-```json
-{
-    "active": "default",
-    "projects": [
-        { "name": "default",    "active": true,  "derived": false, "runnable": true,  "runCount": 0 },
-        { "name": "demo-app",   "active": false, "derived": true,  "runnable": false, "runCount": 1,
-          "lastStatus": "Failed",  "lastRunAt": "2026-08-29T11:02:00Z" },
-        { "name": "relikquary", "active": false, "derived": true,  "runnable": false, "runCount": 1,
-          "lastStatus": "Success", "lastRunAt": "2026-08-29T10:14:00Z" }
-    ],
-    "runWindow": 500
-}
-```
+Open **http://localhost:5173**. With no credentials configured the server runs open, so you land straight
+on the project picker without signing in.
 
-What each part of that tells you:
+### 3. What to look at
 
-- **`relikquary` appeared from a run that never named a project** — it resolved from the repository's short
-  name. This is why an existing run history needs no migration.
-- **`demo-app` came from the explicit `project:` field**, which is how several pipelines (a PR gate, a
-  delivery pipeline, a promotion) group under one entry.
-- **`derived: true, runnable: false`** — both exist only as run history, with no descriptor to run. In the
-  UI they carry a `DERIVED` badge and their RUN PIPELINE button is disabled with the reason.
-- **`default`** is the descriptor on disk, registered and active — the only one that can actually run.
-- **`runWindow`** is the number of recent runs those counts were derived over; the dashboard loads the same
-  window so a count can never advertise more runs than the list can show.
+**The picker** lists three projects, though you only ever wrote one descriptor:
 
-Open the UI (`pnpm --dir web dev`) and the same three appear in the picker. Selecting a derived one scopes
-the runs list to it and disables the trigger.
+- **`relikquary`** — `3 runs · last Success · 7h`, badged `DERIVED`. It exists purely because runs mention
+  that repository. Note that its three runs came from **two different pipelines** (`relikquary-pr` and
+  `relikquary-cd-stage`) and still grouped under one project — that is the point of the feature.
+- **`demo-app`** — `1 run · last Success · 13h`, also `DERIVED`, from the run that named it explicitly.
+- **`default`** — `ACTIVE`, the descriptor on disk. The only one that can actually run.
 
-### Checking the credential guard
+The derived two read *"from run history · no descriptor registered"* and offer no **SET SOURCE** control,
+because there is no descriptor to attach a source to.
+
+**Click `relikquary`.** The runs list scopes to its three runs (`showing 3 of 4`), and **RUN PIPELINE** is
+disabled with the reason *"No descriptor registered for relikquary — add one on the Config screen to run
+it."* There is genuinely nothing to run: the project exists only as history.
+
+**Switch the project dropdown to `all`.** All four runs return, including `demo-app`'s. Switch back and
+forth — the scope never strands you, and the dropdown always names the filter it is applying.
+
+**Try `default`.** It is registered *and* active, so RUN PIPELINE is enabled and will start a real run of
+`deploy/kontinuance.yml`.
+
+Things worth deliberately breaking, to see the honest failure states:
+
+| Do this | You should see |
+|---|---|
+| Stop the server, reload the page | Trigger disabled: *"Couldn't confirm … the project list didn't load"* — it will not offer to run something it cannot verify |
+| Scope to a project that is registered but not active | Trigger disabled, naming that specific reason rather than claiming a missing descriptor |
+| Empty the store (`rm /tmp/kontinuance-demo/runs/*.json`) and reload | `no runs recorded yet` — *not* "no runs match the current filters", because nothing is being filtered out |
+
+### 4. Checking the credential guard
 
 A half-applied secret is the realistic way a deployment ends up unauthenticated, so misconfiguration is a
 startup failure rather than a warning. Confirm it refuses to serve:

@@ -297,7 +297,7 @@
 											</span>
 											{#if p.runCount}
 												<span class="k-mono meta">
-													{p.runCount} runs · last {p.lastStatus ?? '—'} · {lastRunAge(p.lastRunAt)}
+													{p.runCount === 1 ? '1 run' : `${p.runCount} runs`} · last {p.lastStatus ?? '—'} · {lastRunAge(p.lastRunAt)}
 												</span>
 											{/if}
 										</span>
