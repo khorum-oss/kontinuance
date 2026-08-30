@@ -223,6 +223,109 @@ config surface are in [running.md](./running.md); runnable examples are in
 
 ---
 
+## Verifying a local build
+
+Two things are awkward to check by clicking around, because both depend on state that normally takes real
+builds to accumulate. Each takes a couple of minutes with the server alone — no UI, no cluster.
+
+The commands below were run as written against a from-source server; the outputs are the real ones.
+
+### Seeing projects appear from run history
+
+A project shows up in the dashboard on its own once runs exist for it. You do not need real builds to see
+that: the run store is one JSON file per run, so seed it directly.
+
+```bash
+mkdir -p /tmp/kontinuance-demo/runs
+
+# a run with NO project field — resolves from its repo's short name
+cat > /tmp/kontinuance-demo/runs/r1.json <<'JSON'
+{"id":"r1","pipeline":"relikquary-pr","status":"Success","startedAt":"2026-08-29T10:00:00Z",
+ "endedAt":"2026-08-29T10:14:00Z","repo":"khorum-oss/relikquary","sha":"4926ac4f","trigger":"PULL_REQUEST"}
+JSON
+
+# a run declaring one explicitly
+cat > /tmp/kontinuance-demo/runs/r2.json <<'JSON'
+{"id":"r2","pipeline":"nightly","status":"Failed","startedAt":"2026-08-29T11:00:00Z",
+ "endedAt":"2026-08-29T11:02:00Z","repo":"khorum-oss/other","sha":"deadbeef","trigger":"PUSH",
+ "project":"demo-app"}
+JSON
+```
+
+Start the server against that store and ask it what projects it knows about:
+
+```bash
+KONTINUANCE_CONFIG_DESCRIPTOR="$(pwd)/deploy/kontinuance.yml" \
+KONTINUANCE_STORE=/tmp/kontinuance-demo/runs \
+  ./gradlew :server:run
+
+curl -s localhost:8077/api/projects | python3 -m json.tool
+```
+
+```json
+{
+    "active": "default",
+    "projects": [
+        { "name": "default",    "active": true,  "derived": false, "runnable": true,  "runCount": 0 },
+        { "name": "demo-app",   "active": false, "derived": true,  "runnable": false, "runCount": 1,
+          "lastStatus": "Failed",  "lastRunAt": "2026-08-29T11:02:00Z" },
+        { "name": "relikquary", "active": false, "derived": true,  "runnable": false, "runCount": 1,
+          "lastStatus": "Success", "lastRunAt": "2026-08-29T10:14:00Z" }
+    ],
+    "runWindow": 500
+}
+```
+
+What each part of that tells you:
+
+- **`relikquary` appeared from a run that never named a project** — it resolved from the repository's short
+  name. This is why an existing run history needs no migration.
+- **`demo-app` came from the explicit `project:` field**, which is how several pipelines (a PR gate, a
+  delivery pipeline, a promotion) group under one entry.
+- **`derived: true, runnable: false`** — both exist only as run history, with no descriptor to run. In the
+  UI they carry a `DERIVED` badge and their RUN PIPELINE button is disabled with the reason.
+- **`default`** is the descriptor on disk, registered and active — the only one that can actually run.
+- **`runWindow`** is the number of recent runs those counts were derived over; the dashboard loads the same
+  window so a count can never advertise more runs than the list can show.
+
+Open the UI (`pnpm --dir web dev`) and the same three appear in the picker. Selecting a derived one scopes
+the runs list to it and disables the trigger.
+
+### Checking the credential guard
+
+A half-applied secret is the realistic way a deployment ends up unauthenticated, so misconfiguration is a
+startup failure rather than a warning. Confirm it refuses to serve:
+
+```bash
+# only a username — no password
+KONTINUANCE_AUTH_USERNAME=operator ./gradlew :server:run
+```
+
+```
+Kontinuance authentication is half-configured: kontinuance.auth.password is not set. Set both
+credentials to enforce authentication, or neither to run open — a partial configuration would serve
+the API unauthenticated while appearing protected.
+```
+
+```bash
+# credentials declared mandatory, but none supplied
+KONTINUANCE_AUTH_REQUIRED=true ./gradlew :server:run
+```
+
+```
+kontinuance.auth.required is set, but no operator credentials are configured. Set
+kontinuance.auth.username and kontinuance.auth.password, or clear the required flag.
+```
+
+In both cases the process exits during startup — `curl localhost:8077/api/health` gets nothing, because no
+port was ever bound. Set **both** credentials and it starts and enforces; set neither and it runs open with
+a warning, which is what local development wants.
+
+Set `KONTINUANCE_AUTH_REQUIRED=true` on any deployment that must never run open. It is the guard for a
+secret that mounts empty and populates *neither* variable — a case the half-set check alone cannot catch.
+
+---
+
 ## Current limitations & planned work
 
 Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, roughly by area:
