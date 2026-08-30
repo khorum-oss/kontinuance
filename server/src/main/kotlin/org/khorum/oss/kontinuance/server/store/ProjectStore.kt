@@ -1,5 +1,6 @@
 package org.khorum.oss.kontinuance.server.store
 
+import org.khorum.oss.kontinuance.engine.model.ProjectName
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
@@ -91,9 +92,12 @@ class ProjectStore(private val dir: Path) {
         // module needed for the map round-trip) keeps the server off kotlinx-serialization.
         private val JSON: JsonMapper = JsonMapper.builder().build()
 
-        /** A safe project name: letters, digits, and `. _ -`, 1–64 chars (never a path). */
-        private val NAME = Regex("[A-Za-z0-9._-]{1,64}")
-
-        fun isValidName(name: String): Boolean = NAME.matches(name)
+        /**
+         * A safe project name (never a path). Delegates to the engine's [ProjectName] rather than
+         * restating the rule: a name reaching this store also reaches a filesystem path and a URL path
+         * variable, so a second copy that drifted from the descriptor's rule would be a security
+         * divergence, not a cosmetic one.
+         */
+        fun isValidName(name: String): Boolean = ProjectName.isValid(name)
     }
 }

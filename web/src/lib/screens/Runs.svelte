@@ -18,6 +18,7 @@
 		runnable = true,
 		projectName = '',
 		notActiveReason = false,
+		unconfirmedReason = false,
 		onopen,
 		onretry,
 		ontrigger,
@@ -41,6 +42,7 @@
 		runnable?: boolean;
 		projectName?: string;
 		notActiveReason?: boolean;
+		unconfirmedReason?: boolean;
 		onopen?: (id: string) => void;
 		onretry?: () => void;
 		ontrigger?: () => void;
@@ -120,14 +122,23 @@
 			{/if}
 		</div>
 	</div>
-	{#if !runnable && notActiveReason}
+	<!-- Three distinct reasons a scoped trigger is withheld; each names its own cause, because "no
+	     descriptor" would be a lie for a registered project and "not active" would be a lie when we simply
+	     could not ask. A fourth state — the list still loading — deliberately renders NO hint, so an
+	     ordinary page load doesn't flash alarming text before the answer arrives. -->
+	{#if !runnable && unconfirmedReason}
+		<p class="k-mono hint">
+			Couldn't confirm {projectName || 'this project'} is the active project — the project list didn't
+			load. Reload to try again.
+		</p>
+	{:else if !runnable && notActiveReason}
 		<p class="k-mono hint">
 			{projectName || 'this project'} is not the active project — selecting it from the entry screen
 			would make it active and let you run it from here.
 		</p>
-	{:else if !runnable}
+	{:else if !runnable && projectName}
 		<p class="k-mono hint">
-			No descriptor registered for {projectName || 'this project'} — add one on the Config screen to run it.
+			No descriptor registered for {projectName} — add one on the Config screen to run it.
 		</p>
 	{/if}
 

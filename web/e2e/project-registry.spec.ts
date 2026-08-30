@@ -211,3 +211,58 @@ test('a registered project whose runs resolve elsewhere shows an empty scoped li
 	await page.getByLabel('filter by project').selectOption('kontinuance');
 	await expect(page.getByText('#KX-2046')).toBeVisible();
 });
+
+test('disables the trigger when the project list cannot be loaded', async ({ page }) => {
+	// Fail-open used to mean: the projects fetch fails -> `runnable` defaults true -> the trigger stays
+	// enabled, and clicking it runs whatever descriptor is live, which may be a different project than
+	// the one on screen. If we cannot confirm the scope IS the active project, we must not promise it.
+	//
+	// The reachable shape of this: the picker's own fetch succeeds (so you can select a project and get
+	// into the app), and the runs screen's subsequent fetch fails. So serve the first call and fail the
+	// rest, rather than failing everything — which would strand you on the picker and prove nothing.
+	let calls = 0;
+	await page.unroute('**/api/projects');
+	await page.route('**/api/projects', (route) => {
+		calls += 1;
+		return calls === 1
+			? route.fulfill({
+					json: {
+						active: 'kontinuance-service',
+						runWindow: 500,
+						projects: [{ name: 'kontinuance-service', active: true, runnable: true }]
+					}
+				})
+			: route.fulfill({ status: 503, json: { error: 'unavailable' } });
+	});
+
+	await page.goto('/');
+	await enterApp(page);
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
+	await expect(page.getByText(/couldn't confirm/i)).toBeVisible();
+});
+
+test('an unscoped view keeps the trigger enabled even without a project list', async ({ page }) => {
+	// 'all' claims no scope, so there is nothing to mislead about — the trigger runs whatever is active,
+	// which is exactly what it says. Failing closed here would block the common case for no benefit.
+	let calls = 0;
+	await page.unroute('**/api/projects');
+	await page.route('**/api/projects', (route) => {
+		calls += 1;
+		return calls === 1
+			? route.fulfill({
+					json: {
+						active: 'kontinuance-service',
+						runWindow: 500,
+						projects: [{ name: 'kontinuance-service', active: true, runnable: true }]
+					}
+				})
+			: route.fulfill({ status: 503, json: { error: 'unavailable' } });
+	});
+
+	await page.goto('/');
+	await enterApp(page);
+	await page.getByLabel('filter by project').selectOption('all');
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+});

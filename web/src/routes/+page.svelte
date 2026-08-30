@@ -42,20 +42,29 @@
 	// The window the server derived its project run-counts over; the runs fetch matches it (see `init`).
 	// Undefined until the projects call returns, in which case the server applies its own list default.
 	let runWindow = $state<number | undefined>(undefined);
-	// Unscoped view keeps today's behavior (trigger always enabled); a scope not yet in the loaded list
-	// (e.g. still fetching) also defaults permissive rather than punishing a load race with a false negative.
+	// Whether the project list is trustworthy yet. RUN PIPELINE promises "this runs the project you are
+	// looking at", and that promise needs the list to keep it — so an unloaded or failed list must not be
+	// treated as permission. Defaulting permissive here is what let a failed fetch leave the trigger
+	// enabled while scoped to a project the server would not actually run.
+	let projectsState = $state<'loading' | 'ready' | 'failed'>('loading');
+
+	const unscoped = $derived(projectFilter === 'all');
 	const activeProjectEntry = $derived(projectsList.find((p) => p.name === projectFilter));
-	const scopedRunnable = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.runnable ?? true));
-	// The server's currently-active project (the one RUN PIPELINE actually runs) — a project can be
-	// `runnable` (has a descriptor) without being the one the server would run right now. Same fail-open
-	// default as above: while the projects list hasn't loaded, don't punish the race with a false negative.
-	const scopedActive = $derived(projectFilter === 'all' ? true : (activeProjectEntry?.active ?? true));
-	// Gate the trigger on BOTH: a scope with no descriptor can't run at all, and a scope that isn't the
-	// server's active project would run a DIFFERENT project's pipeline than the one on screen (039 footgun).
-	const runnable = $derived(scopedRunnable && scopedActive);
-	const projectName = $derived(projectFilter === 'all' ? '' : projectFilter);
-	// Distinguishes the two disabled reasons so the hint names the right one.
-	const notActiveReason = $derived(scopedRunnable && !scopedActive);
+	// Unscoped claims no project, so there is nothing to mislead about: the trigger runs whatever is
+	// active, which is exactly what it says. Scoped, every condition below must be positively confirmed.
+	const confirmed = $derived(projectsState === 'ready' && activeProjectEntry !== undefined);
+	const scopedRunnable = $derived(activeProjectEntry?.runnable !== false);
+	// A project can be `runnable` (has a descriptor) without being the one the server would run right now.
+	const scopedActive = $derived(activeProjectEntry?.active === true);
+	// Gate on all three: we know what the scope is, it has a descriptor, and it is the server's active
+	// project. Anything less would run a DIFFERENT pipeline than the one on screen (the 039 footgun).
+	const runnable = $derived(unscoped || (confirmed && scopedRunnable && scopedActive));
+	const projectName = $derived(unscoped ? '' : projectFilter);
+	// Which of the three disabled reasons applies, so the hint names the real cause. `unconfirmed` covers
+	// both a failed fetch and a scope the server does not list; `loading` deliberately yields no hint at
+	// all, so an ordinary page load doesn't flash alarming text before the list arrives.
+	const unconfirmedReason = $derived(!unscoped && projectsState === 'failed');
+	const notActiveReason = $derived(!unscoped && confirmed && scopedRunnable && !scopedActive);
 
 	function render() {
 		const all = mergeNewestFirst(byId.values());
@@ -118,15 +127,18 @@
 
 	// Projects first, then runs: the projects response carries the window its run counts were computed
 	// over, and the runs list loads exactly that window so a count can never advertise more runs than the
-	// list can show. A failed projects fetch must NOT block the runs list — `runnable` stays permissive
-	// (see the default above) and the runs fetch falls back to the server's own default window.
+	// list can show. A failed projects fetch must NOT block the runs list — the runs fetch falls back to
+	// the server's own default window — but it DOES withhold the trigger, which cannot be honest without
+	// knowing which project is active.
 	async function init() {
 		try {
 			const body = await api.getProjects();
 			projectsList = body.projects;
 			runWindow = body.runWindow;
+			projectsState = 'ready';
 		} catch {
-			// best-effort; the runs load below still happens
+			// The runs list still loads; only the trigger is withheld (see `runnable`).
+			projectsState = 'failed';
 		}
 		await load();
 	}
@@ -164,6 +176,7 @@
 	{runnable}
 	{projectName}
 	{notActiveReason}
+	{unconfirmedReason}
 	onopen={(id) => goto(`/runs/${encodeURIComponent(id)}`)}
 	onretry={load}
 	ontrigger={trigger}

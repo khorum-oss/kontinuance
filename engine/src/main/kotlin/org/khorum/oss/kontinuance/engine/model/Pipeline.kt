@@ -38,6 +38,9 @@ data class Pipeline(
         require(duplicates.isEmpty()) { "duplicate stage names in pipeline '$name': $duplicates" }
         project?.let {
             require(it.isNotBlank()) { "pipeline '$name' project must be non-blank when set" }
+            require(ProjectName.isValid(it)) {
+                "pipeline '$name' project '$it' is not a valid project name — use ${ProjectName.DESCRIPTION}"
+            }
         }
     }
 }
