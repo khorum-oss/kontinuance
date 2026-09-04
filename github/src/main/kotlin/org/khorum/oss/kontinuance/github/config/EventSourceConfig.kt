@@ -31,7 +31,36 @@ data class EventSourceConfig(
     val baseUrl: String,
     val bindings: List<RepositoryBinding>,
 ) {
+
+    /**
+     * Renders this config back to the YAML [parse] reads, so a config authored through the API round-trips
+     * to the same file the CLI and the `/api/source` reader already load. Paths are written absolute —
+     * they were resolved against the original config's directory on the way in, and re-resolving them
+     * against a possibly-different directory on the way out would silently repoint a pipeline.
+     *
+     * Values are single-quoted (doubling any embedded quote), which is YAML's literal-scalar form: no
+     * escape sequences apply inside, so nothing a repository or path can contain changes the structure.
+     */
+    fun render(): String = buildString {
+        appendLine("# Managed by Kontinuance. Edited through the dashboard or by hand; either is fine.")
+        appendLine("eventSource:")
+        appendLine("  tokenEnv: ${quote(tokenEnv)}")
+        appendLine("  baseUrl: ${quote(baseUrl)}")
+        appendLine("  pollIntervalSeconds: $pollIntervalSeconds")
+        appendLine("  repositories:")
+        bindings.forEach { binding ->
+            appendLine("    - owner: ${quote(binding.repo.owner)}")
+            appendLine("      name: ${quote(binding.repo.name)}")
+            appendLine("      prPipeline: ${quote(binding.prPipeline.toString())}")
+            binding.pushPipeline?.let { appendLine("      pushPipeline: ${quote(it.toString())}") }
+            appendLine("      trackedBranch: ${quote(binding.trackedBranch)}")
+        }
+    }
+
     companion object {
+
+        private fun quote(value: String): String = "'" + value.replace("'", "''") + "'"
+
         private const val DEFAULT_POLL_SECONDS = 60L
         private const val DEFAULT_BASE_URL = "https://api.github.com"
 

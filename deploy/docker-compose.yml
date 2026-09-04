@@ -18,6 +18,17 @@ services:
       SERVER_PORT: 8077
       KONTINUANCE_STORE: ${KONTINUANCE_STORE:-/data/runs}
       KONTINUANCE_CONFIG_DESCRIPTOR: ${KONTINUANCE_CONFIG_DESCRIPTOR:-/etc/kontinuance/kontinuance.yml}
+      # Operator credential. Set BOTH to enable sign-in — which is also what lets you connect a GitHub
+      # repository from the Source screen, since that endpoint accepts a token and will not do so on an
+      # unauthenticated server. Leave both empty to run open (no sign-in, no GitHub connect from the UI).
+      KONTINUANCE_AUTH_USERNAME: ${KONTINUANCE_AUTH_USERNAME:-}
+      KONTINUANCE_AUTH_PASSWORD: ${KONTINUANCE_AUTH_PASSWORD:-}
+      # GitHub event-source state, kept on the run-history volume so a connected repository survives a
+      # restart. Without these they would default under the container's home directory and be lost.
+      KONTINUANCE_GITHUB_CONFIG: ${KONTINUANCE_GITHUB_CONFIG:-/data/runs/github/source.yaml}
+      KONTINUANCE_GITHUB_CURSORS: ${KONTINUANCE_GITHUB_CURSORS:-/data/runs/github/cursors.properties}
+      KONTINUANCE_GITHUB_HEARTBEAT: ${KONTINUANCE_GITHUB_HEARTBEAT:-/data/runs/github/heartbeat.properties}
+      KONTINUANCE_GITHUB_TOKEN_FILE: ${KONTINUANCE_GITHUB_TOKEN_FILE:-/data/runs/github/token}
       # Pipeline secrets referenced by the descriptor, passed through from the host env — never baked in.
       DEPLOY_TOKEN: ${DEPLOY_TOKEN:-}
     volumes:

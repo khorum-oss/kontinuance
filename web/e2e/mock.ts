@@ -383,6 +383,59 @@ export async function mockSource(page: Page, payload: object = sourceConfigured)
 	await page.route(/\/api\/source$/, (route) => route.fulfill({ json: payload }));
 }
 
+/**
+ * Serve the connectable event source (040): `GET` reflects the current state, `POST` connects (turning an
+ * unconfigured source into a running one built from the submitted body), and `DELETE` stops it —
+ * `?forget=true` clears the config entirely. Mirrors the server's own transitions so the screen is driven
+ * the way it would be in production.
+ *
+ * Pass `rejectWith` to make every `POST` fail with that message, exercising the form's error state.
+ */
+export async function mockSourceConnect(
+	page: Page,
+	options: { configured?: boolean; rejectWith?: string } = {}
+): Promise<void> {
+	let state: Record<string, unknown> = options.configured
+		? { ...sourceConfigured, running: true, hasToken: true, manageable: true }
+		: { configured: false, manageable: true };
+
+	await page.route(/\/api\/source(\?.*)?$/, async (route) => {
+		const request = route.request();
+		if (request.method() === 'POST') {
+			if (options.rejectWith) {
+				return route.fulfill({ status: 400, json: { error: options.rejectWith } });
+			}
+			const body = request.postDataJSON() as Record<string, string | number>;
+			state = {
+				configured: true,
+				running: true,
+				hasToken: true,
+				manageable: true,
+				pollIntervalSeconds: body.pollIntervalSeconds ?? 60,
+				baseUrl: 'https://api.github.com',
+				tokenEnv: 'GITHUB_TOKEN',
+				repositories: [
+					{
+						slug: `${body.owner}/${body.name}`,
+						prPipeline: body.prPipeline,
+						pushPipeline: body.pushPipeline,
+						trackedBranch: body.trackedBranch ?? 'main'
+					}
+				],
+				cursors: []
+			};
+			return route.fulfill({ json: state });
+		}
+		if (request.method() === 'DELETE') {
+			state = request.url().includes('forget=true')
+				? { configured: false, manageable: true }
+				: { ...state, running: false };
+			return route.fulfill({ json: state });
+		}
+		return route.fulfill({ json: state });
+	});
+}
+
 /** A run triggered by the GitHub event source (uppercase trigger kind), for the Source screen. */
 export const githubRun = {
 	id: '#KX-3001',

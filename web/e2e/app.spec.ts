@@ -11,6 +11,7 @@ import {
 	mockPipeline,
 	mockProjects,
 	mockSource,
+	mockSourceConnect,
 	mockStream,
 	mockWaitingRun,
 	githubRun,
@@ -440,12 +441,68 @@ test.describe('source screen', () => {
 		await expect(page.getByText('PULL_REQUEST')).toBeVisible();
 	});
 
-	test('shows an honest not-configured state when no event source is set', async ({ page }) => {
+	test('shows an honest not-connected state when no event source is set', async ({ page }) => {
 		await mockApi(page);
 		await mockSource(page, { configured: false });
 		await page.goto('/source');
 		await enterApp(page);
 
-		await expect(page.getByText('NO GITHUB EVENT SOURCE CONFIGURED')).toBeVisible();
+		await expect(page.getByText('NO GITHUB REPOSITORY CONNECTED')).toBeVisible();
+	});
+
+	test('a server without operator auth explains why it cannot connect one', async ({ page }) => {
+		await mockApi(page);
+		await mockSource(page, { configured: false, manageable: false });
+		await page.goto('/source');
+		await enterApp(page);
+
+		await expect(page.getByText(/needs operator authentication/)).toBeVisible();
+		// no form to fill in — the server cannot accept a token
+		await expect(page.getByLabel('github access token')).toHaveCount(0);
+	});
+
+	test('connects a repository from the form and then shows it being polled', async ({ page }) => {
+		await mockApi(page);
+		await mockSourceConnect(page);
+		await page.goto('/source');
+		await enterApp(page);
+
+		await page.getByLabel('repository owner').fill('acme');
+		await page.getByLabel('repository name').fill('widgets');
+		await page.getByLabel('pull request pipeline').fill('/etc/kontinuance/pr.yaml');
+		await page.getByLabel('github access token').fill('ghp-not-a-real-token');
+		await page.getByRole('button', { name: 'CONNECT', exact: true }).click();
+
+		await expect(page.getByText('GITHUB EVENT SOURCE')).toBeVisible();
+		await expect(page.getByText('acme/widgets', { exact: true }).first()).toBeVisible();
+	});
+
+	test('a rejected connect keeps the form and shows the server message', async ({ page }) => {
+		await mockApi(page);
+		await mockSourceConnect(page, { rejectWith: 'no GitHub token available' });
+		await page.goto('/source');
+		await enterApp(page);
+
+		await page.getByLabel('repository owner').fill('acme');
+		await page.getByLabel('repository name').fill('widgets');
+		await page.getByLabel('pull request pipeline').fill('pr.yaml');
+		await page.getByRole('button', { name: 'CONNECT', exact: true }).click();
+
+		await expect(page.getByText('no GitHub token available')).toBeVisible();
+		// the typed values survive the rejection
+		await expect(page.getByLabel('repository owner')).toHaveValue('acme');
+	});
+
+	test('stopping the source reports it as not polling, and disconnect clears it', async ({ page }) => {
+		await mockApi(page);
+		await mockSourceConnect(page, { configured: true });
+		await page.goto('/source');
+		await enterApp(page);
+
+		await page.getByRole('button', { name: 'stop polling' }).click();
+		await expect(page.getByText(/NOT POLLING/)).toBeVisible();
+
+		await page.getByRole('button', { name: 'disconnect and forget' }).click();
+		await expect(page.getByText('NO GITHUB REPOSITORY CONNECTED')).toBeVisible();
 	});
 });

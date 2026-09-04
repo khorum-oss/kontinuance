@@ -54,9 +54,32 @@ All server settings use Spring's relaxed binding — set them as JVM properties 
 | `kontinuance.coverage.report` | `KONTINUANCE_COVERAGE_REPORT` | `build/reports/kover/report.xml` | Kover XML surfaced by the coverage screen. |
 | `kontinuance.stream.poll-interval-ms` | `KONTINUANCE_STREAM_POLL_INTERVAL_MS` | `1000` | How often the live stream re-reads the store for new runs. |
 | `kontinuance.stream.snapshot-limit` | `KONTINUANCE_STREAM_SNAPSHOT_LIMIT` | `50` | Newest-first snapshot size sent when a client connects to the stream. |
+| `kontinuance.github.config` | `KONTINUANCE_GITHUB_CONFIG` | `~/.kontinuance/github-source.yaml` | Event-source config. Written by the Source screen's connect form and read at startup; the same file the `kontinuance-ci` CLI takes as its argument. |
+| `kontinuance.github.cursors` | `KONTINUANCE_GITHUB_CURSORS` | `~/.kontinuance/github-cursors.properties` | Poll cursors — the last commit processed per PR/branch. |
+| `kontinuance.github.heartbeat` | `KONTINUANCE_GITHUB_HEARTBEAT` | `~/.kontinuance/github-heartbeat.properties` | Liveness signal written after each successful poll (036). |
+| `kontinuance.github.token-file` | `KONTINUANCE_GITHUB_TOKEN_FILE` | `~/.kontinuance/github-token` | Where a token supplied through the UI is stored (owner-only permissions). Never returned by the API. An environment variable named by the config's `tokenEnv` takes precedence. |
+| `kontinuance.github.autostart` | `KONTINUANCE_GITHUB_AUTOSTART` | `true` | Resume a stored event source at startup. Set `false` to leave it stopped until someone starts it from the UI. |
 | `management.endpoints.web.exposure.include` | — | `health` | Actuator exposes only `/actuator/health`. |
 
 Paths are resolved relative to the server's working directory unless absolute.
+
+### GitHub event source
+
+The server can host the GitHub poll loop itself, so watching a repository takes one process rather than a
+server plus a separate `kontinuance-ci` CLI. Connect a repository from the **Source** screen — see
+[Connecting GitHub](./getting-started.md#connecting-github) for the walkthrough.
+
+Two things are worth knowing before you connect:
+
+- **The write endpoints require operator authentication.** `POST`/`DELETE /api/source` accept an access
+  token and start outbound work under it, so an unauthenticated server refuses them with `409` and the
+  Source screen explains why instead of showing the form. Reads are unaffected.
+- **A supplied token is stored at rest**, in `kontinuance.github.token-file`, created with owner-only
+  permissions and never returned by any read. To avoid that, leave the token field blank and set the
+  environment variable named by the config's `tokenEnv` (`GITHUB_TOKEN` by default) — the environment
+  always takes precedence over a stored token.
+
+The standalone CLI still works and reads the same files, so an existing deployment needs no change.
 
 ### Secrets
 

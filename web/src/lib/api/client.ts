@@ -4,6 +4,7 @@
 
 import type {
 	Config,
+	ConnectSourceRequest,
 	Coverage,
 	Deploy,
 	Pipeline,
@@ -154,9 +155,49 @@ export const api = {
 	getCoverage: () => getJson<Coverage>('/api/coverage'),
 	getConfig: () => getJson<Config>('/api/config'),
 
-	// Read-only status of the GitHub event source (035): watched repos, cadence, and poll cursors. Answers
-	// `{ configured: false }` when no event-source config is wired.
+	// Status of the GitHub event source (035/036): watched repos, cadence, poll cursors, liveness, and
+	// whether the server is polling. Answers `{ configured: false }` when no event source is wired.
 	getSource: () => getJson<SourceStatus>('/api/source'),
+
+	// Connects a repository and starts polling (040). The token travels once, on this request, and is
+	// never returned by a read. Resolves to the refreshed status; throws [ApiError] with the server's
+	// message on a rejected request (a missing token, a bad field, or an unauthenticated server).
+	connectSource: async (request: ConnectSourceRequest): Promise<SourceStatus> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/source', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', accept: 'application/json' },
+				body: JSON.stringify(request)
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as SourceStatus & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `request failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	},
+
+	// Stops polling (040). `forget` also removes the stored config and token; without it the source can
+	// be started again from the same config.
+	disconnectSource: async (forget = false): Promise<SourceStatus> => {
+		let res: Response;
+		try {
+			res = await fetch(`/api/source?forget=${forget}`, {
+				method: 'DELETE',
+				headers: { accept: 'application/json' }
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as SourceStatus & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `request failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	},
 
 	// Saves an edited pipeline descriptor (027). The server validates it with the engine parser and only
 	// persists it if it parses; resolves to the refreshed [Config], or throws [ApiError] with the parser's

@@ -178,6 +178,28 @@ export interface SourceStatus {
 	repositories?: SourceRepo[];
 	cursors?: SourceCursor[];
 	heartbeat?: SourceHeartbeat;
+	/** Whether the server is polling right now (040) — false for a config that exists but is stopped. */
+	running?: boolean;
+	/** Whether a token is available, from the environment or stored. Never the token itself. */
+	hasToken?: boolean;
+	/** Whether this server can connect a source itself; false means it can only display one (040). */
+	manageable?: boolean;
+}
+
+/**
+ * The connect form's payload (040). `token` is write-only — the server stores it for the poller and no
+ * read ever returns it. Omit it to reuse an already-stored token or the named environment variable.
+ */
+export interface ConnectSourceRequest {
+	owner: string;
+	name: string;
+	prPipeline: string;
+	pushPipeline?: string;
+	trackedBranch?: string;
+	token?: string;
+	tokenEnv?: string;
+	baseUrl?: string;
+	pollIntervalSeconds?: number;
 }
 
 export interface PlanSummary {

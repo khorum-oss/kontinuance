@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.github.config
 
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.github.client.RepoRef
+import org.khorum.oss.kontinuance.github.trigger.RepositoryBinding
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -33,6 +34,48 @@ class EventSourceConfigTest {
         assertEquals(Path.of("pipelines/pr.yaml"), binding.prPipeline)
         assertEquals(Path.of("pipelines/deliver.yaml"), binding.pushPipeline)
         assertEquals("release", binding.trackedBranch)
+    }
+
+    @Test
+    fun `renders back to YAML that parses to the same config`() {
+        val original = EventSourceConfig(
+            tokenEnv = "GH_TOKEN",
+            pollIntervalSeconds = 45,
+            baseUrl = "https://github.example.com/api/v3",
+            bindings = listOf(
+                RepositoryBinding(
+                    repo = RepoRef("acme", "widgets"),
+                    prPipeline = Path.of("/etc/kontinuance/pipelines/pr.yaml"),
+                    pushPipeline = Path.of("/etc/kontinuance/pipelines/deliver.yaml"),
+                    trackedBranch = "release",
+                ),
+                RepositoryBinding(
+                    repo = RepoRef("acme", "gadgets"),
+                    prPipeline = Path.of("/etc/kontinuance/pipelines/gadgets-pr.yaml"),
+                ),
+            ),
+        )
+
+        assertEquals(original, EventSourceConfig.parse(original.render()))
+    }
+
+    @Test
+    fun `renders a name containing a quote without breaking the document`() {
+        val original = EventSourceConfig(
+            tokenEnv = "GH_TOKEN",
+            pollIntervalSeconds = 60,
+            baseUrl = "https://api.github.com",
+            bindings = listOf(
+                RepositoryBinding(
+                    repo = RepoRef("acme", "it's-a-repo"),
+                    prPipeline = Path.of("/pipelines/o'brien.yaml"),
+                ),
+            ),
+        )
+
+        val reparsed = EventSourceConfig.parse(original.render())
+        assertEquals("it's-a-repo", reparsed.bindings.single().repo.name)
+        assertEquals(Path.of("/pipelines/o'brien.yaml"), reparsed.bindings.single().prPipeline)
     }
 
     @Test
