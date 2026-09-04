@@ -25,7 +25,7 @@ server reads `RunRecord`s from the store, it does not run pipelines.
 **real HTTP round-trip** with JDK `java.net.http.HttpClient` (the real boundary, Constitution II) — no
 new mock-server dependency.
 
-**Target Platform**: JVM service on a private network (the Hestia Mini).
+**Target Platform**: JVM service on a private network.
 
 **Project Type**: Multi-module JVM platform — adds one module, `server`.
 

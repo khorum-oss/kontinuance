@@ -28,16 +28,16 @@ DSL** generated on Konstellation KSP.
 
 ## Decisions locked today (2026-07-12)
 
-- **CD for Hestia/Relikquary moves to Kontinuance** (in-house); GitHub Actions dropped for delivery.
+- **CD for the maintainer's own projects moves to Kontinuance** (in-house); GitHub Actions dropped for delivery.
 - **External CI is poll-first**: Kontinuance polls GitHub (outbound only — **no inbound exposure,
   no Cloudflare required**), posts a **commit status** (`pending→success/failure`) on the PR head
   SHA, and a **required status check** gates the merge. A signature-verified **webhook via a
   Cloudflare Tunnel** is an *optional later* latency mode, never a prerequisite.
 - **Commit Status API for v1** (works with a PAT); Checks API deferred (needs a GitHub App).
 - **Thin, mockable `GitHubClient`** integration-tested against a mock API (Constitution II).
-- **Delivery is a Kontinuance pipeline**: drafted `relikquary-cd-stage` + `relikquary-promote-prod`
-  descriptors (in `hestia-systems/platform/deploy/pipelines/`) as the **dogfood target** for the
-  001 engine. Prod is a *separate manual pipeline* = the promotion gate; it **promotes by digest**.
+- **Delivery is a Kontinuance pipeline**: a stage-delivery descriptor plus a prod-promotion descriptor,
+  kept alongside the deployment configuration they serve, as the **dogfood target** for the 001 engine.
+  Prod is a *separate manual pipeline* = the promotion gate; it **promotes by digest**.
 
 ## Roadmap (ordered)
 
@@ -49,7 +49,7 @@ DSL** generated on Konstellation KSP.
 1. **Publish-artifacts enablement** *(005 — ✅ built)* — the installable `kontinuance` CLI plus a
    **native** publish pipeline example (`examples/publish-artifacts/`) + quickstart, so artifacts are
    published to a private repo from your own environment by hand. Descriptors are authored in
-   Kontinuance's own schema — never copied from GitHub Actions or the `hestia-systems` descriptors.
+   Kontinuance's own schema — never copied from GitHub Actions or external delivery descriptors.
    Verified end-to-end against a `file://` repo.
 2. **003 external CI (engine-only)** — *US1 MVP ✅ built*: poll → pending status → run via the engine
    → terminal `success`/`failure` on the head SHA (stable `kontinuance/ci` context, `KONTINUANCE_SHA`
@@ -100,12 +100,6 @@ a `Flow`/`SharedFlow` — the UI's live data model already exists; it just isn't
    `runner:` options (030) add `--network`, `--pull`, and `-u` uid mapping (host-owned workspace files),
    guarded to require an image. The real container run needs a Docker daemon (validated in CI / on real
    hosts). A **Kubernetes backend** is the remaining slice behind the same seam.
-
-## Cross-repo artifacts (today)
-
-- **kontinuance**: `specs/003-github-event-source/*` (PR #4); the `engine→dsl` refactor commit.
-- **hestia-systems**: `platform/deploy/pipelines/{relikquary-cd-stage,relikquary-promote-prod}.yaml`
-  + README (PR #15) — the dogfood delivery descriptors.
 
 ## Immediate next step
 

@@ -1,7 +1,7 @@
 # Quickstart: GitHub Event Source
 
 How this feature is configured and validated. Written to be runnable **against WireMock**
-(no real GitHub) per Constitution II, and to show the real Hestia usage.
+(no real GitHub) per Constitution II, and to show the real Real-world usage.
 
 ## 1. Configure a repository binding
 
@@ -43,13 +43,13 @@ Branch protection on `main` → **Require status checks to pass** → add `konti
 Now a PR cannot merge until Kontinuance reports success — the "trigger on PR and wait for it
 to finish" behavior, with the LAN never exposed.
 
-## 4. Hestia usage (the payoff)
+## 4. Real-world usage (the payoff)
 
 - `pr-pipeline: ci` → runs relikquary's build/test on each PR, gates merge.
-- `push-pipeline: deliver` on `main` → the Hestia delivery pipeline (build → push to
+- `push-pipeline: deliver` on `main` → the delivery pipeline (build → push to
   Relikquary registry → render → argocd sync stage → UAT → prod approval), authored as a
   Kontinuance pipeline using the `002` typed steps (`gradleStep`/`dockerStep`) plus the
-  Hestia steps (render via zosn, deploy via logos, UAT via euri).
+  the deployment steps.
 
 ## Optional: webhook mode (later)
 

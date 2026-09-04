@@ -9,7 +9,7 @@ repository URL and credentials are supplied as environment secrets, never writte
 
 `publish-artifacts.yaml` is authored **from scratch in Kontinuance's own descriptor schema**
 (`pipeline / stages / steps / run / secrets`). It is **not** copied, derived, or mimicked from a
-GitHub Actions workflow, from the `hestia-systems` delivery descriptors, or from any external GitHub
+GitHub Actions workflow, from any external delivery descriptors, or from any external GitHub
 YAML — there are no `on:`, `jobs:`, or `uses:` constructs, and nothing here is coupled to GitHub YAML.
 
 ## Files
