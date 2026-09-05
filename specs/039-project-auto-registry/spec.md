@@ -12,7 +12,7 @@ plus "I at least want some auth login for session, which will also kind of dicta
 
 Today a **project** (032) and a **run** (006) are unrelated concepts. A project is a stored descriptor plus an
 `.active` pointer; a run record carries `pipeline`, `repo`, `sha`, and `trigger` but never says which project
-it belongs to. The consequence, observed live on the Hestia stage deployment: the CI gate's `relikquary-pr`
+it belongs to. The consequence, observed live on the stage deployment: the CI gate's `relikquary-pr`
 runs are recorded and served by `/api/runs`, while `/api/projects` still returns only the seeded `default` —
 so the dashboard can show a global run list but can never show *a project's* builds.
 
@@ -204,7 +204,7 @@ rejection; sign in through the UI and observe the projects and runs.
 
 - **SC-001**: A repository whose builds land in the run store appears as a project in the dashboard without any
   manual registration step.
-- **SC-002**: The Hestia stage deployment shows its existing `relikquary` build history immediately after
+- **SC-002**: The stage deployment shows its existing `relikquary` build history immediately after
   upgrade — no migration, no backfill, no re-run.
 - **SC-003**: Selecting a project scopes the runs list to that project; "all projects" restores the full list;
   live runs continue to arrive in both views.
@@ -242,20 +242,20 @@ rejection; sign in through the UI and observe the projects and runs.
   ship already (016/017). Turning them on is a matter of configuring both credentials from a secret created
   out-of-band. No authentication code is written by this feature.
 
-## Rollout (Hestia deployment, non-code)
+## Rollout (deployment, non-code)
 
-These steps live in the `hestia-systems` hub, not this repository. They are recorded here because the feature is
-not observable without them.
+These steps live wherever the deployment is configured, not in this repository. They are recorded here
+because the feature is not observable without them.
 
-1. Add `project: relikquary` to the hub's PR descriptor and refresh the runner host's checkout of the hub, so
-   runs carry the explicit name rather than relying on the repository fallback.
-2. Create the operator credential secret out-of-band and set **both** credential environment variables on the
-   server Deployment through the hub's render script; the render must never carry the value itself.
-3. Rebuild and ship both container images, render, publish, and advance the deploy mirror.
+1. Add a `project:` key to the watched repository's PR descriptor and refresh the event source's checkout,
+   so runs carry the explicit name rather than relying on the repository fallback.
+2. Create the operator credential out-of-band and set **both** credential environment variables on the
+   server; the deployment manifest must never carry the value itself.
+3. Rebuild and ship both container images, then roll them out.
 4. Verify in a browser: sign-in succeeds, the project picker lists the derived project with its build history,
    selecting it scopes the runs list, and the trigger control is disabled with its reason shown.
-5. Update the hub's readiness notes — this closes the standing "Kontinuance endpoints unauthenticated" caveat,
-   demoting the external access policy from the only lock to defense in depth.
+5. Update the deployment's readiness notes — this closes the standing "Kontinuance endpoints unauthenticated"
+   caveat, demoting any external access policy from the only lock to defense in depth.
 
 ## Out of Scope
 

@@ -108,20 +108,83 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    Kover report), **Config** (the resolved `kontinuance.yml` and its plan), **Deploy** (a promotion
    view derived from the latest run's real stages; the registry/ArgoCD panels are shown honestly as
    external, since Kontinuance publishes/deploys as pipeline steps and doesn't query the cluster), and
-   **Source** (035 — a read-only view of the GitHub **event source**: the repositories it watches, its poll
-   cadence, the last commit it processed per PR/branch, and the runs it triggered, plus a **liveness**
-   indicator (036) showing whether it is polling, how long ago it last checked GitHub, and its poll-cycle
-   count — or a **stale** state when the heartbeat has gone quiet). The event source itself runs as the
-   separate `kontinuance-ci` CLI (003); point the server at its config with `kontinuance.github.config` (its
-   cursor and heartbeat files default under `~/.kontinuance/` and can be overridden with
-   `kontinuance.github.cursors` / `kontinuance.github.heartbeat`) to watch it here. Only the token env-var
-   **name** is shown, never a token value.
+   **Source** (035/036/040 — the GitHub **event source**: connect a repository, then see the repositories
+   it watches, its poll cadence, the last commit it processed per PR/branch, the runs it triggered, and a
+   **liveness** indicator showing whether it is polling, how long ago it last checked GitHub, and its
+   poll-cycle count — or a **stale** state when the heartbeat has gone quiet). See
+   [Connecting GitHub](#connecting-github) below. Only the token env-var **name** is ever shown, never a
+   token value.
 
 > **Live updates (025):** the runs list and the run log-tail stream over SSE. By default the server
 > re-reads on a timer (`kontinuance.stream.mode=poll`). Set `kontinuance.stream.mode=push` to have
 > in-process writes (a run you trigger, a log line) wake the streams **immediately** — the poll interval
 > (`kontinuance.stream.poll-interval-ms`, default `1000`) is kept as a fallback so runs written by a
 > separate process are still picked up. Poll stays the default and remains selectable.
+
+---
+
+## Connecting GitHub
+
+Kontinuance watches a repository by **polling** it — outbound only, so nothing needs to be exposed to the
+internet. When a pull request or a tracked-branch push appears, it runs the pipeline you named and reports
+the result back to GitHub as a commit status, which a branch protection rule can then require.
+
+### 1. Enable the operator credential
+
+Connecting from the UI hands the server an access token, so it refuses to do so on an unauthenticated
+server. Set both variables before you start:
+
+```bash
+KONTINUANCE_AUTH_USERNAME=operator
+KONTINUANCE_AUTH_PASSWORD=<a real password>
+```
+
+With Compose, put them in `deploy/.env`. Setting only one is a startup failure — see
+[running.md](./running.md#authentication).
+
+### 2. Create a token
+
+A GitHub personal access token needs:
+
+- **`repo:status`** — to post the `kontinuance/ci` commit status.
+- **Read access to the repository** — to see pull requests and commits. A classic token's `repo` scope
+  covers both; a fine-grained token needs *Commit statuses: read and write* and *Contents: read* plus
+  *Pull requests: read*.
+
+### 3. Connect
+
+Sign in, open **Source**, and fill in the form:
+
+| Field | What it is |
+| --- | --- |
+| **Owner** / **Repository** | The repository to watch, e.g. `acme` / `widgets`. |
+| **PR pipeline** | Descriptor run for each pull request — the gating check. |
+| **Push pipeline** | Optional; run on a push to the tracked branch (delivery). |
+| **Tracked branch** | Which branch's pushes trigger the push pipeline. Default `main`. |
+| **Poll interval** | Seconds between checks. Default 60; minimum 10. |
+| **Access token** | Stored on the server, never returned by the API. |
+
+The pipeline paths are read **on the server**, so they must exist there — a path inside the container for
+Compose, or an absolute path on the host when running from source.
+
+Press **CONNECT** and the screen switches to the live view: the watched repository, the poll cursors as
+they advance, and the runs it triggers. **STOP** pauses polling and keeps the configuration;
+**DISCONNECT** removes the configuration and the stored token.
+
+### 4. Require the check on GitHub
+
+In the repository's branch protection rules, require the **`kontinuance/ci`** status check. The context is
+stable across runs, so the rule keeps matching.
+
+> **Where the state lives.** The connect form writes the same config file the standalone `kontinuance-ci`
+> CLI reads (`kontinuance.github.config`), alongside its cursor and heartbeat files. Running the CLI
+> separately still works and this screen will display it — what 040 adds is that the server can host the
+> poll loop itself, so there is one process instead of two. A connected source resumes automatically when
+> the server restarts (`kontinuance.github.autostart`).
+>
+> **Keeping the token out of the server's filesystem.** If you would rather not store the token at rest,
+> leave the token field blank and set the environment variable named by the config's `tokenEnv`
+> (`GITHUB_TOKEN` by default) on the server instead. The environment always wins over a stored token.
 
 ---
 
@@ -226,6 +289,18 @@ config surface are in [running.md](./running.md); runnable examples are in
 ## Current limitations & planned work
 
 Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, roughly by area:
+
+**GitHub source**
+- **Connecting a repository is done from the UI (040)** — the server hosts the poll loop, so there is no
+  second process to run. See [Connecting GitHub](#connecting-github).
+- **One repository at a time through the UI.** The config format holds many bindings and the poller
+  handles them, but the connect form and its endpoint take a single one; watching several today means
+  writing the config file directly. Multi-repository editing is a follow-up.
+- Connecting requires operator authentication, and a token supplied through the form is stored on the
+  server (owner-only, never returned). Name an environment variable instead to keep it out of the
+  filesystem.
+- Triggering is **poll-based** — a webhook mode is optional future work, so a new PR is picked up within
+  one poll interval rather than instantly.
 
 **Source & workspace**
 - Checkout supports a **branch/tag `ref`** (shallow clone) **or an exact commit `sha`** (034 — fetched and

@@ -26,6 +26,24 @@ kontinuance:
     password: ${KONTINUANCE_AUTH_PASSWORD:}
     required: ${KONTINUANCE_AUTH_REQUIRED:false}
   store: ${user.home}/.kontinuance/runs
+  # GitHub event source (003/035/036/040). The server can host the poll loop itself, so a repository is
+  # connected from the Source screen rather than by hand-writing this config and running the separate
+  # `kontinuance-ci` CLI. These paths are the same files that CLI uses, so either can drive them.
+  #
+  # `config` is written by the connect endpoint and read at startup; `token-file` holds the access token
+  # when one was supplied through the UI (owner-only permissions, never returned by the API) — a
+  # deployment that would rather keep the secret in the environment names a variable in the config's
+  # `tokenEnv` instead, which takes precedence. Set `autostart: false` to leave a stored source stopped
+  # until someone starts it from the UI.
+  #
+  # Connecting from the UI requires the operator credential above: the endpoint accepts a token, and an
+  # unauthenticated server refuses it.
+  github:
+    config: ${KONTINUANCE_GITHUB_CONFIG:${user.home}/.kontinuance/github-source.yaml}
+    cursors: ${KONTINUANCE_GITHUB_CURSORS:${user.home}/.kontinuance/github-cursors.properties}
+    heartbeat: ${KONTINUANCE_GITHUB_HEARTBEAT:${user.home}/.kontinuance/github-heartbeat.properties}
+    token-file: ${KONTINUANCE_GITHUB_TOKEN_FILE:${user.home}/.kontinuance/github-token}
+    autostart: ${KONTINUANCE_GITHUB_AUTOSTART:true}
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.
   stream:

@@ -6,7 +6,7 @@
 
 **Status**: Implemented (US1 MVP — engine-only; US2/US3 deferred, see tasks.md)
 
-**Input**: User description: "Let Kontinuance act as an external CI for GitHub: detect new PRs and pushes, run the matching pipeline via the v0 engine, and report the outcome back to GitHub as a commit status / check so a required check gates merges. Poll GitHub by default (no inbound exposure); a webhook via Cloudflare Tunnel is an optional lower-latency mode later. This is the piece that lets Kontinuance replace GitHub Actions for the Hestia/Relikquary delivery flow without exposing the LAN."
+**Input**: User description: "Let Kontinuance act as an external CI for GitHub: detect new PRs and pushes, run the matching pipeline via the v0 engine, and report the outcome back to GitHub as a commit status / check so a required check gates merges. Poll GitHub by default (no inbound exposure); a webhook via Cloudflare Tunnel is an optional lower-latency mode later. This is the piece that lets Kontinuance replace GitHub Actions for a self-hosted delivery flow without exposing the LAN."
 
 ## Context
 
@@ -19,7 +19,7 @@ makes Kontinuance a first-class check on a GitHub PR — the standard external-C
 (Jenkins/CircleCI-style) rather than GitHub Actions.
 
 Architectural stance baked into this spec: **poll-first**. Kontinuance runs on a private
-LAN (the Hestia Mini); polling the GitHub API is *outbound only*, so nothing about the
+LAN (a self-hosted node); polling the GitHub API is *outbound only*, so nothing about the
 host is exposed. A webhook mode (behind a Cloudflare Tunnel) is offered as an optional
 latency optimization with identical downstream behavior — never a prerequisite.
 
@@ -93,7 +93,7 @@ repository's *delivery* pipeline (build → publish → deploy), and an operator
 
 **Why this priority**: PR gating (Stories 1–2) proves the integration; production
 delivery on merge and a manual escape hatch are what make it operationally complete for
-the Hestia flow, but they reuse the same event-source + run plumbing.
+the delivery flow, but they reuse the same event-source + run plumbing.
 
 **Independent Test**: Simulate a push event to `main` and assert the configured delivery
 pipeline starts for the pushed SHA; invoke the manual trigger for an arbitrary ref and
@@ -221,7 +221,7 @@ check).
 - Persistent run history / UI (future features).
 - Runner isolation (Docker/k8s) — still in-process per 001/002.
 - The delivery pipeline's *contents* (build/publish/render/deploy/UAT/prod-gate) — those
-  are pipeline definitions + typed steps, specified/authored separately (the Hestia CD
+  are pipeline definitions + typed steps, specified/authored separately (the delivery CD
   pipeline). This feature only *triggers* and *reports*.
 - Multi-SCM support (GitLab/Gitea/Bitbucket) — GitHub only for v1, though the event-source
   interface should not preclude it.

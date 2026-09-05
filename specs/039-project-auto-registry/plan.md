@@ -42,7 +42,7 @@
 | `web/src/routes/+page.svelte` | Runs list screen; owns filter state | Add project scoping + "all projects" |
 | `web/src/lib/screens/Runs.svelte` | Runs table + RUN PIPELINE control | Disable trigger with a reason |
 
-**hestia-systems (sibling repo, Task 10)** — `platform/deploy/pipelines/relikquary-pr.yaml`, `platform/deploy/scripts/render-kontinuance.sh`, `ops/runbooks/kontinuance-deploy-stage.md`, `ops/pipeline-readiness.md`.
+**Deployment configuration (outside this repository, Task 10)** — the watched repository's PR descriptor, the server's credential environment, and the deployment's readiness notes.
 
 ---
 
@@ -1216,11 +1216,11 @@ git commit -m "feat(039): disable the trigger for a descriptor-less project"
 **Files:**
 - Modify: `docs/running.md` (the `project:` key + the derivation window)
 - Modify: `docs/roadmap.md` (039 entry)
-- Modify (sibling repo `~/Projects/hestia-systems`): `platform/deploy/pipelines/relikquary-pr.yaml`, `platform/deploy/scripts/render-kontinuance.sh`, `ops/runbooks/kontinuance-deploy-stage.md`, `ops/pipeline-readiness.md`
+- Modify (outside this repository): the watched repository's PR descriptor, the server's credential environment, and the deployment's readiness notes
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: the feature observable on the Hestia stage deployment.
+- Produces: the feature observable on the stage deployment.
 
 - [ ] **Step 1: Document the descriptor key**
 
@@ -1258,63 +1258,51 @@ git add docs/running.md docs/roadmap.md
 git commit -m "docs(039): document the project key and derived projects"
 ```
 
-- [ ] **Step 4: Name the project in the hub's PR descriptor**
+- [ ] **Step 4: Name the project in the watched repository's PR descriptor**
 
-In `~/Projects/hestia-systems`, add `project: relikquary` under `pipeline:` in `platform/deploy/pipelines/relikquary-pr.yaml`, then refresh the runner's checkout so the daemon reads it:
+In whichever repository holds your delivery descriptors, add a `project:` key under `pipeline:` in the
+PR-gate descriptor, then refresh the event source's checkout so the daemon reads the new key:
 
-```bash
-ssh cirunner@hestia.local 'git -C ~/hestia-systems pull'
+```yaml
+pipeline:
+  name: "my-app-pr"
+  project: "my-app"
 ```
 
-- [ ] **Step 5: Create the operator credential and wire it into the render**
+- [ ] **Step 5: Create the operator credential**
 
-Create the secret out-of-band (never committed — hub convention), then set **both** environment variables on the server Deployment through `render-kontinuance.sh`. Setting only one leaves the server open with a startup warning.
+Create the credential out-of-band (never committed), then set **both** environment variables on the
+server. Setting only one leaves the server open with a startup warning — see
+[`running.md`](../../docs/running.md#authentication).
 
 ```bash
-ssh cirunner@hestia.local 'export PATH=/opt/homebrew/bin:$PATH; \
-  kubectl -n kontinuance-stage create secret generic kontinuance-auth \
-    --from-literal=KONTINUANCE_AUTH_USERNAME=<user> \
-    --from-literal=KONTINUANCE_AUTH_PASSWORD=<password>'
+KONTINUANCE_AUTH_USERNAME=<user>
+KONTINUANCE_AUTH_PASSWORD=<password>
 ```
 
-In the render script, add an `envFrom` referencing `kontinuance-auth` to the server container.
+For a Kubernetes deployment, hold them in a Secret and reference it with `envFrom` on the server
+container; for Compose, pass them through the env file. See [`deploy/README.md`](../../deploy/README.md).
 
-- [ ] **Step 6: Build, ship, render, publish**
+- [ ] **Step 6: Build and deploy**
+
+Build both images and roll them out however your deployment is wired:
 
 ```bash
-cd ~/Projects/kontinuance
-docker build --platform linux/arm64 -f deploy/server.Dockerfile -t kontinuance-server:local .
-docker build --platform linux/arm64 -f deploy/web.Dockerfile    -t kontinuance-web:local .
-docker save kontinuance-server:local | ssh cirunner@192.168.50.206 'export PATH=/opt/homebrew/bin:$PATH; colima ssh -- docker load'
-docker save kontinuance-web:local    | ssh cirunner@192.168.50.206 'export PATH=/opt/homebrew/bin:$PATH; colima ssh -- docker load'
-
-cd ~/Projects/hestia-systems
-KONTINUANCE=~/Projects/kontinuance platform/deploy/scripts/render-kontinuance.sh stage
-git add platform/deploy && git commit -m "cd(kontinuance): project auto-registry + operator auth" && git push origin HEAD:main
-logos hestia gitea mirror-sync
+docker build -f deploy/server.Dockerfile -t kontinuance-server:local .
+docker build -f deploy/web.Dockerfile    -t kontinuance-web:local .
 ```
 
 - [ ] **Step 7: Verify against the running deployment**
 
 ```bash
 # auth is now enforced: unauthenticated reads are rejected
-curl -sk -o /dev/null -w '%{http_code}\n' https://kontinuance.stage.192.168.50.206.nip.io:30443/api/projects   # → 401
-curl -sk https://kontinuance.stage.192.168.50.206.nip.io:30443/api/auth/me                                     # → authRequired: true
+curl -s -o /dev/null -w '%{http_code}\n' "$KONTINUANCE_URL/api/projects"   # → 401
+curl -s "$KONTINUANCE_URL/api/auth/me"                                     # → authRequired: true
 ```
 
-Then in a browser: sign in, confirm the picker lists `relikquary` with a `DERIVED` badge and its build count, select it, confirm the runs list is scoped to `relikquary-pr` runs, and confirm RUN PIPELINE is disabled with its reason shown.
-
-- [ ] **Step 8: Update the hub's readiness notes**
-
-In `ops/pipeline-readiness.md`, close the Phase 4 item *"Kontinuance endpoints unauthenticated (trigger/approve/reject)"* — the operator credential now gates them, demoting Cloudflare Access from the only lock to defense in depth. Note the two standing caveats: sessions are in-memory (a restart signs you out) and the single-replica RWO constraint is unchanged.
-
-- [ ] **Step 9: Commit the hub changes**
-
-```bash
-cd ~/Projects/hestia-systems
-git add platform/deploy/pipelines/relikquary-pr.yaml ops/runbooks/kontinuance-deploy-stage.md ops/pipeline-readiness.md
-git commit -m "cd(kontinuance): name the relikquary project + enable operator auth"
-```
+Then in a browser: sign in, confirm the picker lists the project with a `DERIVED` badge and its build
+count, select it, confirm the runs list is scoped to that project's runs, and confirm RUN PIPELINE is
+disabled with its reason shown.
 
 ---
 

@@ -33,36 +33,38 @@ before a real run.
 
 ## Verify the CLI (smoke test)
 
-A self-contained, **read-only** pipeline that exercises the engine against the live Relikquary
-stage registry — good for confirming the CLI works end-to-end after an install or change. Save as
-`relikquary-uat.yaml`:
+A self-contained, **read-only** pipeline that exercises the engine end to end — good for confirming
+the CLI works after an install or change. It touches nothing outside its own shell. Save as
+`smoke.yaml`:
 
 ```yaml
 pipeline:
-  name: "relikquary-uat-smoke"
+  name: "cli-smoke"
   concurrency: 1
   stages:
-    - name: "uat"
+    - name: "verify"
       steps:
-        - name: "smoke-registry"
-          run: "curl -sfk https://stage.192.168.50.206.nip.io:30443/v2/ >/dev/null"
-        - name: "smoke-readiness"
-          run: "curl -sfk https://stage.192.168.50.206.nip.io:30443/actuator/health/readiness | grep -q UP"
+        - name: "shell-available"
+          run: "echo kontinuance-smoke-ok"
+        - name: "workspace-writable"
+          run: "touch smoke.marker && test -f smoke.marker"
 ```
 
 Then:
 
 ```bash
-kontinuance --check relikquary-uat.yaml   # expect: "descriptor OK: 'relikquary-uat-smoke' — 1 stage(s)" + the two steps
-kontinuance relikquary-uat.yaml           # expect: "pipeline 'relikquary-uat-smoke' finished: Success"
+kontinuance --check smoke.yaml   # expect: "descriptor OK: 'cli-smoke' — 1 stage(s)" + the two steps
+kontinuance smoke.yaml           # expect: "pipeline 'cli-smoke' finished: Success"
 ```
 
-What this proves: the full path works — descriptor load → `PipelineEngine.default()` →
-`RunStep` executed via `ProcessBuilder` (the two `curl`s) → status mapped to an exit code. It hits
-live infra but changes nothing (anonymous reads; no build, push, or deploy).
+What this proves: the full path works — descriptor load → `PipelineEngine.default()` → `RunStep`
+executed via `ProcessBuilder` → status mapped to an exit code.
 
-> The reusable Relikquary **delivery** descriptors (build → push → render → sync → UAT, and the
-> prod promotion) live in `hestia-systems/platform/deploy/pipelines/`. Validate them anytime with
+To smoke-test against a real deployment instead, swap the steps for read-only `curl`s at a health or
+readiness endpoint you control.
+
+> Keep your reusable **delivery** descriptors (build → push → deploy → UAT, and any prod promotion)
+> wherever your deployment configuration lives. Validate them anytime with
 > `kontinuance --check <path>` before a real (heavier) run.
 
 ## Notes

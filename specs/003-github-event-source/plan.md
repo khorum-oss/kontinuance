@@ -34,7 +34,7 @@ mapping); **`@SpringBootTest` + WireMock (or Testcontainers)** for the GitHub cl
 integration — the sole external seam, exercised end-to-end (poll → status create → status
 update) with **zero real-network dependency** (Constitution II).
 
-**Target Platform**: JVM service on the Hestia Mini (self-hosted, single node).
+**Target Platform**: JVM service on a self-hosted single node.
 
 **Project Type**: Multi-module Gradle platform (backend service). Adds one module: `github`.
 
@@ -45,7 +45,7 @@ PR volume; correctness and rate-limit friendliness over throughput.
 rate-limit / `Retry-After` with backoff (no hot-loop); tokens + step secrets masked
 everywhere (logs, status text); idempotent triggering.
 
-**Scale/Scope**: homelab — the Hestia/Relikquary repos plus future khorum apps; single
+**Scale/Scope**: self-hosted — the maintainer's own repositories plus future apps; single
 Kontinuance instance.
 
 ## Constitution Check

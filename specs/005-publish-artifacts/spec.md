@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Make Kontinuance usable in a maintainer's own environment to publish build artifacts to their own private repository, by hand, today — on the already-installable `kontinuance` CLI. Deliver a native Kontinuance pipeline descriptor example that builds and publishes Maven artifacts to a configurable repository, with URL + credentials injected as masked secrets (never hard-coded), plus an examples/ directory and a quickstart. Descriptors must be authored from scratch in Kontinuance's own schema and must NOT be copied or derived from GitHub Actions or the hestia-systems descriptors. Verify end-to-end by publishing to a local file:// Maven repository through the CLI."
+**Input**: User description: "Make Kontinuance usable in a maintainer's own environment to publish build artifacts to their own private repository, by hand, today — on the already-installable `kontinuance` CLI. Deliver a native Kontinuance pipeline descriptor example that builds and publishes Maven artifacts to a configurable repository, with URL + credentials injected as masked secrets (never hard-coded), plus an examples/ directory and a quickstart. Descriptors must be authored from scratch in Kontinuance's own schema and must NOT be copied or derived from GitHub Actions or any external delivery descriptors. Verify end-to-end by publishing to a local file:// Maven repository through the CLI."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -41,7 +41,7 @@ A maintainer reads a quickstart that explains what the example does, which secre
 
 ### User Story 3 - Descriptors are native and free of GitHub-YAML provenance (Priority: P2)
 
-A maintainer (or reviewer) inspects the example and confirms it is written entirely in Kontinuance's own descriptor schema, with nothing copied or adapted from GitHub Actions workflows or from the hestia-systems delivery descriptors.
+A maintainer (or reviewer) inspects the example and confirms it is written entirely in Kontinuance's own descriptor schema, with nothing copied or adapted from GitHub Actions workflows or from external delivery descriptors.
 
 **Why this priority**: An explicit maintainer requirement — keeping the descriptors free of GitHub-YAML coupling avoids future divergence, confusion, and provenance concerns. It is a correctness/hygiene guarantee over the deliverable.
 
@@ -50,7 +50,7 @@ A maintainer (or reviewer) inspects the example and confirms it is written entir
 **Acceptance Scenarios**:
 
 1. **Given** the example descriptor, **When** it is inspected, **Then** it contains only Kontinuance-native schema (pipeline/stages/steps and step payloads) and none of GitHub Actions' constructs (e.g. `on:`, `jobs:`, `uses:`).
-2. **Given** the example, **When** its provenance is reviewed, **Then** it is confirmed authored from scratch and not copied/derived from the hestia-systems descriptors or any external GitHub YAML.
+2. **Given** the example, **When** its provenance is reviewed, **Then** it is confirmed authored from scratch and not copied/derived from any external delivery descriptors or GitHub YAML.
 
 ### Edge Cases
 
@@ -67,7 +67,7 @@ A maintainer (or reviewer) inspects the example and confirms it is written entir
 - **FR-002**: The example MUST take the target repository URL and credentials from injected secrets/environment, never hard-coded in the descriptor.
 - **FR-003**: Credential values MUST be masked in all run output.
 - **FR-004**: A missing or unresolved required credential MUST cause a fail-fast error with no upload attempted, per the engine's existing secret-resolution behavior.
-- **FR-005**: The example descriptor MUST be authored entirely in Kontinuance's native descriptor schema and MUST NOT contain GitHub Actions constructs or be copied/derived from GitHub Actions workflows, the hestia-systems descriptors, or any external GitHub YAML.
+- **FR-005**: The example descriptor MUST be authored entirely in Kontinuance's native descriptor schema and MUST NOT contain GitHub Actions constructs or be copied/derived from GitHub Actions workflows or any external delivery descriptors or GitHub YAML.
 - **FR-006**: The project MUST include a quickstart that explains what the example does, enumerates the required secrets, and shows how to repoint it at common private-repository kinds (e.g. Nexus, Artifactory, GitHub Packages, S3-backed Maven) and run it.
 - **FR-007**: The example and quickstart MUST live in a discoverable location (an `examples/` directory) and be runnable through the installed `kontinuance` CLI, including `--check` validation without side effects.
 - **FR-008**: Adapting the example to a different repository or artifact MUST require editing only the descriptor and environment — no Kontinuance engine/source changes.

@@ -28,7 +28,7 @@ description: "Task list for Publish-Artifacts Enablement"
 
 ## Phase 4: User Story 3 — Native, no GitHub-YAML provenance (P2)
 - [X] T007 [US3] Review the descriptor: only native schema keys, zero GitHub Actions constructs (`on:`/`jobs:`/`uses:`),
-  authored from scratch (not derived from hestia-systems or any external GitHub YAML); note this in the README.
+  authored from scratch (not derived from any external GitHub YAML); note this in the README.
 
 ## Phase 5: Polish
 - [X] T008 Confirm the existing engine build/gates are untouched and green; update `docs/roadmap.md` to mark 005 built.

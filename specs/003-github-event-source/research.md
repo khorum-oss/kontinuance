@@ -7,7 +7,7 @@ Decisions that de-risk the plan. Each records the choice, rationale, and rejecte
 **Decision**: **Poll GitHub by default** (outbound only). Provide an optional
 signature-verified webhook receiver behind a Cloudflare Tunnel as a *later* latency mode.
 
-**Rationale**: Kontinuance runs on a private LAN (Hestia Mini). Polling needs **no inbound
+**Rationale**: Kontinuance runs on a private LAN. Polling needs **no inbound
 exposure** — the single biggest security win for a homelab. Latency (one poll interval,
 30–60s) is invisible for PR checks. Webhooks are strictly a latency optimization and share
 the entire downstream (resolve → run → report), so adding them later is additive, not a
