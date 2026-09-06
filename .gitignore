@@ -20,3 +20,4 @@ public.key
 .claude/settings.local.json
 *.env
 .local
+.superpowers
