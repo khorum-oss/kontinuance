@@ -82,7 +82,9 @@ test.describe('authentication', () => {
 		await page.getByLabel('new project branch').fill('main');
 		await page
 			.getByLabel('descriptor source')
-			.fill('pipeline:\n  name: "billing-api"\n  stages: []');
+			.fill(
+				'pipeline:\n  name: "billing-api"\n  stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]'
+			);
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 		await expect(page.getByText('billing-api', { exact: true })).toBeVisible();
 		await expect(page.getByText('https://example.test/billing · main')).toBeVisible();

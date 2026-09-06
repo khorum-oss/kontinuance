@@ -53,7 +53,7 @@ class RunTriggerTest {
     private val validDescriptor = """
         pipeline:
           name: "demo"
-          stages: []
+          stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]
     """.trimIndent()
 
     private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {

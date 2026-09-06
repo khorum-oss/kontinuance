@@ -19,7 +19,7 @@ class ProjectControllerDerivedTest {
     private val descriptorText = """
         pipeline:
           name: "demo"
-          stages: []
+          stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]
     """.trimIndent()
 
     private fun controller(dir: Path, runs: InMemoryRunStore): ProjectController {

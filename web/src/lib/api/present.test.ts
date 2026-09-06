@@ -6,11 +6,105 @@ import {
 	mergeNewestFirst,
 	runMessage,
 	runRef,
+	runWorkSummary,
+	sourceCheckoutOnlyNote,
 	toRunView
 } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
+
+// The exact shape ProjectSourceInjector prepends when a descriptor declares no checkout of its own.
+const synthesizedCheckout = {
+	name: 'checkout',
+	status: 'Success',
+	steps: [{ name: 'checkout', status: 'Success', tool: 'git' }]
+};
+
+describe('runWorkSummary', () => {
+	it('counts the stages and steps the run executed', () => {
+		expect(
+			runWorkSummary({
+				...base,
+				stages: [
+					{ name: 'build', status: 'Success', steps: [{ name: 'compile', status: 'Success' }] },
+					{
+						name: 'test',
+						status: 'Success',
+						steps: [
+							{ name: 'unit', status: 'Success' },
+							{ name: 'e2e', status: 'Success' }
+						]
+					}
+				]
+			})
+		).toBe('2 stages · 3 steps');
+	});
+
+	it('uses singular wording for a single stage and step', () => {
+		expect(runWorkSummary({ ...base, stages: [synthesizedCheckout] })).toBe('1 stage · 1 step');
+	});
+
+	it('is empty for a record with no stage roll-up, so the caller can omit the line', () => {
+		expect(runWorkSummary(base)).toBe('');
+		expect(runWorkSummary({ ...base, stages: [] })).toBe('');
+	});
+
+	it('tolerates a stage whose steps are absent', () => {
+		expect(runWorkSummary({ ...base, stages: [{ name: 'build', status: 'Success' }] })).toBe(
+			'1 stage · 0 steps'
+		);
+	});
+});
+
+describe('sourceCheckoutOnlyNote', () => {
+	it('explains a run whose only stage was the synthesized source checkout', () => {
+		const note = sourceCheckoutOnlyNote({ ...base, stages: [synthesizedCheckout] });
+		expect(note).toContain('no stages');
+	});
+
+	it('stays silent when the pipeline declared real work alongside the checkout', () => {
+		expect(
+			sourceCheckoutOnlyNote({
+				...base,
+				stages: [synthesizedCheckout, { name: 'build', status: 'Success', steps: [] }]
+			})
+		).toBeNull();
+	});
+
+	it('stays silent for a lone stage that is not a git checkout', () => {
+		expect(
+			sourceCheckoutOnlyNote({
+				...base,
+				stages: [
+					{ name: 'build', status: 'Success', steps: [{ name: 'compile', status: 'Success' }] }
+				]
+			})
+		).toBeNull();
+	});
+
+	it('stays silent for a checkout stage that ran more than one step', () => {
+		expect(
+			sourceCheckoutOnlyNote({
+				...base,
+				stages: [
+					{
+						name: 'checkout',
+						status: 'Success',
+						steps: [
+							{ name: 'checkout', status: 'Success', tool: 'git' },
+							{ name: 'submodules', status: 'Success', tool: 'git' }
+						]
+					}
+				]
+			})
+		).toBeNull();
+	});
+
+	it('stays silent for a record with no stage roll-up', () => {
+		expect(sourceCheckoutOnlyNote(base)).toBeNull();
+	});
+});
 
 describe('runRef', () => {
 	it('joins repo and short sha', () => {

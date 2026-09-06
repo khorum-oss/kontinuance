@@ -5,16 +5,19 @@
 		time = '',
 		message,
 		tone = 'normal'
-	}: { time?: string; message: string; tone?: 'normal' | 'muted' | 'error' | 'ok' } = $props();
+	}: { time?: string; message: string; tone?: 'normal' | 'muted' | 'error' | 'ok' | 'warn' } =
+		$props();
 
 	const c = $derived(
 		tone === 'error'
 			? color.fail
 			: tone === 'ok'
 				? color.ok
-				: tone === 'muted'
-					? color.muted4
-					: color.muted
+				: tone === 'warn'
+					? color.warn
+					: tone === 'muted'
+						? color.muted4
+						: color.muted
 	);
 </script>
 
