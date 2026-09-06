@@ -42,4 +42,10 @@ class RepoRefParseTest {
         assertNull(RepoRef.parse("not a url"))
         assertNull(RepoRef.parse(""))
     }
+
+    @Test
+    fun `returns null for a url with fragment or query suffix`() {
+        assertNull(RepoRef.parse("https://github.com/khorum-oss/spektr#readme"))
+        assertNull(RepoRef.parse("https://github.com/khorum-oss/spektr?tab=readme"))
+    }
 }

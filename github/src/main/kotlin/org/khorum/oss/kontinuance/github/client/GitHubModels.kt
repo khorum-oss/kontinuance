@@ -11,8 +11,8 @@ data class RepoRef(val owner: String, val name: String) {
     }
 
     companion object {
-        private val HTTPS = Regex("^https?://github\\.com/([^/]+)/([^/]+?)(?:\\.git)?/?$")
-        private val SSH = Regex("^git@github\\.com:([^/]+)/([^/]+?)(?:\\.git)?/?$")
+        private val HTTPS = Regex("^https?://github\\.com/([A-Za-z0-9._-]+?)/([A-Za-z0-9._-]+?)(?:\\.git)?/?$")
+        private val SSH = Regex("^git@github\\.com:([A-Za-z0-9._-]+?)/([A-Za-z0-9._-]+?)(?:\\.git)?/?$")
 
         /**
          * The [RepoRef] a repository URL names, or `null` when the URL is not a GitHub repository.
@@ -23,7 +23,7 @@ data class RepoRef(val owner: String, val name: String) {
         fun parse(url: String): RepoRef? {
             val match = HTTPS.find(url.trim()) ?: SSH.find(url.trim()) ?: return null
             val (owner, name) = match.destructured
-            return if (owner.isBlank() || name.isBlank()) null else RepoRef(owner, name)
+            return RepoRef(owner, name)
         }
     }
 }
