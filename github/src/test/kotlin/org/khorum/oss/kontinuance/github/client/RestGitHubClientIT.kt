@@ -62,6 +62,7 @@ class RestGitHubClientIT {
             server.on("GET", "/repos/.+/commits/.+", body = """{"sha":"branchsha","commit":{}}""")
             val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
             assertEquals("branchsha", client.branchHead(repo, "main"))
+            assertEquals(listOf("application/vnd.github+json"), server.requests.single().accept)
         }
     }
 
@@ -100,6 +101,7 @@ class RestGitHubClientIT {
             assertEquals("/repos/khorum-oss/kontinuance/contents/kontinuance.yml", request.path)
             assertTrue(request.rawUri.contains("ref=abc123"), request.rawUri)
             assertEquals("Bearer t0k3n", request.authorization)
+            assertEquals(listOf("application/vnd.github.raw"), request.accept)
         }
     }
 

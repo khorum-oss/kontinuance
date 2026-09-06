@@ -60,8 +60,7 @@ class RestGitHubClient(
         val encodedPath = path.split('/').joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8) }
         val encodedRef = URLEncoder.encode(ref, StandardCharsets.UTF_8)
         // The raw media type returns file contents verbatim, so no base64 decode step is needed.
-        val request = baseRequest("$root/repos/${repo.slug}/contents/$encodedPath?ref=$encodedRef")
-            .header("Accept", "application/vnd.github.raw")
+        val request = baseRequest("$root/repos/${repo.slug}/contents/$encodedPath?ref=$encodedRef", RAW_ACCEPT)
             .GET()
             .build()
         val response = send(request)
@@ -86,10 +85,10 @@ class RestGitHubClient(
     private fun post(url: String, body: String): HttpRequest =
         baseRequest(url).POST(HttpRequest.BodyPublishers.ofString(body)).build()
 
-    private fun baseRequest(url: String): HttpRequest.Builder =
+    private fun baseRequest(url: String, accept: String = DEFAULT_ACCEPT): HttpRequest.Builder =
         HttpRequest.newBuilder(URI.create(url))
             .header("Authorization", "Bearer $token")
-            .header("Accept", "application/vnd.github+json")
+            .header("Accept", accept)
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("Content-Type", "application/json")
 
@@ -107,5 +106,7 @@ class RestGitHubClient(
     private companion object {
         val SUCCESS_RANGE = 200..299
         const val NOT_FOUND = 404
+        const val DEFAULT_ACCEPT = "application/vnd.github+json"
+        const val RAW_ACCEPT = "application/vnd.github.raw"
     }
 }

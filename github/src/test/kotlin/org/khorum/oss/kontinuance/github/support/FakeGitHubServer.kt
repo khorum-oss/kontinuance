@@ -10,13 +10,18 @@ import java.net.InetSocketAddress
  */
 class FakeGitHubServer : AutoCloseable {
 
-    /** A request the server received. [path] excludes the query string; [rawUri] includes it. */
+    /**
+     * A request the server received. [path] excludes the query string; [rawUri] includes it. [accept]
+     * carries every `Accept` header value sent, in order — a list rather than a single value so tests
+     * can assert exactly one was sent (a client bug can append a second rather than replacing it).
+     */
     data class Recorded(
         val method: String,
         val path: String,
         val rawUri: String,
         val body: String,
         val authorization: String?,
+        val accept: List<String>,
     )
 
     private data class Rule(val method: String, val path: Regex, val status: Int, val body: String)
@@ -33,7 +38,8 @@ class FakeGitHubServer : AutoCloseable {
             val body = exchange.requestBody.readBytes().decodeToString()
             val path = exchange.requestURI.path
             val auth = exchange.requestHeaders.getFirst("Authorization")
-            requests += Recorded(exchange.requestMethod, path, exchange.requestURI.toString(), body, auth)
+            val accept = exchange.requestHeaders["Accept"] ?: emptyList()
+            requests += Recorded(exchange.requestMethod, path, exchange.requestURI.toString(), body, auth, accept)
             val rule = rules.firstOrNull { it.method == exchange.requestMethod && it.path.matches(path) }
             val status = rule?.status ?: NOT_FOUND
             val payload = (rule?.body ?: """{"message":"no rule"}""").encodeToByteArray()
