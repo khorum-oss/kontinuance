@@ -10,10 +10,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandlers
+import java.nio.charset.StandardCharsets
 
 /**
  * A thin [GitHubClient] over JDK 21's built-in [HttpClient] and the GitHub REST API. No third-party
@@ -52,6 +54,20 @@ class RestGitHubClient(
         if (response.statusCode() == NOT_FOUND) return null
         requireSuccess(response)
         return Json.parseToJsonElement(response.body()).jsonObject.getValue("sha").jsonPrimitive.content
+    }
+
+    override suspend fun fileAt(repo: RepoRef, path: String, ref: String): String? {
+        val encodedPath = path.split('/').joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8) }
+        val encodedRef = URLEncoder.encode(ref, StandardCharsets.UTF_8)
+        // The raw media type returns file contents verbatim, so no base64 decode step is needed.
+        val request = baseRequest("$root/repos/${repo.slug}/contents/$encodedPath?ref=$encodedRef")
+            .header("Accept", "application/vnd.github.raw")
+            .GET()
+            .build()
+        val response = send(request)
+        if (response.statusCode() == NOT_FOUND) return null
+        requireSuccess(response)
+        return response.body()
     }
 
     override suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus) {
