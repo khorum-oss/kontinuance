@@ -1,6 +1,6 @@
 # Feature 041: Repo-hosted descriptors
 
-**Status**: Designed, unbuilt · **Depends on**: 027 (editable config), 032 (project registry),
+**Status**: Built · **Depends on**: 027 (editable config), 032 (project registry),
 033 (project source), 034 (commit-SHA checkout), 039 (project auto-registry), 040 (GitHub connect)
 
 ## Problem
