@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+	descriptorCheckMessage,
+	descriptorOriginLabel,
 	filterRuns,
 	lastRunAge,
 	matchesRunFilter,
@@ -279,5 +281,40 @@ describe('lastRunAge', () => {
 
 	it('is an em dash for an unparseable timestamp', () => {
 		expect(lastRunAge('not-a-date', now)).toBe('—');
+	});
+});
+
+describe('descriptorOriginLabel', () => {
+	it('names where the descriptor came from', () => {
+		expect(descriptorOriginLabel({ origin: 'repo', overridden: false })).toBe('from the repository');
+		expect(descriptorOriginLabel({ origin: 'live', overridden: false })).toBe(
+			"from this server's descriptor file"
+		);
+	});
+
+	it('calls out an override explicitly', () => {
+		expect(descriptorOriginLabel({ origin: 'stored', overridden: true })).toBe(
+			'overriding the repository'
+		);
+	});
+});
+
+describe('descriptorCheckMessage', () => {
+	it('summarises a descriptor that was found', () => {
+		expect(descriptorCheckMessage({ ok: true, pipeline: 'spektr-ci', stages: 3 })).toEqual({
+			tone: 'ok',
+			text: "found kontinuance.yml — pipeline 'spektr-ci', 3 stages"
+		});
+	});
+
+	it('passes a failure through as a warning', () => {
+		expect(descriptorCheckMessage({ ok: false, message: 'no kontinuance.yml on main' })).toEqual({
+			tone: 'warn',
+			text: 'no kontinuance.yml on main'
+		});
+	});
+
+	it('is null when nothing was checked', () => {
+		expect(descriptorCheckMessage(undefined)).toBeNull();
 	});
 });

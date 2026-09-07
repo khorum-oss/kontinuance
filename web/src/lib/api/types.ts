@@ -230,8 +230,24 @@ export interface PlanSummary {
 	deploy: string;
 }
 
+// What add-time descriptor checking found (041). Advisory — the project is created either way.
+export interface DescriptorCheck {
+	ok: boolean;
+	pipeline?: string;
+	stages?: number;
+	message?: string;
+}
+
+export interface CreatedProject {
+	name: string;
+	descriptor?: DescriptorCheck;
+}
+
 export interface Config {
 	source: string;
 	text: string;
 	plan: PlanSummary;
+	// Where this descriptor came from, and whether a stored one is shadowing a repo that also has one (041).
+	origin?: string;
+	overridden?: boolean;
 }

@@ -2,7 +2,7 @@
 // Kept separate from the transport so components stay presentational.
 
 import { normalizeStatus, type Status } from '../theme/tokens';
-import type { RunRecord } from './types';
+import type { DescriptorCheck, RunRecord } from './types';
 
 export interface RunView {
 	id: string;
@@ -174,6 +174,36 @@ export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
 	const byId = new Map<string, RunRecord>();
 	for (const r of records) byId.set(r.id, r);
 	return [...byId.values()].sort((a, b) => runSortKey(b).localeCompare(runSortKey(a)));
+}
+
+// ----- descriptor provenance (041) -----
+
+/** Where the descriptor the server would run came from, in words. Pure. */
+export function descriptorOriginLabel(config: { origin?: string; overridden?: boolean }): string {
+	if (config.overridden) return 'overriding the repository';
+	switch (config.origin) {
+		case 'repo':
+			return 'from the repository';
+		case 'stored':
+			return 'stored on this server';
+		default:
+			return "from this server's descriptor file";
+	}
+}
+
+/** The add-time descriptor check as a tone + line, or null when nothing was checked. Pure. */
+export function descriptorCheckMessage(
+	check: DescriptorCheck | undefined
+): { tone: 'ok' | 'warn'; text: string } | null {
+	if (!check) return null;
+	if (check.ok) {
+		const stages = check.stages ?? 0;
+		return {
+			tone: 'ok',
+			text: `found kontinuance.yml — pipeline '${check.pipeline}', ${stages} stage${stages === 1 ? '' : 's'}`
+		};
+	}
+	return { tone: 'warn', text: check.message ?? 'the descriptor could not be read' };
 }
 
 /** Project a record into its display view. [nowMs] lets callers/tests pin "now". */
