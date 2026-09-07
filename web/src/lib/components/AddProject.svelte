@@ -76,7 +76,7 @@
 		class="k-mono link disclosure"
 		onclick={() => (showDescriptor = !showDescriptor)}
 	>
-		{showDescriptor ? '✕ don’t paste a descriptor' : 'paste a descriptor instead'}
+		{showDescriptor ? "✕ don't paste a descriptor" : 'paste a descriptor instead'}
 	</button>
 	{#if showDescriptor}
 		<textarea
