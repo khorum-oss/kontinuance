@@ -7,6 +7,7 @@ import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.server.domain.RunApi
 import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
+import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Path
 import java.time.Instant
@@ -100,6 +101,44 @@ class ProjectControllerDerivedTest {
         assertTrue(!listed.runnable)
         assertEquals(1, listed.runCount)
         assertEquals("Success", listed.lastStatus)
+    }
+
+    @Test
+    fun `a project with a source but no stored descriptor is runnable (041 reverses 039)`(@TempDir dir: Path) = runTest {
+        // A run gives spektr an entry in the listing (names comes from registered ∪ derived-from-runs);
+        // the point under test is runnable/derived, not how the name became visible.
+        val runs = InMemoryRunStore()
+        runs.record(RunRecord(id = "r1", pipeline = "spektr-pr", status = "Success", repo = "khorum-oss/spektr"))
+        val store = ProjectStore(dir.resolve("projects"))
+        // A source, but never a stored descriptor — 039 would call this non-runnable; 041's FR-006 says
+        // otherwise, because the trigger can read kontinuance.yml out of the repo instead.
+        store.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        val subject = ProjectController(
+            store,
+            runs,
+            dir.resolve("live.yml").toString(),
+            500,
+            noGitHubClient,
+            "kontinuance.yml",
+        )
+
+        val listed = subject.list().projects.single { it.name == "spektr" }
+
+        assertTrue(listed.derived, "spektr has no stored descriptor, so it is not registered")
+        assertTrue(listed.runnable, "a source gives the trigger something to read a descriptor from (FR-006)")
+    }
+
+    @Test
+    fun `a project with neither a descriptor nor a source is not runnable`(@TempDir dir: Path) = runTest {
+        // The other half of the same rule: with nothing to read a pipeline from — no stored descriptor,
+        // no source — there is nothing FR-006 can rescue, so 039's original "not runnable" still holds.
+        val runs = InMemoryRunStore()
+        runs.record(RunRecord(id = "r1", pipeline = "relikquary-pr", status = "Success", repo = "khorum-oss/relikquary"))
+
+        val listed = controller(dir, runs).list().projects.single { it.name == "relikquary" }
+
+        assertTrue(listed.derived)
+        assertTrue(!listed.runnable, "no stored descriptor and no source means there is nothing to run")
     }
 
     @Test
