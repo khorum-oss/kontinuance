@@ -63,6 +63,15 @@ class ProjectStore(private val dir: Path) {
         resolve(name + SUFFIX).writeText(text)
     }
 
+    /**
+     * Removes [name]'s stored descriptor only, never its source sidecar (041). This is what makes
+     * reverting an override clean: a project with a source falls back to being repo-hosted rather than
+     * disappearing, because [exists]/[list] still see it via the sidecar.
+     */
+    fun delete(name: String) {
+        resolve(name + SUFFIX).deleteIfExists()
+    }
+
     /** The active project's name, or `null` when none is set. */
     fun activeName(): String? =
         resolve(ACTIVE).takeIf { Files.isRegularFile(it) }?.readText()?.trim()?.ifEmpty { null }
