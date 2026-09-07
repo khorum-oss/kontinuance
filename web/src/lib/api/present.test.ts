@@ -292,6 +292,12 @@ describe('descriptorOriginLabel', () => {
 		);
 	});
 
+	it('names a stored descriptor that is not overriding anything', () => {
+		expect(descriptorOriginLabel({ origin: 'stored', overridden: false })).toBe(
+			'stored on this server'
+		);
+	});
+
 	it('calls out an override explicitly', () => {
 		expect(descriptorOriginLabel({ origin: 'stored', overridden: true })).toBe(
 			'overriding the repository'
@@ -307,10 +313,31 @@ describe('descriptorCheckMessage', () => {
 		});
 	});
 
+	it('tolerates a missing pipeline name rather than rendering "undefined"', () => {
+		expect(descriptorCheckMessage({ ok: true, stages: 2 })).toEqual({
+			tone: 'ok',
+			text: "found kontinuance.yml — pipeline 'the descriptor', 2 stages"
+		});
+	});
+
+	it('defaults the stage count to zero when absent', () => {
+		expect(descriptorCheckMessage({ ok: true, pipeline: 'spektr-ci' })).toEqual({
+			tone: 'ok',
+			text: "found kontinuance.yml — pipeline 'spektr-ci', 0 stages"
+		});
+	});
+
 	it('passes a failure through as a warning', () => {
 		expect(descriptorCheckMessage({ ok: false, message: 'no kontinuance.yml on main' })).toEqual({
 			tone: 'warn',
 			text: 'no kontinuance.yml on main'
+		});
+	});
+
+	it('falls back to a generic warning when the failure carries no message', () => {
+		expect(descriptorCheckMessage({ ok: false })).toEqual({
+			tone: 'warn',
+			text: 'the descriptor could not be read'
 		});
 	});
 

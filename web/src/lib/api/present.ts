@@ -200,7 +200,7 @@ export function descriptorCheckMessage(
 		const stages = check.stages ?? 0;
 		return {
 			tone: 'ok',
-			text: `found kontinuance.yml — pipeline '${check.pipeline}', ${stages} stage${stages === 1 ? '' : 's'}`
+			text: `found kontinuance.yml — pipeline '${check.pipeline ?? 'the descriptor'}', ${stages} stage${stages === 1 ? '' : 's'}`
 		};
 	}
 	return { tone: 'warn', text: check.message ?? 'the descriptor could not be read' };
