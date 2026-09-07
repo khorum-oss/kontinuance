@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.server.domain.RunApi
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Path
 import java.time.Instant
@@ -22,10 +23,22 @@ class ProjectControllerDerivedTest {
           stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]
     """.trimIndent()
 
+    // None of these tests exercise repo-hosted descriptor checking (041) — every project here either has
+    // a stored descriptor or none at all — so a client that never resolves is enough to satisfy the
+    // constructor.
+    private val noGitHubClient = GitHubClientProvider { null }
+
     private fun controller(dir: Path, runs: InMemoryRunStore): ProjectController {
         val descriptor = dir.resolve("kontinuance.yml")
         descriptor.writeText(descriptorText)
-        return ProjectController(ProjectStore(dir.resolve("projects")), runs, descriptor.toString(), 500)
+        return ProjectController(
+            ProjectStore(dir.resolve("projects")),
+            runs,
+            descriptor.toString(),
+            500,
+            noGitHubClient,
+            "kontinuance.yml",
+        )
     }
 
     @Test
@@ -45,6 +58,8 @@ class ProjectControllerDerivedTest {
             InMemoryRunStore(),
             descriptor.toString(),
             RunApi.MAX_LIMIT * 10,
+            noGitHubClient,
+            "kontinuance.yml",
         )
 
         assertEquals(RunApi.MAX_LIMIT, subject.list().runWindow)
@@ -59,7 +74,14 @@ class ProjectControllerDerivedTest {
         }
         val descriptor = dir.resolve("kontinuance.yml")
         descriptor.writeText(descriptorText)
-        val subject = ProjectController(ProjectStore(dir.resolve("projects")), runs, descriptor.toString(), 2)
+        val subject = ProjectController(
+            ProjectStore(dir.resolve("projects")),
+            runs,
+            descriptor.toString(),
+            2,
+            noGitHubClient,
+            "kontinuance.yml",
+        )
 
         val listed = subject.list()
 
@@ -135,7 +157,7 @@ class ProjectControllerDerivedTest {
         val descriptor = dir.resolve("kontinuance.yml")
         descriptor.writeText(descriptorText)
 
-        ProjectController(store, runs, descriptor.toString(), 500).list()
+        ProjectController(store, runs, descriptor.toString(), 500, noGitHubClient, "kontinuance.yml").list()
 
         assertTrue(!store.exists("relikquary"))
     }
@@ -156,7 +178,14 @@ class ProjectControllerDerivedTest {
         runs.record(RunRecord(id = "r1", pipeline = "relikquary-pr", status = "Success", repo = "khorum-oss/relikquary"))
         val descriptor = dir.resolve("kontinuance.yml")
         descriptor.writeText(descriptorText)
-        val subject = ProjectController(ProjectStore(dir.resolve("projects")), runs, descriptor.toString(), 500)
+        val subject = ProjectController(
+            ProjectStore(dir.resolve("projects")),
+            runs,
+            descriptor.toString(),
+            500,
+            noGitHubClient,
+            "kontinuance.yml",
+        )
 
         val response = subject.activate("relikquary")
 
