@@ -237,6 +237,40 @@ describe('api.addProject', () => {
 	});
 });
 
+describe('api.revertConfigOverride', () => {
+	it('DELETEs the override endpoint and returns the refreshed config', async () => {
+		const seen: { url: string; method?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method });
+				return Promise.resolve(
+					json({
+						source: 'kontinuance.yml',
+						text: 'version: 0.4',
+						plan: { stages: 1, tasks: 1, maxParallel: 1, toolchain: 't', publish: 'p', deploy: 'd' },
+						origin: 'repo',
+						overridden: false
+					})
+				);
+			})
+		);
+		const config = await api.revertConfigOverride();
+		expect(seen[0].url).toBe('/api/config/override');
+		expect(seen[0].method).toBe('DELETE');
+		expect(config.origin).toBe('repo');
+		expect(config.overridden).toBe(false);
+	});
+
+	it('throws ApiError with the server message when there is nothing to revert', async () => {
+		mockFetch(() => json({ error: 'nothing to revert' }, { status: 409, statusText: 'Conflict' }));
+		const err = await api.revertConfigOverride().catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(409);
+		expect(err.message).toBe('nothing to revert');
+	});
+});
+
 describe('error handling', () => {
 	it('throws ApiError with the status on a non-2xx response', async () => {
 		mockFetch(() => json({ error: 'not found' }, { status: 404, statusText: 'Not Found' }));
