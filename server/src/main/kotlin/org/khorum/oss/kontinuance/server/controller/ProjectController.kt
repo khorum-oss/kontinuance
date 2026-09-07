@@ -197,10 +197,11 @@ class ProjectController(
             return@withContext notFound(name)
         }
         val text = store.get(name)
-        // A derived project (039) has runs but no stored descriptor: it can be made active — which
-        // scopes the dashboard to it — but there is nothing to write as the live descriptor, and
-        // overwriting the current one with an unrelated project's pipeline would be a footgun.
-        if (text == null && name !in deriveStats().keys) {
+        // A derived project (039) has runs but no stored descriptor, and a repo-only project (041/Task 6c)
+        // is registered by its source sidecar alone — either way it can be made active, which scopes the
+        // dashboard to it, but there is nothing to write as the live descriptor, and overwriting the
+        // current one with an unrelated project's pipeline would be a footgun.
+        if (text == null && name !in deriveStats().keys && !store.exists(name)) {
             return@withContext notFound(name)
         }
         if (text != null) {

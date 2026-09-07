@@ -105,17 +105,15 @@ class ProjectControllerDerivedTest {
 
     @Test
     fun `a project with a source but no stored descriptor is runnable (041 reverses 039)`(@TempDir dir: Path) = runTest {
-        // A run gives spektr an entry in the listing (names comes from registered ∪ derived-from-runs);
-        // the point under test is runnable/derived, not how the name became visible.
-        val runs = InMemoryRunStore()
-        runs.record(RunRecord(id = "r1", pipeline = "spektr-pr", status = "Success", repo = "khorum-oss/spektr"))
+        // A source sidecar alone registers the project (Task 6c) — no run is needed to give it an entry
+        // in the listing, unlike before that fix.
         val store = ProjectStore(dir.resolve("projects"))
         // A source, but never a stored descriptor — 039 would call this non-runnable; 041's FR-006 says
         // otherwise, because the trigger can read kontinuance.yml out of the repo instead.
         store.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
         val subject = ProjectController(
             store,
-            runs,
+            InMemoryRunStore(),
             dir.resolve("live.yml").toString(),
             500,
             noGitHubClient,
@@ -124,8 +122,34 @@ class ProjectControllerDerivedTest {
 
         val listed = subject.list().projects.single { it.name == "spektr" }
 
-        assertTrue(listed.derived, "spektr has no stored descriptor, so it is not registered")
+        assertTrue(!listed.derived, "a source sidecar registers the project — it is not merely inferred from run history")
         assertTrue(listed.runnable, "a source gives the trigger something to read a descriptor from (FR-006)")
+    }
+
+    @Test
+    fun `a repo-only project with zero runs is registered, runnable, and activatable (Task 6c)`(@TempDir dir: Path) = runTest {
+        // The defect: ProjectStore keyed every operation off the .yml descriptor file, so a project
+        // created with only a repo (no kontinuance.yml stored on the server) was invisible in list(),
+        // could not be activated, and could be silently duplicated. A source sidecar with zero runs is
+        // exactly the shape 041's "connect with just a repo" story produces.
+        val store = ProjectStore(dir.resolve("projects"))
+        store.saveSource("repo-only", ProjectSource("https://github.com/khorum-oss/repo-only", "main"))
+        val subject = ProjectController(
+            store,
+            InMemoryRunStore(),
+            dir.resolve("live.yml").toString(),
+            500,
+            noGitHubClient,
+            "kontinuance.yml",
+        )
+
+        val listed = subject.list().projects.single { it.name == "repo-only" }
+        assertTrue(!listed.derived, "explicitly registered via a source, not inferred from run history")
+        assertTrue(listed.runnable, "a source gives the trigger something to read a descriptor from")
+
+        val response = subject.activate("repo-only")
+        assertEquals(200, response.statusCode.value(), "a registered repo-only project must be activatable")
+        assertEquals("repo-only", subject.list().active)
     }
 
     @Test

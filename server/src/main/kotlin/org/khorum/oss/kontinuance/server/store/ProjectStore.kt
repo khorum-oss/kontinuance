@@ -12,8 +12,10 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 /**
- * A small file-backed registry of named pipeline descriptors ("projects", 032) and which one is active.
- * Each project is one descriptor's text stored at `<dir>/<name>.yml`; the active project's name lives in
+ * A small file-backed registry of named projects (032) and which one is active. A project is registered
+ * either by a descriptor's text stored at `<dir>/<name>.yml`, or by a `<dir>/<name>.meta.json` source
+ * sidecar (033) naming a repo/branch to read `kontinuance.yml` from at trigger time (041) — a project
+ * connected with only a repo has the latter but never the former. The active project's name lives in
  * `<dir>/.active`. Activating a project writes its text to the server's live descriptor file (done by the
  * controller), so the trigger and Config screen use it. Small on purpose — a database backend can replace
  * this behind the same surface, mirroring the run/log stores.
@@ -27,19 +29,33 @@ class ProjectStore(private val dir: Path) {
         Files.createDirectories(dir)
     }
 
-    /** The registered project names, sorted. */
-    fun list(): List<String> =
-        Files.list(dir).use { stream ->
-            stream.map { it.name }
-                .filter { it.endsWith(SUFFIX) }
-                .map { it.removeSuffix(SUFFIX) }
-                .sorted()
-                .toList()
-        }
+    /**
+     * The registered project names, sorted. A name counts as registered by either file — a stored
+     * descriptor or a source sidecar — since 041 lets an operator register a project with only a repo,
+     * never writing a `.yml` at all. Suffixes are stripped with an exact trailing match, not a split on
+     * the first `.`, so a name that itself contains a suffix-like substring (e.g. `foo.meta`) round-trips
+     * unmangled.
+     */
+    fun list(): List<String> {
+        val fileNames = Files.list(dir).use { stream -> stream.map { it.name }.toList() }
+        return fileNames.mapNotNull { fileName ->
+            when {
+                fileName.endsWith(SUFFIX) -> fileName.removeSuffix(SUFFIX)
+                fileName.endsWith(SOURCE_SUFFIX) -> fileName.removeSuffix(SOURCE_SUFFIX)
+                else -> null
+            }
+        }.distinct().sorted()
+    }
 
-    fun exists(name: String): Boolean = Files.isRegularFile(resolve(name + SUFFIX))
+    /** True when [name] is registered by either a stored descriptor or a source sidecar. */
+    fun exists(name: String): Boolean =
+        Files.isRegularFile(resolve(name + SUFFIX)) || Files.isRegularFile(resolve(name + SOURCE_SUFFIX))
 
-    /** The descriptor text of [name], or `null` if there is no such project. */
+    /**
+     * The descriptor text of [name], or `null` if it has none. Deliberately narrower than [exists] —
+     * unlike list/exists this never falls back to the source sidecar, because [DescriptorResolver] reads
+     * a `null` here as "this project is repo-hosted, go fetch its descriptor from GitHub instead."
+     */
     fun get(name: String): String? = resolve(name + SUFFIX).takeIf { Files.isRegularFile(it) }?.readText()
 
     /** Stores (or replaces) [name]'s descriptor [text]. */
