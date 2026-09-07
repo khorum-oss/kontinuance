@@ -425,6 +425,29 @@ test.describe('config screen', () => {
 		await expect(page.getByText('KONTINUANCE DSL')).toBeVisible();
 	});
 
+	test('shows where the descriptor came from and reverts an override', async ({ page }) => {
+		await mockApi(page);
+		await mockConfig(page);
+		await page.goto('/config');
+		await enterApp(page);
+
+		await expect(page.getByText('from the repository')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'REVERT TO REPO', exact: true })).toBeHidden();
+
+		await page.getByRole('button', { name: 'EDIT', exact: true }).click();
+		await page
+			.getByLabel('descriptor source')
+			.fill(
+				'pipeline:\n  name: "patched"\n  stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]'
+			);
+		await page.getByRole('button', { name: 'SAVE', exact: true }).click();
+
+		await expect(page.getByText('OVERRIDDEN')).toBeVisible();
+		await page.getByRole('button', { name: 'REVERT TO REPO', exact: true }).click();
+		await expect(page.getByText('from the repository')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'REVERT TO REPO', exact: true })).toBeHidden();
+	});
+
 	test('edits the descriptor and saves it, and shows a validation error for a bad edit', async ({ page }) => {
 		await mockApi(page);
 		await mockConfig(page);

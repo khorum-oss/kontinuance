@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { descriptorOriginLabel } from '$lib/api/present';
 	import type { Config } from '$lib/api/types';
 
 	let {
@@ -6,18 +7,24 @@
 		loading = false,
 		error = null,
 		saveError = null,
+		revertError = null,
 		onretry,
-		onsave
+		onsave,
+		onrevert
 	}: {
 		config?: Config | null;
 		loading?: boolean;
 		error?: string | null;
 		/** Validation error from the last save attempt (the server parser's message), shown inline. */
 		saveError?: string | null;
+		/** Error from the last revert attempt (e.g. nothing to revert), shown inline in the banner. */
+		revertError?: string | null;
 		onretry?: () => void;
 		/** Persists edited descriptor text; resolves `true` on success (editor then closes), `false` on a
 		 * rejected edit (editor stays open showing [saveError]). */
 		onsave?: (text: string) => Promise<boolean>;
+		/** Discards a stored override, restoring the repository's descriptor (041). */
+		onrevert?: () => Promise<void>;
 	} = $props();
 
 	const lines = $derived(config ? config.text.split('\n') : []);
@@ -25,6 +32,7 @@
 	let editing = $state(false);
 	let draft = $state('');
 	let saving = $state(false);
+	let reverting = $state(false);
 
 	function isComment(line: string): boolean {
 		return line.trimStart().startsWith('#');
@@ -41,6 +49,13 @@
 		const ok = await onsave(draft);
 		saving = false;
 		if (ok) editing = false;
+	}
+
+	async function revert() {
+		if (!onrevert || reverting) return;
+		reverting = true;
+		await onrevert();
+		reverting = false;
 	}
 </script>
 
@@ -60,10 +75,23 @@
 					<button class="act cancel" onclick={() => (editing = false)} disabled={saving}>CANCEL</button>
 					<button class="act save" onclick={save} disabled={saving}>{saving ? 'SAVING…' : 'SAVE'}</button>
 				{:else}
-					<span class="origin">SOURCE // repo root</span>
+					<span class="origin">{descriptorOriginLabel(config)}</span>
 					<button class="act edit" onclick={startEdit}>EDIT</button>
 				{/if}
 			</div>
+			{#if config.overridden}
+				<div class="warn-banner k-mono">
+					<span class="warn-msg">
+						OVERRIDDEN — this server is running a stored descriptor, not the repository's
+					</span>
+					<button class="warn-revert" disabled={reverting} onclick={revert}>
+						{reverting ? 'REVERTING…' : 'REVERT TO REPO'}
+					</button>
+				</div>
+				{#if revertError}
+					<div class="save-err k-mono" role="alert">{revertError}</div>
+				{/if}
+			{/if}
 			{#if editing}
 				<textarea
 					class="editor k-mono"
@@ -178,6 +206,39 @@
 	}
 	.act.cancel {
 		margin-left: auto;
+	}
+	.warn-banner {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 10px 16px;
+		border-bottom: 1px solid var(--k-border-soft);
+		border-left: 3px solid rgba(251, 212, 107, 0.4);
+		background: rgba(251, 212, 107, 0.06);
+	}
+	.warn-msg {
+		font-size: 10.5px;
+		letter-spacing: 0.5px;
+		color: var(--k-warn);
+	}
+	.warn-revert {
+		margin-left: auto;
+		flex: none;
+		font-size: 9px;
+		letter-spacing: 1.5px;
+		border-radius: 4px;
+		padding: 6px 14px;
+		background: none;
+		border: 1px solid rgba(251, 212, 107, 0.45);
+		color: var(--k-warn);
+		cursor: pointer;
+	}
+	.warn-revert:hover:not(:disabled) {
+		background: rgba(251, 212, 107, 0.12);
+	}
+	.warn-revert:disabled {
+		opacity: 0.55;
+		cursor: default;
 	}
 	.editor {
 		width: 100%;

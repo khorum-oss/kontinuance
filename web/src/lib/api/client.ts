@@ -221,6 +221,25 @@ export const api = {
 		return body;
 	},
 
+	// Reverts a stored override back to the repository's descriptor (041). Resolves to the refreshed
+	// [Config]; throws [ApiError] (409) with the server's message when there is nothing to revert.
+	revertConfigOverride: async (): Promise<Config> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/config/override', {
+				method: 'DELETE',
+				headers: { accept: 'application/json' }
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as Config & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `revert failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	},
+
 	// The named pipeline descriptors ("projects", 032) and which is active.
 	getProjects: () => getJson<ProjectsResponse>('/api/projects'),
 
