@@ -38,6 +38,9 @@ dependencies {
     testImplementation(rootProject.libs.coroutines.test)
     testImplementation(project(":core-test"))
     testImplementation(rootProject.libs.mockk)
+    // RecordingGitHubClient (041) — the shared fake GitHubClient, published via :github's testFixtures
+    // source set so DescriptorResolverTest doesn't reimplement it.
+    testImplementation(testFixtures(project(":github")))
 }
 
 // The `application` plugin is applied to every module by the root build; the Spring Boot plugin uses its
