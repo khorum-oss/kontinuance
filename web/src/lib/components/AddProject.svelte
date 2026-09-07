@@ -1,28 +1,41 @@
 <script lang="ts">
-	// The add-project panel (032/041): name + descriptor + optional source repo/branch. Extracted
-	// unchanged from Login.svelte's project picker — behavior is identical to before the move.
+	// The add-project panel (032/041): name + a source repo/branch, since Kontinuance can read
+	// kontinuance.yml out of the repository at run time. Pasting a descriptor directly is the exception —
+	// it lives behind a disclosure toggle — for a project with no repository, or one whose descriptor
+	// isn't checked in yet.
 	import { api, ApiError } from '$lib/api/client';
+	import { descriptorCheckMessage } from '$lib/api/present';
 
 	let { onadded, onclose }: { onadded?: (name: string) => void; onclose?: () => void } = $props();
 
 	let newName = $state('');
-	let newText = $state('');
 	let newRepo = $state('');
-	let newBranch = $state('');
+	let newBranch = $state('main');
+	let newText = $state('');
+	let showDescriptor = $state(false);
 	let adding = $state(false);
 	let addError = $state<string | null>(null);
+	let check = $state<ReturnType<typeof descriptorCheckMessage>>(null);
 
 	async function addProject() {
-		if (adding || !newName.trim() || !newText.trim()) return;
+		if (adding || !newName.trim()) return;
 		adding = true;
 		addError = null;
+		check = null;
 		try {
-			await api.addProject(newName.trim(), newText, newRepo.trim(), newBranch.trim());
+			const created = await api.addProject(
+				newName.trim(),
+				newText,
+				newRepo.trim(),
+				newBranch.trim()
+			);
+			check = descriptorCheckMessage(created.descriptor);
 			const name = newName.trim();
 			newName = '';
-			newText = '';
 			newRepo = '';
-			newBranch = '';
+			newBranch = 'main';
+			newText = '';
+			showDescriptor = false;
 			onadded?.(name);
 		} catch (e) {
 			addError = e instanceof ApiError ? e.message : (e as Error).message;
@@ -59,27 +72,35 @@
 			bind:value={newBranch}
 		/>
 	</div>
-	<textarea
-		class="k-mono editor"
-		aria-label="descriptor source"
-		placeholder="pipeline:&#10;  name: &quot;my-service&quot;&#10;  stages: …"
-		spellcheck="false"
-		bind:value={newText}
-	></textarea>
+	<button
+		class="k-mono link disclosure"
+		onclick={() => (showDescriptor = !showDescriptor)}
+	>
+		{showDescriptor ? '✕ don’t paste a descriptor' : 'paste a descriptor instead'}
+	</button>
+	{#if showDescriptor}
+		<textarea
+			class="k-mono editor"
+			aria-label="descriptor source"
+			placeholder="pipeline:&#10;  name: &quot;my-service&quot;&#10;  stages: …"
+			spellcheck="false"
+			bind:value={newText}
+		></textarea>
+	{/if}
 	{#if addError}
 		<div class="k-mono add-err" role="alert">{addError}</div>
 	{/if}
+	{#if check}
+		<div class="k-mono add-check" class:warn={check.tone === 'warn'}>{check.text}</div>
+	{/if}
 	<div class="add-row">
-		<button
-			class="k-mono add-btn"
-			disabled={adding || !newName.trim() || !newText.trim()}
-			onclick={addProject}
-		>
+		<button class="k-mono add-btn" disabled={adding || !newName.trim()} onclick={addProject}>
 			{adding ? 'SAVING…' : 'SAVE PROJECT'}
 		</button>
 	</div>
 	<div class="k-mono add-help">
-		the descriptor is validated by the engine parser — an invalid one is rejected, not stored
+		a pasted descriptor is validated by the engine parser — an invalid one is rejected, not stored;
+		otherwise the repository's <code>kontinuance.yml</code> is read when the project runs
 	</div>
 </div>
 
@@ -142,6 +163,12 @@
 		flex: 1;
 		min-width: 0;
 	}
+	.disclosure {
+		align-self: flex-start;
+	}
+	.disclosure:hover {
+		color: var(--k-teal);
+	}
 	.editor {
 		width: 100%;
 		box-sizing: border-box;
@@ -163,6 +190,14 @@
 		font-size: 10px;
 		color: var(--k-fail);
 		white-space: pre-wrap;
+	}
+	.add-check {
+		font-size: 10px;
+		color: var(--k-ok);
+		white-space: pre-wrap;
+	}
+	.add-check.warn {
+		color: var(--k-warn);
 	}
 	.add-row {
 		display: flex;

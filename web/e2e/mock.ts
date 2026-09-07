@@ -365,7 +365,13 @@ export async function mockProjects(page: Page): Promise<void> {
 			const repo = (body.repo ?? '').trim() || undefined;
 			const branch = repo ? (body.branch ?? '').trim() || undefined : undefined;
 			projects.push({ name, active: false, repo, branch });
-			return route.fulfill({ json: { name } });
+			// A repo-backed project gets an advisory descriptor check (041) — the server read
+			// kontinuance.yml out of the repository at add time. Stand in with a deterministic result
+			// derived from the repo's short name so the fixture stays predictable across tests.
+			const descriptor = repo
+				? { ok: true, pipeline: `${repo.split('/').pop()}-ci`, stages: 3 }
+				: undefined;
+			return route.fulfill({ json: { name, descriptor } });
 		}
 		const active = projects.find((p) => p.active)?.name ?? null;
 		// `runWindow` mirrors the real server: the window its run counts were derived over, which the

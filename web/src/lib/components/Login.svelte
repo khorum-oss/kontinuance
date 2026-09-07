@@ -513,10 +513,6 @@
 		color: var(--k-fail);
 		white-space: pre-wrap;
 	}
-	.add-row {
-		display: flex;
-		gap: 10px;
-	}
 	.add-btn {
 		flex: none;
 		padding: 10px 24px;
@@ -600,14 +596,6 @@
 		flex-direction: column;
 		gap: 8px;
 		padding: 0 18px 16px;
-	}
-	.src-row {
-		display: flex;
-		gap: 10px;
-	}
-	.src-row .field {
-		flex: 1;
-		min-width: 0;
 	}
 	.src-edit .add-btn {
 		align-self: flex-start;

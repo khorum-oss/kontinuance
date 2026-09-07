@@ -80,6 +80,7 @@ test.describe('authentication', () => {
 		await page.getByPlaceholder(/project name/).fill('billing-api');
 		await page.getByLabel('new project repo').fill('https://example.test/billing');
 		await page.getByLabel('new project branch').fill('main');
+		await page.getByText('paste a descriptor instead').click();
 		await page
 			.getByLabel('descriptor source')
 			.fill(
@@ -88,6 +89,26 @@ test.describe('authentication', () => {
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 		await expect(page.getByText('billing-api', { exact: true })).toBeVisible();
 		await expect(page.getByText('https://example.test/billing · main')).toBeVisible();
+	});
+
+	test('connects a project from a repository with no descriptor', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('mkuraja');
+		await page.getByPlaceholder('password').fill('s3cret');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
+		await page.getByPlaceholder(/project name/).fill('spektr');
+		await page.getByLabel('new project repo').fill('https://github.com/khorum-oss/spektr');
+		await page.getByLabel('new project branch').fill('main');
+
+		// The descriptor box is not shown until asked for.
+		await expect(page.getByLabel('descriptor source')).toBeHidden();
+
+		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
+		await expect(page.getByText(/found kontinuance\.yml/)).toBeVisible();
+		await expect(page.getByText('spektr', { exact: true })).toBeVisible();
 	});
 
 	test('sets a source on an existing project inline', async ({ page }) => {
@@ -117,6 +138,7 @@ test.describe('authentication', () => {
 
 		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
 		await page.getByPlaceholder(/project name/).fill('bad-one');
+		await page.getByText('paste a descriptor instead').click();
 		await page.getByLabel('descriptor source').fill('BROKEN: not a pipeline');
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 
