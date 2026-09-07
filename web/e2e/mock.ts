@@ -279,11 +279,17 @@ export async function mockConfig(page: Page): Promise<void> {
 }
 
 /**
- * Serve the named-project registry (032): the project list + add + activate. Seeded with two projects
- * (`kontinuance-service` active, `infra-charts` available). `POST /api/projects` appends a project —
- * rejecting a bad-slug name (400), a duplicate (409), and a descriptor containing `BROKEN` (400, a
- * stand-in for the server's strict-parser validation). Activate flips which project is active. State is
- * in-memory so the add + reload flow reflects the new project.
+ * Serve the named-project registry (032): the project list + add + activate. Seeded with three projects,
+ * each exercising exactly one runnability shape (039/041):
+ *   - `kontinuance-service` (active) and `infra-charts`: a stored descriptor, so runnable regardless of
+ *     source.
+ *   - `relikquary`: NEITHER a stored descriptor NOR a source — discovered from run history alone, not
+ *     runnable.
+ *   - `aurora-uplink`: a source (repo + branch) but NO stored descriptor — runnable per FR-006 (041),
+ *     since Kontinuance reads `kontinuance.yml` out of the repo at trigger time.
+ * `POST /api/projects` appends a project — rejecting a bad-slug name (400), a duplicate (409), and a
+ * descriptor containing `BROKEN` (400, a stand-in for the server's strict-parser validation). Activate
+ * flips which project is active. State is in-memory so the add + reload flow reflects the new project.
  */
 export async function mockProjects(page: Page): Promise<void> {
 	const projects: {
@@ -298,7 +304,8 @@ export async function mockProjects(page: Page): Promise<void> {
 	}[] = [
 		{ name: 'kontinuance-service', active: true, runnable: true },
 		{ name: 'infra-charts', active: false, runnable: true },
-		// A project discovered from run history alone (039): builds, but no registered descriptor.
+		// A project discovered from run history alone (039): builds, but no registered descriptor, and no
+		// source either — the "neither" shape, still not runnable under FR-006.
 		{
 			name: 'relikquary',
 			active: false,
@@ -307,6 +314,16 @@ export async function mockProjects(page: Page): Promise<void> {
 			runCount: 12,
 			lastStatus: 'Success',
 			lastRunAt: '2026-07-17T00:00:00Z'
+		},
+		// A project with a source (repo + branch) but no stored descriptor (041, FR-006): Kontinuance can
+		// read kontinuance.yml out of the repo at trigger time, so this IS runnable despite having nothing
+		// stored.
+		{
+			name: 'aurora-uplink',
+			active: false,
+			runnable: true,
+			repo: 'khorum-oss/aurora-uplink',
+			branch: 'main'
 		}
 	];
 	await page.route(/\/api\/projects\/[^/?]+\/activate$/, (route) => {
