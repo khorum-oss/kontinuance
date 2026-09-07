@@ -9,6 +9,7 @@ import org.khorum.oss.kontinuance.server.domain.ConfigUpdateRequest
 import org.khorum.oss.kontinuance.server.domain.StubFixtures
 import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
 import org.khorum.oss.kontinuance.server.domain.project.Origin
+import org.khorum.oss.kontinuance.server.domain.project.Rejected
 import org.khorum.oss.kontinuance.server.domain.project.Resolved
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import org.springframework.beans.factory.annotation.Value
@@ -22,11 +23,11 @@ import org.springframework.web.bind.annotation.RestController
 import java.nio.file.Path
 
 /**
- * Serves and edits `/api/config`. `GET` reads a real Kontinuance descriptor when present (parsed by
- * [DescriptorConfigReader]), falling back to fixture data otherwise, and annotates the projection with
- * `origin`/`overridden` from [DescriptorResolver] (041, FR-008) — the resolver, not this file, knows
- * whether the active project's real descriptor actually lives in its repository rather than on this
- * server's disk. `PUT` (027) accepts an edited descriptor `{ "text": … }`, validates it with the engine's
+ * Serves and edits `/api/config`. `GET` asks [DescriptorResolver] what would actually run (041, FR-008)
+ * and renders the response from exactly that — its own text and its own parsed pipeline — so `source`,
+ * `text`, and `origin` can never disagree; only when nothing resolved does it fall back to reading a real
+ * Kontinuance descriptor off local disk (parsed by [DescriptorConfigReader]), or fixture data if even that
+ * is absent. `PUT` (027) accepts an edited descriptor `{ "text": … }`, validates it with the engine's
  * strict parser via [DescriptorConfigWriter], and — only if it parses — writes it to the descriptor file
  * *and* to the active project's stored slot (so an edit against a repo-hosted project becomes a visible
  * override rather than a one-off change to the live file), returning the refreshed projection; an invalid
@@ -44,22 +45,35 @@ class ConfigController(
     private val descriptor: Path = Path.of(descriptorPath)
 
     @GetMapping("/api/config")
-    suspend fun config(): ConfigResponse {
-        val base = withContext(Dispatchers.IO) { DescriptorConfigReader.read(descriptor) } ?: StubFixtures.config()
-        val origin = (resolver.resolve() as? Resolved)?.origin ?: Origin.Live
-        val overridden = origin == Origin.Stored && withContext(Dispatchers.IO) { overridesRepository() }
-        return base.copy(origin = origin.name.lowercase(), overridden = overridden)
+    suspend fun config(): ConfigResponse = when (val resolution = resolver.resolve()) {
+        is Resolved -> withContext(Dispatchers.IO) { renderResolved(resolution) }
+        is Rejected -> withContext(Dispatchers.IO) { DescriptorConfigReader.read(descriptor) } ?: StubFixtures.config()
     }
 
     /**
-     * True only when the active project's stored descriptor is shadowing a repository that also has one —
-     * a stored descriptor on a project with no source (or a source pointing somewhere other than GitHub)
-     * isn't overriding anything, so it must not raise the override banner.
+     * Renders exactly what [resolved] holds — its [Resolved.text] and [Resolved.pipeline] — through the
+     * same plan-summary logic [DescriptorConfigReader.read] uses, so the projection can never show one
+     * descriptor's content under another descriptor's label (the defect this exists to prevent: a
+     * repo-hosted project's Config screen previously showed the local live-descriptor file's content
+     * mislabelled as `origin: "repo"`). [source] names where that text came from, matching [origin] so
+     * the two never contradict: the project name for a stored descriptor, `owner/repo@branch` for a
+     * repo-hosted one, or the live descriptor's filename when no project is active.
      */
-    private fun overridesRepository(): Boolean {
-        val active = projects.activeName() ?: return false
-        val repo = projects.source(active)?.repo ?: return false
-        return RepoRef.parse(repo) != null
+    private fun renderResolved(resolved: Resolved): ConfigResponse {
+        val active = projects.activeName()
+        val projectSource = active?.let { projects.source(it) }
+        val repo = projectSource?.repo?.let { RepoRef.parse(it) }
+        val source = when (resolved.origin) {
+            Origin.Live -> descriptor.fileName.toString()
+            Origin.Stored -> active ?: "stored"
+            Origin.Repo -> repo?.let { "${it.slug}@${projectSource.branch ?: "?"}" } ?: "repository"
+        }
+        // Only a stored descriptor can be "overriding" anything, and only when a repository is actually
+        // there to be shadowed — a stored descriptor on a project with no source, or one whose source
+        // isn't GitHub, is just that project's config, not an override (041, FR-008).
+        val overridden = resolved.origin == Origin.Stored && repo != null
+        return DescriptorConfigReader.project(source, resolved.text, resolved.pipeline)
+            .copy(origin = resolved.origin.name.lowercase(), overridden = overridden)
     }
 
     @PutMapping("/api/config")

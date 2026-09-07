@@ -19,9 +19,12 @@ sealed interface Resolution
 
 /**
  * A parsed pipeline plus, for a repo-hosted descriptor, the commit [sha] it was read from — which the
- * caller pins the checkout to so descriptor and code always come from one commit (FR-004).
+ * caller pins the checkout to so descriptor and code always come from one commit (FR-004). [text] is the
+ * raw source the pipeline was parsed from, kept alongside it so a display surface (the Config screen,
+ * 041 FR-008) can show the descriptor that actually resolved rather than re-deriving it from some other
+ * file and risking the two disagreeing.
  */
-data class Resolved(val pipeline: Pipeline, val sha: String?, val origin: Origin) : Resolution
+data class Resolved(val pipeline: Pipeline, val sha: String?, val origin: Origin, val text: String) : Resolution
 
 /** Resolution failed. [reason] is operator-facing and names the cause (FR-005). */
 data class Rejected(val reason: String) : Resolution
@@ -106,7 +109,7 @@ class DescriptorResolver(
     /** Parses [text], naming [failurePrefix] (which source it came from) in any rejection (FR-005). */
     private fun parse(text: String, sha: String?, origin: Origin, failurePrefix: String): Resolution =
         try {
-            Resolved(PipelineDescriptor.parse(text), sha, origin)
+            Resolved(PipelineDescriptor.parse(text), sha, origin, text)
         } catch (e: DescriptorException) {
             Rejected("$failurePrefix: ${e.message}")
         }

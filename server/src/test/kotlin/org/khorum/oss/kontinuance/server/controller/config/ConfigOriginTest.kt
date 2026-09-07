@@ -10,6 +10,7 @@ import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Path
+import kotlin.io.path.writeText
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -120,5 +121,58 @@ class ConfigOriginTest {
         assertTrue(projects.exists("spektr"), "the project should still be registered by its source sidecar")
         assertEquals(null, projects.get("spektr"), "the stored descriptor should be gone")
         assertTrue("spektr" in projects.list())
+    }
+
+    @Test
+    fun `shows the repository's descriptor rather than a stale local file, for a repo-hosted project`(
+        @TempDir dir: Path,
+    ) = runTest {
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+
+        // The live descriptor file holds a stale, unrelated pipeline — e.g. left over from whichever
+        // project was activated before this one — clearly distinguishable from the repo's descriptor by
+        // both name and stage count.
+        val staleLocal = """
+            pipeline:
+              name: "stale-local"
+              stages: [{ name: "only-stage", steps: [{ name: "x", run: "true" }] }]
+        """.trimIndent()
+        dir.resolve("live.yml").writeText(staleLocal)
+
+        val fromRepo = """
+            pipeline:
+              name: "from-repo"
+              stages:
+                - name: "build"
+                  steps: [{ name: "x", run: "true" }]
+                - name: "test"
+                  steps: [{ name: "y", run: "true" }]
+        """.trimIndent()
+        val clients = GitHubClientProvider {
+            RecordingGitHubClient(
+                branchHeads = mapOf("main" to "abc123"),
+                files = mapOf("kontinuance.yml" to fromRepo),
+            )
+        }
+        val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = dir.resolve("live.yml"),
+            descriptorPath = "kontinuance.yml",
+            clients = clients,
+        )
+        val controller = ConfigController(
+            descriptorPath = dir.resolve("live.yml").toString(),
+            projects = projects,
+            resolver = resolver,
+        )
+
+        val response = controller.config()
+
+        assertEquals("repo", response.origin)
+        assertEquals(fromRepo, response.text, "text must be the repository's descriptor, not the stale local file")
+        assertEquals(2, response.plan.stages, "plan must be derived from the repository's descriptor too")
+        assertEquals(2, response.plan.tasks)
     }
 }
