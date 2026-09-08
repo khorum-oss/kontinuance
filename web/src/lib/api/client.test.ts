@@ -189,6 +189,88 @@ describe('api.logout', () => {
 	});
 });
 
+describe('api.addProject', () => {
+	it('sends text only when non-empty, and returns the advisory descriptor check', async () => {
+		const seen: { url: string; method?: string; body?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method, body: init?.body as string });
+				return Promise.resolve(
+					json({ name: 'spektr', descriptor: { ok: true, pipeline: 'spektr-ci', stages: 3 } })
+				);
+			})
+		);
+		const created = await api.addProject('spektr', '', 'https://github.com/khorum-oss/spektr', 'main');
+		expect(seen[0].url).toBe('/api/projects');
+		expect(seen[0].method).toBe('POST');
+		expect(JSON.parse(seen[0].body ?? '{}')).toEqual({
+			name: 'spektr',
+			repo: 'https://github.com/khorum-oss/spektr',
+			branch: 'main'
+		});
+		expect(created).toEqual({ name: 'spektr', descriptor: { ok: true, pipeline: 'spektr-ci', stages: 3 } });
+	});
+
+	it('includes the descriptor text when it is non-empty', async () => {
+		const seen: { body?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ body: init?.body as string });
+				return Promise.resolve(json({ name: 'billing-api' }));
+			})
+		);
+		await api.addProject('billing-api', 'pipeline:\n  name: "billing-api"');
+		expect(JSON.parse(seen[0].body ?? '{}')).toEqual({
+			name: 'billing-api',
+			text: 'pipeline:\n  name: "billing-api"'
+		});
+	});
+
+	it('throws ApiError with the server message on a rejected descriptor', async () => {
+		mockFetch(() => json({ error: 'invalid descriptor' }, { status: 400, statusText: 'Bad Request' }));
+		const err = await api.addProject('bad-one', 'BROKEN').catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(400);
+		expect(err.message).toBe('invalid descriptor');
+	});
+});
+
+describe('api.revertConfigOverride', () => {
+	it('DELETEs the override endpoint and returns the refreshed config', async () => {
+		const seen: { url: string; method?: string }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn((input: string | URL | Request, init?: RequestInit) => {
+				seen.push({ url: String(input), method: init?.method });
+				return Promise.resolve(
+					json({
+						source: 'kontinuance.yml',
+						text: 'version: 0.4',
+						plan: { stages: 1, tasks: 1, maxParallel: 1, toolchain: 't', publish: 'p', deploy: 'd' },
+						origin: 'repo',
+						overridden: false
+					})
+				);
+			})
+		);
+		const config = await api.revertConfigOverride();
+		expect(seen[0].url).toBe('/api/config/override');
+		expect(seen[0].method).toBe('DELETE');
+		expect(config.origin).toBe('repo');
+		expect(config.overridden).toBe(false);
+	});
+
+	it('throws ApiError with the server message when there is nothing to revert', async () => {
+		mockFetch(() => json({ error: 'nothing to revert' }, { status: 409, statusText: 'Conflict' }));
+		const err = await api.revertConfigOverride().catch((e) => e);
+		expect(err).toBeInstanceOf(ApiError);
+		expect(err.status).toBe(409);
+		expect(err.message).toBe('nothing to revert');
+	});
+});
+
 describe('error handling', () => {
 	it('throws ApiError with the status on a non-2xx response', async () => {
 		mockFetch(() => json({ error: 'not found' }, { status: 404, statusText: 'Not Found' }));

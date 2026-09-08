@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.server.service
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.execution.ApprovalDecision
@@ -10,6 +11,8 @@ import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Files
 import java.nio.file.Path
@@ -44,7 +47,14 @@ class RunApprovalsTest {
             CoroutineScope(Dispatchers.Unconfined),
             InMemoryRunLogStore(),
         )
-        val trigger = RunTrigger(store, launcher, ProjectStore(descriptor.resolveSibling("projects")), descriptor.toString())
+        private val projects = ProjectStore(descriptor.resolveSibling("projects"))
+        private val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = descriptor,
+            descriptorPath = "kontinuance.yml",
+            clients = GitHubClientProvider { null },
+        )
+        val trigger = RunTrigger(store, launcher, projects, resolver)
         val approvals = RunApprovals(store, gate, launcher, descriptor.toString())
     }
 
@@ -55,7 +65,7 @@ class RunApprovalsTest {
     }
 
     @Test
-    fun `a gated run pauses WaitingOnApproval, then approving resumes it to Success`(@TempDir dir: Path) {
+    fun `a gated run pauses WaitingOnApproval, then approving resumes it to Success`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val host = Host(store, descriptorIn(dir))
 
@@ -71,7 +81,7 @@ class RunApprovalsTest {
     }
 
     @Test
-    fun `rejecting a paused run ends it Cancelled`(@TempDir dir: Path) {
+    fun `rejecting a paused run ends it Cancelled`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val host = Host(store, descriptorIn(dir))
         val id = (host.trigger.trigger() as RunTrigger.Result.Accepted).id
@@ -88,7 +98,7 @@ class RunApprovalsTest {
     }
 
     @Test
-    fun `approval works after a restart - a fresh host resolves the persisted paused run`(@TempDir dir: Path) {
+    fun `approval works after a restart - a fresh host resolves the persisted paused run`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val descriptor = descriptorIn(dir)
 

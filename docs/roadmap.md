@@ -144,7 +144,14 @@ scoping work for pipelines that were never explicitly registered; registering a 
 name promotes it to runnable with its history intact), and **connecting GitHub from the UI** (040 — the
 server hosts the poll loop itself and the Source screen writes the event-source config, so watching a
 repository is a form to fill in rather than a second process to run; the standalone CLI still works
-against the same files). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the
+against the same files), and **repo-hosted descriptors** (041 — a project can be connected with just a
+name, a repository and a branch: the branch resolves to a commit through the GitHub seam, `kontinuance.yml`
+is read at that commit, and the checkout is pinned to the same one, so a run's descriptor and its code can
+never come from different commits. A descriptor stored on the server still wins, which turns the paste flow
+into an explicit, visible override the Config screen can revert. Resolution happens before a run record
+exists, so a missing or unparseable descriptor is a clean rejection rather than a run that starts and then
+finds nothing to do). Remaining: a **cross-process** notify (DB `LISTEN`/broker) behind the
 `streamTriggers` seam, descriptor locking, **multiple watched repositories** in one source (the API takes
-one binding today, though the config format holds many), and the Kubernetes runner backend behind the
-`StepSandbox` seam.
+one binding today, though the config format holds many), the **event source** still resolving descriptors
+from local paths rather than from the commit it is building (041 covers the manual trigger path only), and
+the Kubernetes runner backend behind the `StepSandbox` seam.

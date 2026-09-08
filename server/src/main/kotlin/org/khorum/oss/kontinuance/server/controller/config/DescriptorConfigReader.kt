@@ -22,10 +22,16 @@ object DescriptorConfigReader {
         if (!Files.isRegularFile(path)) return null
         val text = Files.readString(path)
         val pipeline = runCatching { PipelineDescriptor.parse(text) }.getOrNull()
-        return render(path.fileName.toString(), text, pipeline)
+        return project(path.fileName.toString(), text, pipeline)
     }
 
-    private fun render(source: String, text: String, pipeline: Pipeline?): ConfigResponse = ConfigResponse(
+    /**
+     * Builds the `/api/config` projection from an already-obtained [source] label, raw [text], and parsed
+     * [pipeline] — no file access, so a caller that resolved a descriptor from somewhere other than this
+     * server's disk (a project's repository, 041) can still render it through the exact same plan-summary
+     * logic [read] uses, instead of re-deriving it and risking drift.
+     */
+    fun project(source: String, text: String, pipeline: Pipeline?): ConfigResponse = ConfigResponse(
         source = source,
         text = text,
         plan = PlanSummary(

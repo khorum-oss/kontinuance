@@ -18,3 +18,6 @@ public.key
 
 # Claude Code / agent local settings (may contain tokens) — keep shared skills/commands tracked
 .claude/settings.local.json
+*.env
+.local
+.superpowers

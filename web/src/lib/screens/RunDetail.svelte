@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { normalizeStatus, statusColor } from '$lib/theme/tokens';
+	import { runWorkSummary, sourceCheckoutOnlyNote } from '$lib/api/present';
 	import type { Coverage, RunRecord } from '$lib/api/types';
 	import CoverageBar from '$lib/components/CoverageBar.svelte';
 	import LogLine from '$lib/components/LogLine.svelte';
@@ -7,7 +8,7 @@
 	interface Line {
 		time: string;
 		message: string;
-		tone: 'normal' | 'muted' | 'error' | 'ok';
+		tone: 'normal' | 'muted' | 'error' | 'ok' | 'warn';
 	}
 
 	let {
@@ -70,6 +71,12 @@
 		if (status === 'failed' && (run.failingStep || run.reason)) {
 			out.push({ time: hhmmss(run.endedAt), message: `${run.failingStep ?? 'failure'}: ${run.reason ?? ''}`.trim(), tone: 'error' });
 		}
+		// What the run actually executed. Without this a run that did nothing is indistinguishable from
+		// one that did everything — both show a status and then whatever output happened to land.
+		const work = runWorkSummary(run);
+		if (work) out.push({ time: hhmmss(run.endedAt), message: `ran ${work}`, tone: 'muted' });
+		const note = sourceCheckoutOnlyNote(run);
+		if (note) out.push({ time: hhmmss(run.endedAt), message: note, tone: 'warn' });
 		out.push({ time: '', message: '── step output ──', tone: 'muted' });
 		if (logs.length) {
 			for (const line of logs) out.push({ time: '', message: line, tone: 'normal' });

@@ -3,24 +3,32 @@ package org.khorum.oss.kontinuance.server.service
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.execution.StatusEvent
 import org.khorum.oss.kontinuance.engine.logging.LogSink
+import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.model.RunId
 import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
+import org.khorum.oss.kontinuance.github.client.GitHubClient
+import org.khorum.oss.kontinuance.github.support.RecordingGitHubClient
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
+import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -50,26 +58,56 @@ class RunTriggerTest {
         override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
     }
 
+    /** Records the pipeline it was handed, so a test can assert what the trigger actually built. */
+    private class CapturingEngine : PipelineEngine {
+        var pipeline: Pipeline? = null
+
+        override suspend fun run(
+            pipeline: Pipeline,
+            secrets: SecretSource,
+            completedStages: List<StageRun>,
+            logSink: LogSink?,
+            runId: RunId?,
+        ): Run {
+            this.pipeline = pipeline
+            return Run(runId ?: RunId("engine-generated"), pipeline, PipelineStatus.Success, emptyList())
+        }
+
+        override fun statuses(runId: RunId): Flow<StatusEvent> = throw UnsupportedOperationException()
+        override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
+    }
+
     private val validDescriptor = """
         pipeline:
           name: "demo"
-          stages: []
+          stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]
     """.trimIndent()
 
-    private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {
+    private fun triggerFor(
+        store: InMemoryRunStore,
+        engine: PipelineEngine,
+        path: Path,
+        projects: ProjectStore = ProjectStore(path.resolveSibling("projects")),
+        client: GitHubClient? = null,
+    ): RunTrigger {
         val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined), InMemoryRunLogStore())
-        val projects = ProjectStore(path.resolveSibling("projects"))
-        return RunTrigger(store, launcher, projects, path.toString())
+        val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = path,
+            descriptorPath = "kontinuance.yml",
+            clients = GitHubClientProvider { client },
+        )
+        return RunTrigger(store, launcher, projects, resolver)
     }
 
     @Test
-    fun `rejects when no descriptor file is present`(@TempDir dir: Path) {
+    fun `rejects when no descriptor file is present`(@TempDir dir: Path) = runTest {
         val result = triggerFor(InMemoryRunStore(), FakeEngine(), dir.resolve("missing.yml")).trigger()
         assertTrue(result is RunTrigger.Result.Rejected, "expected rejection when descriptor is absent")
     }
 
     @Test
-    fun `rejects an invalid descriptor without recording a run`(@TempDir dir: Path) {
+    fun `rejects an invalid descriptor without recording a run`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val file = dir.resolve("kontinuance.yml")
         Files.writeString(file, "pipeline:\n  bogusKey: 1\n")
@@ -81,7 +119,7 @@ class RunTriggerTest {
     }
 
     @Test
-    fun `accepts a valid descriptor and records the terminal run under the returned id`(@TempDir dir: Path) {
+    fun `accepts a valid descriptor and records the terminal run under the returned id`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val file = dir.resolve("kontinuance.yml")
         Files.writeString(file, validDescriptor)
@@ -101,7 +139,7 @@ class RunTriggerTest {
     }
 
     @Test
-    fun `records a Failed run when the engine throws`(@TempDir dir: Path) {
+    fun `records a Failed run when the engine throws`(@TempDir dir: Path) = runTest {
         val store = InMemoryRunStore()
         val file = dir.resolve("kontinuance.yml")
         Files.writeString(file, validDescriptor)
@@ -113,5 +151,36 @@ class RunTriggerTest {
         val record = assertNotNull(store.get(id))
         assertEquals("Failed", record.status)
         assertEquals("boom", record.reason)
+    }
+
+    @Test
+    fun `records no run when the descriptor cannot be resolved`(@TempDir dir: Path) = runTest {
+        val store = InMemoryRunStore()
+        // No descriptor file, no active project: resolution must fail before anything is recorded.
+        val trigger = triggerFor(store, FakeEngine(), dir.resolve("absent.yml"))
+
+        val result = trigger.trigger()
+
+        assertTrue(result is RunTrigger.Result.Rejected)
+        assertTrue(store.recent(10).isEmpty(), "no run should be recorded for an unresolvable descriptor")
+    }
+
+    @Test
+    fun `pins the checkout to the commit the descriptor was read from`(@TempDir dir: Path) = runTest {
+        val store = InMemoryRunStore()
+        val engine = CapturingEngine()
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val client = RecordingGitHubClient(
+            branchHeads = mapOf("main" to "abc1234"),
+            files = mapOf("kontinuance.yml" to validDescriptor),
+        )
+
+        triggerFor(store, engine, dir.resolve("live.yml"), projects, client).trigger()
+
+        val checkout = engine.pipeline!!.stages.first().steps.first().definition as GitStep
+        assertEquals("abc1234", checkout.sha)
+        assertNull(checkout.ref)
     }
 }

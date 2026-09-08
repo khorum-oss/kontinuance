@@ -2,13 +2,18 @@ package org.khorum.oss.kontinuance.server.controller
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
+import org.khorum.oss.kontinuance.github.client.GitHubApiException
+import org.khorum.oss.kontinuance.github.client.RepoRef
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.domain.ErrorResponse
 import org.khorum.oss.kontinuance.server.domain.RunApi
 import org.khorum.oss.kontinuance.server.domain.project.ActiveProject
 import org.khorum.oss.kontinuance.server.domain.project.CreateProjectRequest
 import org.khorum.oss.kontinuance.server.domain.project.CreatedProject
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorCheck
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.domain.project.ProjectDto
 import org.khorum.oss.kontinuance.server.domain.project.ProjectResolver
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
@@ -24,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -32,8 +38,11 @@ import java.nio.file.Path
  *
  * - `GET /api/projects` — list the projects (with each one's optional source, 033) and the active one,
  *   seeding a `default` project from the current descriptor on first use.
- * - `POST /api/projects` — register `{name, text, repo?, branch?}`; the name must be a safe slug and the
- *   text must parse with the engine's strict parser, or it is rejected `400` (and `409` if the name exists).
+ * - `POST /api/projects` — register `{name, text?, repo?, branch?}`; the name must be a safe slug, a
+ *   supplied text must parse with the engine's strict parser, and a request with neither text nor a repo
+ *   is rejected — `400` on either failure (and `409` if the name exists). A repo without text is checked
+ *   against GitHub advisorily (041, FR-007): the check result comes back on the response, but a failed
+ *   check never blocks creation.
  * - `POST /api/projects/{name}/activate` — make a project active: write its descriptor to the server's live
  *   descriptor file (so the trigger and Config screen use it) and record it as active; `404` if unknown.
  * - `POST /api/projects/{name}/source` — set/update a project's source (repo/branch, 033); `404` if unknown.
@@ -46,6 +55,8 @@ class ProjectController(
     private val runs: RunStore,
     @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
     @Value("\${kontinuance.projects.derive-limit:500}") private val deriveLimit: Int,
+    private val clients: GitHubClientProvider,
+    @Value("\${kontinuance.project.descriptorPath:kontinuance.yml}") private val descriptorFileName: String,
 ) {
     private val descriptor: Path = Path.of(descriptorPath)
 
@@ -75,7 +86,9 @@ class ProjectController(
                     repo = src?.repo,
                     branch = src?.branch,
                     derived = name !in registered,
-                    runnable = name in registered,
+                    // Runnable when there is something to run: a stored descriptor, or a source to read
+                    // one from (041). A derived project with neither stays non-runnable.
+                    runnable = name in registered || src != null,
                     runCount = stat?.count ?: 0,
                     lastStatus = stat?.status,
                     lastRunAt = stat?.at,
@@ -112,8 +125,11 @@ class ProjectController(
     suspend fun create(@RequestBody(required = false) request: CreateProjectRequest?): ResponseEntity<*> {
         val name = request?.name
         val text = request?.text
-        if (name == null || text == null) {
-            return badRequest("malformed request body — expected {\"name\": …, \"text\": …}")
+        if (name == null) {
+            return badRequest("malformed request body — expected {\"name\": …}")
+        }
+        if (text == null && request.repo.isNullOrBlank()) {
+            return badRequest("a project needs a descriptor or a repository to read one from")
         }
         if (!ProjectStore.isValidName(name)) {
             return badRequest("invalid project name (use letters, digits, and . _ -)")
@@ -121,14 +137,49 @@ class ProjectController(
         if (store.exists(name)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse("project already exists: $name"))
         }
-        runCatching { PipelineDescriptor.parse(text) }
-            .getOrElse { return badRequest(it.message ?: "invalid descriptor") }
+        // A supplied descriptor must still parse before it is stored (032). A repo-hosted one is checked
+        // but never blocking: the operator may be registering the project before the file exists (FR-007).
+        if (text != null) {
+            runCatching { PipelineDescriptor.parse(text) }
+                .getOrElse { return badRequest(it.message ?: "invalid descriptor") }
+        }
+        val check = if (text == null) checkRepository(request.repo!!, request.branch) else null
         withContext(Dispatchers.IO) {
-            store.save(name, text)
+            if (text != null) store.save(name, text)
             // Persist the optional source (033) alongside the descriptor when a repo was supplied.
             store.saveSource(name, ProjectSource(request.repo, request.branch))
         }
-        return ResponseEntity.ok(CreatedProject(name))
+        return ResponseEntity.ok(CreatedProject(name, check))
+    }
+
+    /** Resolves a would-be repo-hosted descriptor to report what was found. Never throws. */
+    private suspend fun checkRepository(repo: String, branch: String?): DescriptorCheck {
+        val ref = RepoRef.parse(repo)
+            ?: return DescriptorCheck(false, message = "$repo is not a GitHub repository — paste a descriptor instead")
+        val target = branch?.takeIf { it.isNotBlank() }
+            ?: return DescriptorCheck(false, message = "a repo-hosted descriptor needs a branch")
+        val client = clients.client()
+            ?: return DescriptorCheck(
+                false,
+                message = "no GitHub token available — the project was created, but runs will fail until one is set",
+            )
+        return try {
+            val sha = client.branchHead(ref, target)
+                ?: return DescriptorCheck(false, message = "branch '$target' not found on ${ref.slug}")
+            val text = client.fileAt(ref, descriptorFileName, sha)
+                ?: return DescriptorCheck(false, message = "no $descriptorFileName on '$target' at ${ref.slug}")
+            val pipeline = PipelineDescriptor.parse(text)
+            DescriptorCheck(true, pipeline = pipeline.name, stages = pipeline.stages.size)
+        } catch (e: GitHubApiException) {
+            // Reached GitHub, but it said no (bad token, rate limit, server error, ...).
+            DescriptorCheck(false, message = "GitHub API returned HTTP ${e.statusCode} for ${ref.slug}")
+        } catch (e: IOException) {
+            // Never reached GitHub at all (DNS, connection refused, TLS, timeout) — a routine outcome for
+            // an add-time check, since a token or network may not be ready yet (FR-007).
+            DescriptorCheck(false, message = "GitHub unreachable — ${e.message}")
+        } catch (e: DescriptorException) {
+            DescriptorCheck(false, message = "invalid descriptor from ${ref.slug}@$target:$descriptorFileName: ${e.message}")
+        }
     }
 
     @PostMapping("/api/projects/{name}/activate")
@@ -146,10 +197,11 @@ class ProjectController(
             return@withContext notFound(name)
         }
         val text = store.get(name)
-        // A derived project (039) has runs but no stored descriptor: it can be made active — which
-        // scopes the dashboard to it — but there is nothing to write as the live descriptor, and
-        // overwriting the current one with an unrelated project's pipeline would be a footgun.
-        if (text == null && name !in deriveStats().keys) {
+        // A derived project (039) has runs but no stored descriptor, and a repo-only project (041/Task 6c)
+        // is registered by its source sidecar alone — either way it can be made active, which scopes the
+        // dashboard to it, but there is nothing to write as the live descriptor, and overwriting the
+        // current one with an unrelated project's pipeline would be a footgun.
+        if (text == null && name !in deriveStats().keys && !store.exists(name)) {
             return@withContext notFound(name)
         }
         if (text != null) {

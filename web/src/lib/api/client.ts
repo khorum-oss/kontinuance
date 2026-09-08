@@ -6,6 +6,7 @@ import type {
 	Config,
 	ConnectSourceRequest,
 	Coverage,
+	CreatedProject,
 	Deploy,
 	Pipeline,
 	ProjectsResponse,
@@ -220,14 +221,40 @@ export const api = {
 		return body;
 	},
 
+	// Reverts a stored override back to the repository's descriptor (041). Resolves to the refreshed
+	// [Config]; throws [ApiError] (409) with the server's message when there is nothing to revert.
+	revertConfigOverride: async (): Promise<Config> => {
+		let res: Response;
+		try {
+			res = await fetch('/api/config/override', {
+				method: 'DELETE',
+				headers: { accept: 'application/json' }
+			});
+		} catch (e) {
+			throw new ApiError(`cannot reach the server (${(e as Error).message})`);
+		}
+		const body = (await res.json().catch(() => ({}))) as Config & { error?: string };
+		if (!res.ok) {
+			throw new ApiError(body.error ?? `revert failed: ${res.status} ${res.statusText}`, res.status);
+		}
+		return body;
+	},
+
 	// The named pipeline descriptors ("projects", 032) and which is active.
 	getProjects: () => getJson<ProjectsResponse>('/api/projects'),
 
-	// Registers a new project from a name + descriptor text (and an optional source repo/branch, 033); the
+	// Registers a new project from a name and an optional source repo/branch (033/041); a pasted descriptor
+	// is sent only when non-empty — most projects lean on the repository's kontinuance.yml instead. The
 	// server validates the descriptor and rejects a bad name / duplicate / unparseable text with [ApiError]
-	// (400 / 409) carrying its message.
-	addProject: async (name: string, text: string, repo?: string, branch?: string): Promise<void> => {
-		await postJson('/api/projects', { name, text, repo, branch });
+	// (400 / 409) carrying its message. Resolves to the created project plus an advisory descriptor check
+	// (041) — the project is created even when the check fails, so a caller should render that as a
+	// warning, not treat it as the request having failed.
+	addProject: async (name: string, text: string, repo?: string, branch?: string): Promise<CreatedProject> => {
+		const body: Record<string, string> = { name };
+		if (text.trim()) body.text = text.trim();
+		if (repo) body.repo = repo;
+		if (branch) body.branch = branch;
+		return postJson<CreatedProject>('/api/projects', body);
 	},
 
 	// Sets/updates a project's source (033) — the repo/branch a run of it checks out; a blank repo clears it.
@@ -242,9 +269,10 @@ export const api = {
 	}
 };
 
-// POST optional JSON to [path]; resolves on 2xx, throws [ApiError] with the server's `error` message
-// otherwise. Shared by the project actions (032).
-async function postJson(path: string, body?: unknown): Promise<void> {
+// POST optional JSON to [path]; resolves to the parsed response body on 2xx (callers that don't need it
+// can simply await without assigning), throws [ApiError] with the server's `error` message otherwise.
+// Shared by the project actions (032).
+async function postJson<T = void>(path: string, body?: unknown): Promise<T> {
 	let res: Response;
 	try {
 		res = await fetch(path, {
@@ -257,8 +285,9 @@ async function postJson(path: string, body?: unknown): Promise<void> {
 	} catch (e) {
 		throw new ApiError(`cannot reach the server (${(e as Error).message})`);
 	}
+	const parsed = (await res.json().catch(() => ({}))) as T & { error?: string };
 	if (!res.ok) {
-		const parsed = (await res.json().catch(() => ({}))) as { error?: string };
 		throw new ApiError(parsed.error ?? `request failed: ${res.status} ${res.statusText}`, res.status);
 	}
+	return parsed;
 }

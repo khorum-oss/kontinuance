@@ -5,6 +5,8 @@ import org.khorum.oss.kontinuance.persistence.FileRunStore
 import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.domain.RunApi
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.service.RunChangeNotifier
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import org.khorum.oss.kontinuance.server.store.NotifyingRunLogStore
@@ -66,4 +68,22 @@ class ServerConfig {
             ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
         return ProjectStore(base.resolve("projects"))
     }
+
+    /**
+     * Descriptor resolution for the manual trigger path (041). Note the two distinct paths: the live
+     * descriptor is a file on this server, while `descriptorPath` is a filename looked up *inside* a
+     * project's repository.
+     */
+    @Bean
+    fun descriptorResolver(
+        projects: ProjectStore,
+        clients: GitHubClientProvider,
+        @Value("\${kontinuance.config.descriptor:kontinuance.yml}") liveDescriptorPath: String,
+        @Value("\${kontinuance.project.descriptorPath:kontinuance.yml}") repoDescriptorPath: String,
+    ): DescriptorResolver = DescriptorResolver(
+        projects = projects,
+        liveDescriptor = Path.of(liveDescriptorPath),
+        descriptorPath = repoDescriptorPath,
+        clients = clients,
+    )
 }

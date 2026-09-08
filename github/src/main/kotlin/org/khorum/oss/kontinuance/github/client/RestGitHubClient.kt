@@ -10,10 +10,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandlers
+import java.nio.charset.StandardCharsets
 
 /**
  * A thin [GitHubClient] over JDK 21's built-in [HttpClient] and the GitHub REST API. No third-party
@@ -54,6 +56,19 @@ class RestGitHubClient(
         return Json.parseToJsonElement(response.body()).jsonObject.getValue("sha").jsonPrimitive.content
     }
 
+    override suspend fun fileAt(repo: RepoRef, path: String, ref: String): String? {
+        val encodedPath = path.split('/').joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8) }
+        val encodedRef = URLEncoder.encode(ref, StandardCharsets.UTF_8)
+        // The raw media type returns file contents verbatim, so no base64 decode step is needed.
+        val request = baseRequest("$root/repos/${repo.slug}/contents/$encodedPath?ref=$encodedRef", RAW_ACCEPT)
+            .GET()
+            .build()
+        val response = send(request)
+        if (response.statusCode() == NOT_FOUND) return null
+        requireSuccess(response)
+        return response.body()
+    }
+
     override suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus) {
         val body = buildJsonObject {
             put("state", status.state.wire)
@@ -70,10 +85,10 @@ class RestGitHubClient(
     private fun post(url: String, body: String): HttpRequest =
         baseRequest(url).POST(HttpRequest.BodyPublishers.ofString(body)).build()
 
-    private fun baseRequest(url: String): HttpRequest.Builder =
+    private fun baseRequest(url: String, accept: String = DEFAULT_ACCEPT): HttpRequest.Builder =
         HttpRequest.newBuilder(URI.create(url))
             .header("Authorization", "Bearer $token")
-            .header("Accept", "application/vnd.github+json")
+            .header("Accept", accept)
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("Content-Type", "application/json")
 
@@ -91,5 +106,7 @@ class RestGitHubClient(
     private companion object {
         val SUCCESS_RANGE = 200..299
         const val NOT_FOUND = 404
+        const val DEFAULT_ACCEPT = "application/vnd.github+json"
+        const val RAW_ACCEPT = "application/vnd.github.raw"
     }
 }

@@ -13,6 +13,14 @@ interface GitHubClient {
     /** The head commit SHA of [branch] on [repo], or `null` if the branch does not exist. */
     suspend fun branchHead(repo: RepoRef, branch: String): String?
 
+    /**
+     * The contents of [path] in [repo] at [ref], or `null` when there is no such file at that ref.
+     *
+     * Used to read a project's descriptor out of its repository (041). [ref] is a commit SHA at every
+     * call site, so the descriptor a run parses and the code it builds come from one commit.
+     */
+    suspend fun fileAt(repo: RepoRef, path: String, ref: String): String?
+
     /** Posts [status] on [repo]@[sha]. Throws [GitHubApiException] on a non-success response. */
     suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus)
 }

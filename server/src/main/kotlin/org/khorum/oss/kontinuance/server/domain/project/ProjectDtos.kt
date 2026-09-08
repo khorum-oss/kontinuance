@@ -12,8 +12,9 @@ data class ProjectsResponse(val active: String?, val projects: List<ProjectDto>,
 
 /**
  * A project on the wire. `derived` marks an entry computed from run history rather than a registered
- * descriptor (039); `runnable` is false exactly when there is no stored descriptor to run. The run
- * statistics come from the derivation window and are `0`/`null` for a project with no recorded runs.
+ * descriptor (039); `runnable` is false only when the project has neither a stored descriptor nor a
+ * source to read one from (041). The run statistics come from the derivation window and are `0`/`null`
+ * for a project with no recorded runs.
  */
 data class ProjectDto(
     val name: String,
@@ -38,8 +39,16 @@ data class CreateProjectRequest(
 /** `POST /api/projects/{name}/source` body. */
 data class SourceRequest(val repo: String? = null, val branch: String? = null)
 
-/** `POST /api/projects` response: the created project's name. */
-data class CreatedProject(val name: String)
+/** What add-time descriptor checking found (041, FR-007). Advisory: the project is created either way. */
+data class DescriptorCheck(
+    val ok: Boolean,
+    val pipeline: String? = null,
+    val stages: Int? = null,
+    val message: String? = null,
+)
+
+/** `POST /api/projects` response: the created project's name, and what its descriptor check found. */
+data class CreatedProject(val name: String, val descriptor: DescriptorCheck? = null)
 
 /** `POST /api/projects/{name}/activate` response: the now-active project's name. */
 data class ActiveProject(val active: String)

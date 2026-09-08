@@ -7,6 +7,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let saveError = $state<string | null>(null);
+	let revertError = $state<string | null>(null);
 
 	async function load() {
 		loading = true;
@@ -33,9 +34,29 @@
 		}
 	}
 
+	// Discards a stored override, restoring the repository's descriptor (041). A 409 ("nothing to
+	// revert") is surfaced inline rather than treated as a failed page load.
+	async function revert(): Promise<void> {
+		revertError = null;
+		try {
+			config = await api.revertConfigOverride();
+		} catch (e) {
+			revertError = e instanceof ApiError ? e.message : (e as Error).message;
+		}
+	}
+
 	$effect(() => {
 		load();
 	});
 </script>
 
-<ConfigScreen {config} {loading} {error} {saveError} onretry={load} onsave={save} />
+<ConfigScreen
+	{config}
+	{loading}
+	{error}
+	{saveError}
+	{revertError}
+	onretry={load}
+	onsave={save}
+	onrevert={revert}
+/>

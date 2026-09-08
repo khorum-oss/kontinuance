@@ -1,6 +1,22 @@
 // Types mirroring the server API. The run shape is the real 007/008 record; the pipeline/deploy/coverage/
 // config shapes mirror specs/009-web-ui/contracts/stub-api.md (served by the stub endpoints for now).
 
+// One executed step within a stage. `tool` names the executor the step resolved to ('git', 'gradle',
+// 'npm', 'docker', …) and is absent on plain `run:` steps.
+export interface RunStepRecord {
+	name: string;
+	status: string;
+	tool?: string;
+	startedAt?: string;
+	endedAt?: string;
+}
+
+export interface RunStageRecord {
+	name: string;
+	status: string;
+	steps?: RunStepRecord[];
+}
+
 export interface RunRecord {
 	id: string;
 	pipeline: string;
@@ -13,6 +29,9 @@ export interface RunRecord {
 	sha?: string;
 	trigger?: string;
 	project?: string;
+	// What the run actually executed. Omitted by the server when empty, and absent entirely on records
+	// written before the stage roll-up existed — so every reader must tolerate `undefined`.
+	stages?: RunStageRecord[];
 }
 
 export interface RunsResponse {
@@ -211,8 +230,24 @@ export interface PlanSummary {
 	deploy: string;
 }
 
+// What add-time descriptor checking found (041). Advisory — the project is created either way.
+export interface DescriptorCheck {
+	ok: boolean;
+	pipeline?: string;
+	stages?: number;
+	message?: string;
+}
+
+export interface CreatedProject {
+	name: string;
+	descriptor?: DescriptorCheck;
+}
+
 export interface Config {
 	source: string;
 	text: string;
 	plan: PlanSummary;
+	// Where this descriptor came from, and whether a stored one is shadowing a repo that also has one (041).
+	origin?: string;
+	overridden?: boolean;
 }
