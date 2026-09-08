@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
+import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
 import org.khorum.oss.kontinuance.github.client.RepoRef
 import org.khorum.oss.kontinuance.persistence.RunStore
@@ -139,17 +140,35 @@ class ProjectController(
         }
         // A supplied descriptor must still parse before it is stored (032). A repo-hosted one is checked
         // but never blocking: the operator may be registering the project before the file exists (FR-007).
-        if (text != null) {
+        val parsed = if (text == null) null else {
             runCatching { PipelineDescriptor.parse(text) }
                 .getOrElse { return badRequest(it.message ?: "invalid descriptor") }
         }
-        val check = if (text == null) checkRepository(request.repo!!, request.branch) else null
+        val check = if (text == null) checkRepository(request.repo!!, request.branch) else nameMismatch(name, parsed)
         withContext(Dispatchers.IO) {
             if (text != null) store.save(name, text)
             // Persist the optional source (033) alongside the descriptor when a repo was supplied.
             store.saveSource(name, ProjectSource(request.repo, request.branch))
         }
         return ResponseEntity.ok(CreatedProject(name, check))
+    }
+
+    /**
+     * Reports a descriptor that files its runs under a different name than the project being registered.
+     *
+     * The descriptor's `project:` key wins when a run is recorded (039), so a project registered as `a`
+     * whose descriptor declares `project: b` can never show a single run of its own: every one is filed
+     * under `b`. The run works, the server logs it, and the project's own view stays empty forever —
+     * which reads as a broken trigger. Reported rather than rejected, because the two names disagreeing
+     * is legal and occasionally deliberate; what is not acceptable is finding out by seeing nothing.
+     */
+    private fun nameMismatch(name: String, parsed: Pipeline?): DescriptorCheck? {
+        val declared = parsed?.project?.takeIf { it.isNotBlank() && it != name } ?: return null
+        return DescriptorCheck(
+            ok = false,
+            message = "this descriptor files its runs under project '$declared', not '$name' — " +
+                "runs of it will appear under '$declared'",
+        )
     }
 
     /** Resolves a would-be repo-hosted descriptor to report what was found. Never throws. */

@@ -15,6 +15,7 @@
 		degraded = false,
 		triggering = false,
 		triggerError = null,
+		startedElsewhere = null,
 		runnable = true,
 		projectName = '',
 		notActiveReason = false,
@@ -39,6 +40,8 @@
 		degraded?: boolean;
 		triggering?: boolean;
 		triggerError?: string | null;
+		/** A run that started but is filed under another project, so this view cannot show it. */
+		startedElsewhere?: { id: string; project: string } | null;
 		runnable?: boolean;
 		projectName?: string;
 		notActiveReason?: boolean;
@@ -142,6 +145,18 @@
 		</p>
 	{/if}
 
+	<!-- The run started, and it is not here. Without this the list just stayed empty and the operator had
+	     no way to tell a working trigger from a broken one. -->
+	{#if startedElsewhere}
+		<p class="k-mono hint">
+			Started {startedElsewhere.id}, but its descriptor files it under project
+			<button class="scope-jump" onclick={() => onproject?.(startedElsewhere.project)}>
+				{startedElsewhere.project}
+			</button>
+			— so it is not in this view.
+		</p>
+	{/if}
+
 	<div class="head k-mono">
 		<span></span><span>RUN</span><span>REF</span><span>COMMIT</span><span>PROGRESS</span><span>TIME</span
 		><span>AGE</span>
@@ -202,6 +217,15 @@
 	.terror {
 		font-size: 10px;
 		color: var(--k-fail);
+	}
+	.scope-jump {
+		font: inherit;
+		color: var(--k-teal);
+		background: none;
+		border: none;
+		padding: 0;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 	.hint {
 		font-size: 10px;

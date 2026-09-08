@@ -12,6 +12,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.reactive.server.WebTestClient
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.assertTrue
 import kotlin.test.assertEquals
 
 /**
@@ -192,6 +193,49 @@ class ProjectControllerIT(
             .jsonPath("$.error").exists()
     }
 
+    @Test
+    fun `registering a descriptor that files runs elsewhere reports the mismatch`() {
+        // The descriptor's `project:` key wins when a run is recorded (039), so a project registered
+        // under one name whose descriptor declares another can never show a run of its own: every one is
+        // filed under the declared name. Observed live as "I clicked run, the server logged it, and the
+        // list stayed empty". Reported, not rejected — the disagreement is legal, finding out by seeing
+        // nothing is not.
+        client.post().uri("/api/projects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(createBody("spektr-dsl", DECLARES_OTHER_PROJECT))
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.name").isEqualTo("spektr-dsl")
+            .jsonPath("$.descriptor.ok").isEqualTo(false)
+            .jsonPath("$.descriptor.message").value<String> { message ->
+                assertTrue(message.contains("spektr"), "names where runs will land, was: $message")
+                assertTrue(message.contains("spektr-dsl"), "names the project registered, was: $message")
+            }
+    }
+
+    @Test
+    fun `a descriptor declaring the project's own name is not a mismatch`() {
+        client.post().uri("/api/projects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(createBody("svc-matching", DECLARES_OWN_NAME))
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.descriptor").doesNotExist()
+    }
+
+    @Test
+    fun `a descriptor declaring no project at all is not a mismatch`() {
+        client.post().uri("/api/projects")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(createBody("svc-silent", ONE_STAGE))
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.descriptor").doesNotExist()
+    }
+
     private fun createBody(name: String, text: String, repo: String? = null, branch: String? = null) =
         CreateProjectRequest(name = name, text = text, repo = repo, branch = branch)
 
@@ -199,6 +243,28 @@ class ProjectControllerIT(
         private val storeDir: Path = Files.createTempDirectory("knt-projects-store-")
         private val projectsDir: Path = storeDir.resolve("projects")
         private val descriptorFile: Path = Files.createTempFile("knt-projects-desc-", ".yml")
+
+        private val DECLARES_OTHER_PROJECT = """
+            pipeline:
+              name: "spektr-dsl-ci"
+              project: "spektr"
+              stages:
+                - name: "build"
+                  steps:
+                    - name: "assemble"
+                      run: "true"
+        """.trimIndent() + "\n"
+
+        private val DECLARES_OWN_NAME = """
+            pipeline:
+              name: "svc"
+              project: "svc-matching"
+              stages:
+                - name: "build"
+                  steps:
+                    - name: "assemble"
+                      run: "true"
+        """.trimIndent() + "\n"
 
         private val ONE_STAGE = """
             pipeline:

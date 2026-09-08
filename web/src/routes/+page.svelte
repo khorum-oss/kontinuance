@@ -21,6 +21,11 @@
 	let degraded = $state(false);
 	let triggering = $state(false);
 	let triggerError = $state<string | null>(null);
+	// A run that started fine but records under a project other than the one in view. The descriptor's
+	// own `project:` key wins over the project it was launched under (039), so the two can disagree — and
+	// when they do the runs list simply stayed empty: the run happened, the server logged it, and nothing
+	// on screen said where it went. Naming it is the difference between "broken" and "over there".
+	let startedElsewhere = $state<{ id: string; project: string } | null>(null);
 
 	// Runs-list filters (037) — a projection over the live set; byId stays the untouched source of truth.
 	let query = $state('');
@@ -88,11 +93,14 @@
 	}
 
 	// Re-project when a filter changes (byId is untouched, so clearing restores the full list instantly).
+	// Changing a filter also retires the "started elsewhere" notice: it describes one click's outcome
+	// against one scope, and it would be stale the moment either changes.
 	$effect(() => {
 		query;
 		statusFilter;
 		triggerFilter;
 		projectFilter;
+		startedElsewhere = null;
 		render();
 	});
 
@@ -122,6 +130,12 @@
 			}
 			render();
 			await load();
+			// Where did it actually land? `load` has replaced the placeholder with the server's record, so
+			// this is the project the run is really filed under, not the one we assumed.
+			const landed = id ? byId.get(id) : undefined;
+			const project = landed ? runProject(landed) : null;
+			startedElsewhere =
+				!unscoped && project && project !== projectFilter ? { id, project } : null;
 		} catch (e) {
 			triggerError = e instanceof ApiError ? e.message : (e as Error).message;
 		} finally {
@@ -177,6 +191,7 @@
 	{degraded}
 	{triggering}
 	{triggerError}
+	{startedElsewhere}
 	{runnable}
 	{projectName}
 	{notActiveReason}

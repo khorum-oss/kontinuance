@@ -336,3 +336,55 @@ test('a run opens its own pipeline, and the pipeline links back to that run', as
 	await page.getByRole('button', { name: 'kontinuance-service' }).click();
 	await expect(page).toHaveURL(/\/runs\/%23KX-2044$/);
 });
+
+test('a run filed under another project says so instead of leaving the list empty', async ({ page }) => {
+	// The reported symptom, reproduced against the real app first: the operator picks a project, clicks
+	// RUN PIPELINE, the server accepts it and logs the run — and the list stays empty, because the
+	// descriptor's own `project:` key files the run under a different name (039 precedence). Nothing on
+	// screen distinguished that from a broken trigger.
+	const filed = {
+		id: '#SPK-1',
+		pipeline: 'spektr-dsl-ci',
+		status: 'Running',
+		project: 'spektr',
+		startedAt: '2026-09-08T03:00:00Z'
+	};
+	await page.unroute(/\/api\/runs(\?.*)?$/);
+	let triggered = false;
+	await page.route(/\/api\/runs(\?.*)?$/, (route) =>
+		route.fulfill({ json: { runs: triggered ? [filed] : [] } })
+	);
+	await page.route(/\/api\/runs\/trigger$/, (route) => {
+		triggered = true;
+		return route.fulfill({ status: 202, json: { runId: filed.id } });
+	});
+	await page.unroute('**/api/projects');
+	await page.route('**/api/projects', (route) =>
+		route.fulfill({
+			json: {
+				active: 'spektr-dsl',
+				runWindow: 500,
+				projects: [{ name: 'spektr-dsl', active: true, runnable: true }]
+			}
+		})
+	);
+
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('spektr-dsl', { exact: true }).click();
+
+	await page.getByRole('button', { name: 'RUN PIPELINE' }).click();
+
+	// It names the run, names where it went, and does not pretend nothing happened.
+	await expect(page.getByText(/Started #SPK-1/)).toBeVisible();
+	await expect(page.getByText(/files it under project/)).toBeVisible();
+
+	// And the named project is one click away from actually seeing it.
+	await page.getByRole('button', { name: 'spektr', exact: true }).click();
+	await expect(page.getByLabel('filter by project')).toHaveValue('spektr');
+	await expect(page.getByText('#SPK-1')).toBeVisible();
+	// The notice belongs to one click against one scope; switching retires it.
+	await expect(page.getByText(/files it under project/)).toHaveCount(0);
+});
