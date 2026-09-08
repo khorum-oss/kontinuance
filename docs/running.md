@@ -104,6 +104,23 @@ two variables is all it takes; mismatch them and the poller records runs the das
 A misspelled backend name fails startup with a message naming it, rather than quietly serving an empty
 history.
 
+**Trying it locally.** Nothing to install or provision — point `KONTINUANCE_STORE` at a directory and
+start the server; the database is created there on first start, along with any tables it needs. The
+from-source quick start in [getting-started.md](./getting-started.md#b-run-from-source-for-development)
+already uses `.local/runs` (gitignored) for exactly this.
+
+**Clearing it.** Remove the store directory:
+
+```bash
+rm -rf .local/runs          # from source
+docker compose -f deploy/docker-compose.yml down -v   # containers (drops the named volume)
+```
+
+Remove the *directory*, not just `kontinuance.db` — a `kontinuance.db-wal` left behind by a hard kill
+would be replayed into the next database created at that path. In normal operation there are no sidecar
+files at rest: connections are opened per operation, and SQLite checkpoints and removes the write-ahead
+log when the last one closes.
+
 Neither backend changes what is durable across a restart — see
 [Durability](#durability-only-paused-runs-survive-a-restart) below. Registered project descriptors,
 event-source configuration, and the poll cursors stay as files beside the history either way; the
