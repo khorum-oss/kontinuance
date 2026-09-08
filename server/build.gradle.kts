@@ -91,3 +91,9 @@ java {
         languageVersion = JavaLanguageVersion.of(21)
     }
 }
+
+// The suite's run history (see src/test/resources/application.properties) starts empty on every run, so a
+// leftover record from a previous invocation can never make a test pass or fail on its own.
+tasks.named<Test>("test") {
+    doFirst { layout.buildDirectory.dir("test-run-store").get().asFile.deleteRecursively() }
+}

@@ -51,6 +51,10 @@ KONTINUANCE_STORE="$(pwd)/.local/runs" \
 
 The server listens on `127.0.0.1:8077` (loopback). Health check: `curl http://localhost:8077/api/health`.
 
+Run history needs no setup: the first start creates `.local/runs/kontinuance.db` and its tables. To start
+over, `rm -rf .local/runs` — `.local/` is gitignored, so a local history never reaches a commit. See
+[Run history](./running.md#run-history) for the backend options.
+
 **Terminal 2 — the web UI** (Vite dev server, hot reload; it proxies `/api` and `/ws` to the server):
 
 ```bash

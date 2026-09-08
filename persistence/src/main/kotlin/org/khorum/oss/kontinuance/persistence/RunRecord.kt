@@ -5,6 +5,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.PipelineStatus
 import org.khorum.oss.kontinuance.engine.model.Run
 import java.time.Instant
@@ -63,9 +64,7 @@ data class RunRecord(
         ): RunRecord {
             val steps = run.stageRuns.flatMap { it.stepRuns }
             val failed = run.status as? PipelineStatus.Failed
-            val toolByStep = run.pipeline.stages
-                .flatMap { it.steps }
-                .associate { it.name to (it.definition::class.simpleName?.removeSuffix("Step")?.lowercase()) }
+            val toolByStep = toolByStep(run.pipeline)
             return RunRecord(
                 id = run.id.value,
                 pipeline = run.pipeline.name,
@@ -95,6 +94,30 @@ data class RunRecord(
                 },
             )
         }
+
+        /**
+         * The pipeline's declared stage/step shape with nothing executed yet — every stage and step
+         * `Pending`. Recorded with a run the moment it starts, before the engine has produced a single
+         * step result, so the pipeline view of a live run shows the pipeline that is actually running
+         * rather than an empty breakdown. Replaced by the real one from [from] when the run settles.
+         */
+        fun skeleton(pipeline: Pipeline): List<StageRecord> {
+            val toolByStep = toolByStep(pipeline)
+            return pipeline.stages.map { stage ->
+                StageRecord(
+                    name = stage.name,
+                    status = PENDING,
+                    steps = stage.steps.map { StepRecord(name = it.name, status = PENDING, tool = toolByStep[it.name]) },
+                )
+            }
+        }
+
+        /** Each step's tool kind (`run`/`gradle`/`docker`/`npm`), keyed by step name. */
+        private fun toolByStep(pipeline: Pipeline): Map<String, String?> = pipeline.stages
+            .flatMap { it.steps }
+            .associate { it.name to (it.definition::class.simpleName?.removeSuffix("Step")?.lowercase()) }
+
+        private const val PENDING = "Pending"
 
         /** Parses a record from [json] (as written by [toJson]). */
         fun fromJson(json: String): RunRecord {

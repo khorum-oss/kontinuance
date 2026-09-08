@@ -12,7 +12,7 @@ import org.khorum.oss.kontinuance.github.poll.FileCursorStore
 import org.khorum.oss.kontinuance.github.poll.Poller
 import org.khorum.oss.kontinuance.github.report.RunReporter
 import org.khorum.oss.kontinuance.github.trigger.TriggerResolver
-import org.khorum.oss.kontinuance.persistence.FileRunStore
+import org.khorum.oss.kontinuance.persistence.RunStores
 import org.khorum.oss.kontinuance.persistence.NoOpRunStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
@@ -54,7 +54,15 @@ fun main(args: Array<String>) {
     val config = loadConfig(configPath)
     val stateDir = Path.of(System.getProperty("user.home"), ".kontinuance")
     val cursors = FileCursorStore(stateDir.resolve("github-cursors.properties"))
-    val runStore = FileRunStore(stateDir.resolve("runs"))
+    // The run history opens through the same factory the server uses, honouring the same two variables
+    // (041). The CLI and the server share a state directory in the target deployment, so if one chose a
+    // backend on its own the other would read a store the first was not writing — runs recorded by the
+    // poller would simply be missing from the dashboard.
+    val runStore = RunStores.open(
+        System.getenv("KONTINUANCE_STORE")?.takeIf { it.isNotBlank() }?.let(Path::of)
+            ?: stateDir.resolve("runs"),
+        RunStores.Backend.of(System.getenv("KONTINUANCE_STORE_BACKEND")),
+    ).runs
     val heartbeat = FileHeartbeat(stateDir.resolve("github-heartbeat.properties"))
     val source = try {
         eventSourceFrom(config, cursors, runStore, heartbeat)

@@ -114,8 +114,12 @@
 		triggerError = null;
 		try {
 			const id = await api.triggerRun();
-			// Reflect the just-started run immediately; the SSE stream keeps it current after this.
-			if (id) byId.set(id, { id, pipeline: '', status: 'Running' });
+			// Reflect the just-started run immediately; the SSE stream keeps it current after this. The
+			// placeholder carries the scope it was launched under — the server stamps the same project on
+			// the real record — or a scoped list would filter out the very run the operator just started.
+			if (id) {
+				byId.set(id, { id, pipeline: '', status: 'Running', project: unscoped ? undefined : projectFilter });
+			}
 			render();
 			await load();
 		} catch (e) {

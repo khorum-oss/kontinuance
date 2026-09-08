@@ -1,35 +1,54 @@
 <script lang="ts">
 	import { normalizeStatus, statusColor, toolAccent, type Status } from '$lib/theme/tokens';
-	import type { Pipeline, PipelineTask } from '$lib/api/types';
+	import type { Pipeline, PipelineTask, RunRecord } from '$lib/api/types';
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
 	import TaskCard from '$lib/components/TaskCard.svelte';
 
 	let {
 		pipeline = null,
+		run = null,
+		scope = 'all',
 		loading = false,
 		error = null,
-		onretry
+		onretry,
+		onopenrun
 	}: {
 		pipeline?: Pipeline | null;
+		/** The run this breakdown belongs to, so the header names it rather than leaving the screen
+		 *  showing "a pipeline" with no way to tell which run produced it. */
+		run?: RunRecord | null;
+		/** The active project scope, echoed in the header ('all' when unscoped). */
+		scope?: string;
 		loading?: boolean;
 		error?: string | null;
 		onretry?: () => void;
+		onopenrun?: (id: string) => void;
 	} = $props();
 
 	const allTasks = $derived<PipelineTask[]>(pipeline ? pipeline.stages.flatMap((s) => s.tasks) : []);
+
+	// A run with nothing to draw renders an explicit note; the screen never substitutes a pipeline of its
+	// own, because an invented flow reads exactly like the run's real one and contradicts the run detail
+	// beside it.
+	const noStages = $derived(pipeline !== null && pipeline.stages.length === 0);
+	const scopeLabel = $derived(scope === 'all' ? 'all projects' : scope);
 
 	const overall = $derived(
 		allTasks.length ? Math.round(allTasks.reduce((a, t) => a + t.progress, 0) / allTasks.length) : 0
 	);
 
+	// The run's own recorded status is authoritative — the per-step roll-up only stands in when there is
+	// no record to ask (a pipeline rendered from a fixture in Storybook, say).
 	const runStatus = $derived<Status>(
-		allTasks.some((t) => normalizeStatus(t.status) === 'failed')
-			? 'failed'
-			: allTasks.some((t) => normalizeStatus(t.status) === 'running')
-				? 'running'
-				: allTasks.length && allTasks.every((t) => normalizeStatus(t.status) === 'success')
-					? 'success'
-					: 'pending'
+		run
+			? normalizeStatus(run.status)
+			: allTasks.some((t) => normalizeStatus(t.status) === 'failed')
+				? 'failed'
+				: allTasks.some((t) => normalizeStatus(t.status) === 'running')
+					? 'running'
+					: allTasks.length && allTasks.every((t) => normalizeStatus(t.status) === 'success')
+						? 'success'
+						: 'pending'
 	);
 
 	let hovered = $state<string | null>(null);
@@ -66,53 +85,74 @@
 			</div>
 			<div class="sep"></div>
 			<div class="run">
-				<span class="rtitle">pipeline run</span>
-				<span class="k-mono rsub">{pipeline.runId} · {allTasks.length} tasks</span>
+				{#if run}
+					<button class="rtitle rlink" onclick={() => onopenrun?.(run.id)} title="open this run">
+						{run.pipeline || 'pipeline run'}
+					</button>
+				{:else}
+					<span class="rtitle">pipeline run</span>
+				{/if}
+				<span class="k-mono rsub">
+					{pipeline.runId} · {allTasks.length} tasks · {scopeLabel}
+				</span>
 			</div>
 			<div class="progress">
 				<div class="k-mono plabel"><span>TOTAL PROGRESS</span><span class="teal">{overall}%</span></div>
 				<ProgressBar value={overall} indeterminate={runStatus === 'running'} />
 			</div>
-			<button class="k-mono replay" onclick={() => onretry?.()}>↻ REPLAY</button>
+			<button class="k-mono replay" onclick={() => onretry?.()}>↻ REFRESH</button>
 		</div>
 
-		<div class="flow">
-			{#each pipeline.stages as stage, i (stage.id)}
-				{#if i > 0}<div class="conn"></div>{/if}
-				<div class="stage">
-					<div class="shead k-mono">
-						<span class="idx">{String(i + 1).padStart(2, '0')}</span>
-						<span class="sname">{stage.name}</span>
-						<span class="mark">{stageMark(stage.tasks)}</span>
-					</div>
-					{#each stage.tasks as task (task.id)}
-						<TaskCard
-							{task}
-							active={hovered === task.id}
-							related={hovered !== null && hovered !== task.id && related.has(task.id)}
-							dim={hovered !== null && !related.has(task.id)}
-							onhover={(id) => (hovered = id)}
-						/>
-					{/each}
-				</div>
-			{/each}
-		</div>
-
-		<div class="feed">
-			<div class="fhead k-mono">
-				<span class="blink"></span>
-				<span>TELEMETRY // pipeline</span>
-				<span class="hint">hover a task to trace its dependencies</span>
+		{#if noStages}
+			<div class="note k-mono">
+				no stages recorded for {pipeline.runId} — the pipeline declares none, or the run predates
+				per-step recording
 			</div>
-			<div class="flines k-mono">
-				{#each allTasks as t (t.id)}
-					<div class="fline">
-						<span class="ftool" style="color:{toolAccent(t.tool)};">{t.tool}</span>
-						<span class="fname">{t.name}</span>
-						<span class="fstatus" style="color:{statusColor(normalizeStatus(t.status))};">{t.status}</span>
+		{:else}
+			<div class="flow">
+				{#each pipeline.stages as stage, i (stage.id)}
+					{#if i > 0}<div class="conn"></div>{/if}
+					<div class="stage">
+						<div class="shead k-mono">
+							<span class="idx">{String(i + 1).padStart(2, '0')}</span>
+							<span class="sname">{stage.name}</span>
+							<span class="mark">{stageMark(stage.tasks)}</span>
+						</div>
+						{#each stage.tasks as task (task.id)}
+							<TaskCard
+								{task}
+								active={hovered === task.id}
+								related={hovered !== null && hovered !== task.id && related.has(task.id)}
+								dim={hovered !== null && !related.has(task.id)}
+								onhover={(id) => (hovered = id)}
+							/>
+						{/each}
 					</div>
 				{/each}
 			</div>
+
+			<div class="feed">
+				<div class="fhead k-mono">
+					<span class="blink"></span>
+					<span>TELEMETRY // pipeline</span>
+					<span class="hint">hover a task to trace its dependencies</span>
+				</div>
+				<div class="flines k-mono">
+					{#each allTasks as t (t.id)}
+						<div class="fline">
+							<span class="ftool" style="color:{toolAccent(t.tool)};">{t.tool}</span>
+							<span class="fname">{t.name}</span>
+							<span class="fstatus" style="color:{statusColor(normalizeStatus(t.status))};">{t.status}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	{:else}
+		<div class="note k-mono">
+			{scope === 'all'
+				? 'no runs recorded yet — trigger one from the runs screen'
+				: `no runs recorded for ${scope} yet — trigger one from the runs screen`}
 		</div>
 	{/if}
 </div>
@@ -164,6 +204,18 @@
 		font-size: 13.5px;
 		font-weight: 600;
 		color: var(--k-heading);
+	}
+	.rlink {
+		padding: 0;
+		border: none;
+		background: none;
+		text-align: left;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.rlink:hover {
+		color: var(--k-teal);
+		text-decoration: underline;
 	}
 	.rsub {
 		font-size: 10.5px;

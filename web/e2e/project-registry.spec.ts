@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { enterApp, mockApi, mockAuth, mockProjects, mockStream, sampleRuns } from './mock';
+import {
+	enterApp,
+	mockApi,
+	mockAuth,
+	mockPipelineEcho,
+	mockProjects,
+	mockStream,
+	sampleRuns
+} from './mock';
 
 test.beforeEach(async ({ page }) => {
 	await mockAuth(page);
@@ -279,4 +287,52 @@ test('an unscoped view keeps the trigger enabled even without a project list', a
 	await page.getByLabel('filter by project').selectOption('all');
 
 	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
+});
+
+test('the pipeline screen describes the active project, not the newest run overall', async ({
+	page
+}) => {
+	// A run of ANOTHER project, newer than every kontinuance-service run. The pipeline screen used to take
+	// the newest run on the server regardless of scope, so this run's flow appeared under a dashboard
+	// focused on kontinuance-service — a pipeline that matched nothing else on screen.
+	const otherProject = {
+		id: '#RQ-9001',
+		pipeline: 'relikquary-pr',
+		status: 'Success',
+		repo: 'khorum-oss/relikquary',
+		project: 'relikquary',
+		sha: 'ffee0011aa',
+		startedAt: '2026-07-18T00:00:00Z',
+		endedAt: '2026-07-18T00:01:00Z'
+	};
+	const runs = [otherProject, ...sampleRuns];
+	await page.unroute(/\/api\/runs(\?.*)?$/);
+	await mockApi(page, runs);
+	await mockStream(page, runs);
+	await mockPipelineEcho(page);
+
+	await page.goto('/pipeline');
+	await enterApp(page);
+
+	// #KX-2045 is kontinuance-service's newest run; #RQ-9001 is newer but belongs to relikquary.
+	await expect(page.getByText(/#KX-2045/)).toBeVisible();
+	await expect(page.getByText(/#RQ-9001/)).toHaveCount(0);
+});
+
+test('a run opens its own pipeline, and the pipeline links back to that run', async ({ page }) => {
+	await mockPipelineEcho(page);
+
+	await page.goto('/');
+	await enterApp(page);
+	await page.getByText('#KX-2044', { exact: true }).click();
+	await expect(page).toHaveURL(/\/runs\/%23KX-2044$/);
+
+	// The two screens must describe the SAME run — the run detail had no way to reach its own pipeline.
+	await page.getByRole('button', { name: 'PIPELINE →' }).click();
+	await expect(page).toHaveURL(/\/pipeline\?run=%23KX-2044$/);
+	await expect(page.getByText(/#KX-2044/)).toBeVisible();
+
+	// and back again, from the pipeline header
+	await page.getByRole('button', { name: 'kontinuance-service' }).click();
+	await expect(page).toHaveURL(/\/runs\/%23KX-2044$/);
 });

@@ -8,6 +8,9 @@ data:
   SERVER_PORT: "8077"
   # Run store on the mounted PVC; descriptor from the mounted ConfigMap.
   KONTINUANCE_STORE: "/data/runs"
+  # Run history backend (042): one embedded SQLite database on the PVC, or "file" for the original
+  # file-per-run layout. Switching to sqlite imports an existing file history once, non-destructively.
+  KONTINUANCE_STORE_BACKEND: "sqlite"
   KONTINUANCE_CONFIG_DESCRIPTOR: "/etc/kontinuance/kontinuance.yml"
   # Live-stream tuning.
   KONTINUANCE_STREAM_POLL_INTERVAL_MS: "1000"

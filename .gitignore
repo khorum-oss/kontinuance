@@ -10,6 +10,15 @@
 
 secret.properties
 
+# Local run store — the path docs/getting-started.md tells you to point KONTINUANCE_STORE at when
+# running from source. It holds a real run history (now a SQLite database), so it must never be
+# committed by a `git add -A`.
+.local/
+# SQLite write-ahead sidecars, in case a store is pointed somewhere else. They exist only while a
+# connection is open, or after the process was killed mid-write.
+*.db-wal
+*.db-shm
+
 jreleaser_public.asc
 public.key
 .serena

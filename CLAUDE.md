@@ -9,7 +9,7 @@ state" table is the authoritative record of each numbered feature.
 | Module | What it is |
 | --- | --- |
 | `engine` | Pipeline model, strict YAML descriptor parser, Kotlin DSL, execution, secret masking |
-| `persistence` | `RunStore` / `RunLogStore` — durable run history behind a swappable seam |
+| `persistence` | `RunStore` / `RunLogStore` — durable run history behind a swappable seam; file or embedded SQLite |
 | `github` | GitHub event source: polling, trigger resolution, commit-status reporting |
 | `server` | Spring Boot 4.1 (WebFlux + coroutines) API over the stores, SSE + WebSocket streams |
 | `web` | SvelteKit 5 (runes) dashboard, Vitest + Playwright |
@@ -36,4 +36,9 @@ or from source per [`docs/getting-started.md`](docs/getting-started.md).
   CI system's YAML.
 - **Secrets are resolved by name and masked in logs.** Never inline a secret value, and never return one
   from an API read.
+- **Both run-store backends answer to one contract.** `RunStoreContractTest` / `RunLogStoreContractTest`
+  run against the file and SQLite implementations alike — a behaviour only one of them has is a bug in
+  the seam. Pick the backend with `KONTINUANCE_STORE_BACKEND` (`sqlite` default, `file`); never construct
+  a store directly outside `RunStores.open`, or the server and the `kontinuance-ci` CLI can end up reading
+  different stores of the same directory.
 - Each feature has a `specs/NNN-name/spec.md`. Keep them short; the roadmap carries the running summary.

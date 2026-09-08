@@ -257,6 +257,44 @@ because the feature is not observable without them.
 5. Update the deployment's readiness notes — this closes the standing "Kontinuance endpoints unauthenticated"
    caveat, demoting any external access policy from the only lock to defense in depth.
 
+## Follow-up: a run must carry the project that started it (2026-09-08)
+
+Shipped 039 resolved a run's project from the descriptor's `project:` key, else the repository's short name.
+Neither is available for a run started from the dashboard's own trigger, and the *registered* project the
+operator activated — the one thing that unambiguously answers "whose run is this?" — was never recorded. The
+observable failure: a run started under project **P** disappeared from P's scoped runs list and reappeared
+only under "all projects".
+
+Three separate records lost the owner, so the run vanished at a different moment in each case:
+
+- the immediate `Running` record the trigger writes — the run vanished for as long as it was in flight, then
+  reappeared if the descriptor happened to declare `project:`;
+- the terminal record, when the descriptor declares no `project:` and the project has no source repository —
+  the run never appeared under its project at all;
+- the record a resumed run writes after an approval gate, which dropped `repo` as well.
+
+- **FR-012**: A run started by the dashboard trigger MUST record the project it was launched under, on every
+  record it writes. The descriptor's own `project:` key still takes precedence (the 039 rule is unchanged);
+  the activating project is the fallback the reader cannot infer, ahead of nothing at all. With no active
+  project and no declared one, the record carries no project and the repository fallback still applies —
+  no owner is invented.
+- **FR-013**: A run paused at an approval gate MUST keep its repository and project when it resumes.
+
+## Follow-up: the pipeline view must describe the run on screen (2026-09-08)
+
+The Pipeline screen (009) contradicted the rest of the dashboard in two ways, both fixed here:
+
+- **FR-014**: `GET /api/runs/{id}/pipeline` MUST describe the run asked about or answer `404`. It previously
+  served a six-stage fixture flow (CHECKOUT → … → DEPLOY, with tools no run had used) for any run whose
+  stages were not recorded — which is every run while it is still executing. That fixture reads as the run's
+  real pipeline and cannot be told apart from one.
+- **FR-015**: The trigger MUST record the pipeline's declared stages and steps, every one `Pending`, when the
+  run starts, so a live run has a real breakdown to show before it produces its first step result. The
+  terminal record replaces it with the executed one.
+- **FR-016**: The Pipeline screen MUST follow the active project scope, name the run it is describing, and
+  link to it — and a run MUST link to its own pipeline. It previously showed the newest run on the server
+  regardless of scope, with no way to reach the pipeline of the run being viewed.
+
 ## Out of Scope
 
 - Per-user or per-role project visibility, and any user store beyond the single configured operator.

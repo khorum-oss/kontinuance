@@ -17,6 +17,12 @@ services:
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 8077
       KONTINUANCE_STORE: ${KONTINUANCE_STORE:-/data/runs}
+      # Run history backend (042): `sqlite` (default) keeps runs and their output in one embedded
+      # database, /data/runs/kontinuance.db, on the volume below — copy that one file to back the
+      # history up, or read it with `sqlite3`. `file` keeps the original file-per-run layout. Switching
+      # to sqlite imports an existing file history once and leaves the files in place, so switching back
+      # loses nothing.
+      KONTINUANCE_STORE_BACKEND: ${KONTINUANCE_STORE_BACKEND:-sqlite}
       KONTINUANCE_CONFIG_DESCRIPTOR: ${KONTINUANCE_CONFIG_DESCRIPTOR:-/etc/kontinuance/kontinuance.yml}
       # Operator credential. Set BOTH to enable sign-in — which is also what lets you connect a GitHub
       # repository from the Source screen, since that endpoint accepts a token and will not do so on an
