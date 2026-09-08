@@ -23,8 +23,8 @@ import java.time.Instant
  *
  * The run id is carried into the engine via [ApprovalToken] so an approval gate can be addressed by it.
  * [completedStages] resumes a paused run: those stages are skipped and reused rather than re-executed.
- * [context] is the run's ownership (033/039), carried onto every record this writes so a run never loses
- * the repository or project it was started under.
+ * [context] is the run's repository, commit, and project (033/041/039), carried onto every record this
+ * writes so finishing a run never erases what starting it recorded.
  */
 @Component
 class RunLauncher(
@@ -51,12 +51,20 @@ class RunLauncher(
                         logSink = RecordingLogSink(id, logStore),
                         runId = RunId(id),
                     )
-                    // Carry the active project's repo (033) onto the terminal record so the runs list shows it.
-                    // `project` likewise: RunRecord.from only knows the descriptor's own `project:` key, so
-                    // without this a run of a project whose descriptor omits it would lose its owner the
-                    // moment it finished and drop out of the project-scoped runs list (039).
+                    // The terminal record REPLACES the `Running` one by id, so anything the engine cannot
+                    // report has to be restored here or finishing a run erases it. The engine knows
+                    // nothing about the repository (033), the commit the checkout was pinned to (041), or
+                    // the project the run was launched under beyond the descriptor's own `project:` key
+                    // (039) — and `startedAt`, which it derives from step timings, is absent for a run
+                    // whose steps never started.
                     val recorded = RunRecord.from(run, Instant.now(), trigger = "manual")
-                    recorded.copy(id = id, repo = context.repo, project = recorded.project ?: context.project)
+                    recorded.copy(
+                        id = id,
+                        repo = context.repo,
+                        sha = context.sha,
+                        project = recorded.project ?: context.project,
+                        startedAt = recorded.startedAt ?: startedAt,
+                    )
                 }
             }.getOrElse {
                 RunRecord(
@@ -67,6 +75,7 @@ class RunLauncher(
                     startedAt = startedAt,
                     endedAt = Instant.now(),
                     repo = context.repo,
+                    sha = context.sha,
                     trigger = "manual",
                     project = context.project,
                     stages = RunRecord.skeleton(pipeline),

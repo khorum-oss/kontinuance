@@ -54,7 +54,13 @@ class RunApprovals(
         // Carry the paused record's owning context forward (033/039): the resumed run writes a fresh
         // terminal record, and without repo/project it would come back owned by nobody and disappear
         // from the project-scoped runs list the moment it was approved.
-        launcher.launch(id, pipeline, record.startedAt ?: Instant.now(), completed, RunContext(record.repo, record.project))
+        launcher.launch(
+            id,
+            pipeline,
+            record.startedAt ?: Instant.now(),
+            completed,
+            RunContext(record.repo, record.project, record.sha),
+        )
         return true
     }
 
