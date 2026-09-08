@@ -25,7 +25,8 @@
 		onretry,
 		onapprove,
 		onreject,
-		oncancel
+		oncancel,
+		onpipeline
 	}: {
 		run?: RunRecord | null;
 		logs?: string[];
@@ -42,6 +43,9 @@
 		onapprove?: () => void;
 		onreject?: () => void;
 		oncancel?: () => void;
+		/** Open the pipeline view of THIS run — the two screens describe the same run or neither is worth
+		 *  reading, and there was previously no way to get from one to the other. */
+		onpipeline?: () => void;
 	} = $props();
 
 	const status = $derived(run ? normalizeStatus(run.status) : 'pending');
@@ -97,6 +101,7 @@
 				{#if run.trigger}<span>trigger <span class="v">{run.trigger}</span></span>{/if}
 				{#if run.sha}<span>sha <span class="v">{run.sha.slice(0, 7)}</span></span>{/if}
 			</div>
+			<button class="k-mono pipeline-link" onclick={() => onpipeline?.()}>PIPELINE →</button>
 			{#if cancellable}
 				<button class="k-mono cancel-run" disabled={cancelling} onclick={() => oncancel?.()}>
 					{cancelling ? 'CANCELLING…' : 'CANCEL RUN'}
@@ -199,6 +204,19 @@
 		gap: 18px;
 		font-size: 10.5px;
 		color: var(--k-muted-3);
+	}
+	.pipeline-link {
+		font-size: 10px;
+		letter-spacing: 1.5px;
+		color: var(--k-teal);
+		background: none;
+		border: 1px solid rgba(94, 234, 212, 0.25);
+		border-radius: 4px;
+		padding: 6px 12px;
+		cursor: pointer;
+	}
+	.pipeline-link:hover {
+		background: rgba(94, 234, 212, 0.08);
 	}
 	.cancel-run {
 		font-size: 10px;

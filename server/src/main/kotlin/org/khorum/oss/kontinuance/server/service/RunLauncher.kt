@@ -23,6 +23,8 @@ import java.time.Instant
  *
  * The run id is carried into the engine via [ApprovalToken] so an approval gate can be addressed by it.
  * [completedStages] resumes a paused run: those stages are skipped and reused rather than re-executed.
+ * [context] is the run's ownership (033/039), carried onto every record this writes so a run never loses
+ * the repository or project it was started under.
  */
 @Component
 class RunLauncher(
@@ -36,7 +38,7 @@ class RunLauncher(
         pipeline: Pipeline,
         startedAt: Instant,
         completedStages: List<StageRun> = emptyList(),
-        repo: String? = null,
+        context: RunContext = RunContext(),
     ) {
         scope.launch {
             val record = runCatching {
@@ -50,7 +52,11 @@ class RunLauncher(
                         runId = RunId(id),
                     )
                     // Carry the active project's repo (033) onto the terminal record so the runs list shows it.
-                    RunRecord.from(run, Instant.now(), trigger = "manual").copy(id = id, repo = repo)
+                    // `project` likewise: RunRecord.from only knows the descriptor's own `project:` key, so
+                    // without this a run of a project whose descriptor omits it would lose its owner the
+                    // moment it finished and drop out of the project-scoped runs list (039).
+                    val recorded = RunRecord.from(run, Instant.now(), trigger = "manual")
+                    recorded.copy(id = id, repo = context.repo, project = recorded.project ?: context.project)
                 }
             }.getOrElse {
                 RunRecord(
@@ -60,8 +66,10 @@ class RunLauncher(
                     reason = it.message,
                     startedAt = startedAt,
                     endedAt = Instant.now(),
-                    repo = repo,
+                    repo = context.repo,
                     trigger = "manual",
+                    project = context.project,
+                    stages = RunRecord.skeleton(pipeline),
                 )
             }
             store.record(record)

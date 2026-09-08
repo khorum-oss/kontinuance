@@ -35,9 +35,17 @@ class RunTrigger(
 
         // Drive the checkout from the active project's source (033): override the descriptor's first `git:`
         // step (or add a checkout when it has none). A project with no source leaves the pipeline unchanged.
-        val source = projects.activeName()?.let { projects.source(it) }
+        val activeProject = projects.activeName()
+        val source = activeProject?.let { projects.source(it) }
         val pipeline = ProjectSourceInjector.apply(parsed, source)
         val repo = source?.repo?.takeIf { it.isNotBlank() }
+
+        // Which project this run belongs to (039). The descriptor's own `project:` key still wins; failing
+        // that the run belongs to the project it was launched under, which the reader cannot infer. Without
+        // this the record carries no project and the reader falls back to the repo's short name — so a run
+        // of project "foo" whose descriptor declares nothing, and whose source is "org/bar" or absent
+        // entirely, never appeared under "foo" in the runs list even though "foo" is what started it.
+        val project = pipeline.project ?: activeProject
 
         val id = "run-" + UUID.randomUUID().toString().substring(0, ID_LEN)
         val startedAt = Instant.now()
@@ -49,9 +57,13 @@ class RunTrigger(
                 startedAt = startedAt,
                 repo = repo,
                 trigger = "manual",
+                project = project,
+                // The pipeline as declared, every step Pending: the run's shape is known now, so the
+                // pipeline view of a live run shows the real stages instead of nothing.
+                stages = RunRecord.skeleton(pipeline),
             ),
         )
-        launcher.launch(id, pipeline, startedAt, repo = repo)
+        launcher.launch(id, pipeline, startedAt, context = RunContext(repo, project))
         return Result.Accepted(id)
     }
 

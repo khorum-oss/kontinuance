@@ -9,7 +9,8 @@ import kotlin.test.assertTrue
 
 /**
  * Exercises the additive STUB endpoints on the real Spring Boot runtime via a live HTTP round-trip. Also
- * asserts the existing `/api/health` contract is unchanged, so adding the stubs did not disturb routing.
+ * asserts the existing `/api/health` contract is unchanged, so adding the stubs did not disturb routing,
+ * and that the pipeline endpoint has no fixture to fall back on — it answers for a real run or not at all.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -33,11 +34,8 @@ class StubEndpointsIT(
             .expectBody(String::class.java).returnResult().responseBody ?: ""
 
     @Test
-    fun `pipeline stub returns typed stages for the run`() {
-        val json = body("/api/runs/run-7/pipeline")
-        assertTrue(json.contains("\"runId\":\"run-7\""))
-        assertTrue(json.contains("\"stages\":["))
-        assertTrue(json.contains("CHECKOUT") && json.contains("\"tool\":\"gradle\""))
+    fun `pipeline has no fixture — an unknown run is a 404`() {
+        client.get().uri("/api/runs/run-7/pipeline").exchange().expectStatus().isNotFound
     }
 
     @Test

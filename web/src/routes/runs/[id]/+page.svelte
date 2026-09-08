@@ -95,6 +95,7 @@
 	{cancelling}
 	{cancelError}
 	onback={() => goto('/')}
+	onpipeline={() => goto(`/pipeline?run=${encodeURIComponent(id)}`)}
 	onretry={load}
 	onapprove={() => decide('approve')}
 	onreject={() => decide('reject')}

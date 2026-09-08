@@ -3,28 +3,34 @@ package org.khorum.oss.kontinuance.server.controller
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.persistence.StepRecord
-import org.khorum.oss.kontinuance.server.domain.StubFixtures
+import org.khorum.oss.kontinuance.server.domain.ErrorResponse
 import org.khorum.oss.kontinuance.server.domain.PipelineResponse
 import org.khorum.oss.kontinuance.server.domain.PipelineStage
 import org.khorum.oss.kontinuance.server.domain.PipelineTask
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
 
 /**
  * Serves `/api/runs/{id}/pipeline` from the run's **real persisted stage/step breakdown** (recorded in
- * [RunRecord] with per-step status, timing, and tool), mapped into the pipeline contract shape. Falls
- * back to fixture data when the run is unknown or predates stage recording (older records carry no
- * stages). Dependencies between tasks are not modeled by the engine (stages run in order, steps within a
- * stage in order), so `deps` is empty — the shape stays stable for a future DAG.
+ * [RunRecord] with per-step status, timing, and tool), mapped into the pipeline contract shape. It answers
+ * only for the run asked about: an unknown id is a `404`, and a known run that recorded no stages (one
+ * predating stage recording) answers with an empty stage list. Neither case invents a pipeline — serving
+ * a fixture here showed a six-stage demo flow that belonged to no run at all, which reads as the run's
+ * own pipeline and contradicts everything else on screen. Dependencies between tasks are not modeled by
+ * the engine (stages run in order, steps within a stage in order), so `deps` is empty — the shape stays
+ * stable for a future DAG.
  */
 @RestController
 class PipelineController(private val store: RunStore) {
 
     @GetMapping("/api/runs/{id}/pipeline")
-    fun pipeline(@PathVariable id: String): PipelineResponse {
+    fun pipeline(@PathVariable id: String): ResponseEntity<*> {
         val run = store.get(id)
-        return if (run != null && run.stages.isNotEmpty()) render(run) else StubFixtures.pipeline(id)
+            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse("not found"))
+        return ResponseEntity.ok(render(run))
     }
 
     private fun render(run: RunRecord): PipelineResponse = PipelineResponse(

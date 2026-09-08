@@ -16,11 +16,14 @@ import org.khorum.oss.kontinuance.engine.model.StageRun
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
 import org.khorum.oss.kontinuance.persistence.InMemoryRunLogStore
 import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
+import org.khorum.oss.kontinuance.persistence.RunRecord
+import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -56,11 +59,46 @@ class RunTriggerTest {
           stages: []
     """.trimIndent()
 
-    private fun triggerFor(store: InMemoryRunStore, engine: PipelineEngine, path: Path): RunTrigger {
+    /**
+     * An [InMemoryRunStore] that also keeps every write in order. The store overwrites by id, so without
+     * this the initial `Running` record is gone by the time the inline background run has replaced it —
+     * and that record is exactly what the runs list shows while a run is in flight.
+     */
+    private class RecordingRunStore : RunStore {
+        private val delegate = InMemoryRunStore()
+        val writes = mutableListOf<RunRecord>()
+
+        override fun record(record: RunRecord) {
+            writes += record
+            delegate.record(record)
+        }
+
+        override fun recent(limit: Int): List<RunRecord> = delegate.recent(limit)
+        override fun get(id: String): RunRecord? = delegate.get(id)
+    }
+
+    private val stagedDescriptor = """
+        pipeline:
+          name: "demo"
+          stages:
+            - name: "build"
+              steps:
+                - name: "assemble"
+                  run: "true"
+    """.trimIndent()
+
+    private fun triggerFor(store: RunStore, engine: PipelineEngine, path: Path): RunTrigger {
         val launcher = RunLauncher(store, engine, CoroutineScope(Dispatchers.Unconfined), InMemoryRunLogStore())
         val projects = ProjectStore(path.resolveSibling("projects"))
         return RunTrigger(store, launcher, projects, path.toString())
     }
+
+    /** Registers [name] as a project and makes it active, as the entry picker does. */
+    private fun activate(path: Path, name: String, text: String): ProjectStore =
+        ProjectStore(path.resolveSibling("projects")).apply {
+            save(name, text)
+            setActive(name)
+        }
 
     @Test
     fun `rejects when no descriptor file is present`(@TempDir dir: Path) {
@@ -113,5 +151,65 @@ class RunTriggerTest {
         val record = assertNotNull(store.get(id))
         assertEquals("Failed", record.status)
         assertEquals("boom", record.reason)
+    }
+
+    @Test
+    fun `stamps the active project on every record when the descriptor declares none`(@TempDir dir: Path) {
+        val store = RecordingRunStore()
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, validDescriptor)
+        activate(file, "web-ui", validDescriptor)
+
+        val result = triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
+
+        assertTrue(result is RunTrigger.Result.Accepted)
+        // Both writes — the immediate `Running` one the runs list shows while the run is in flight, and the
+        // terminal one — must name the project, or the run vanishes from the project-scoped list (039).
+        assertEquals(2, store.writes.size, "expected a running record and a terminal record")
+        assertTrue(store.writes.all { it.project == "web-ui" }, "every record should name the launching project")
+    }
+
+    @Test
+    fun `the descriptor's own project wins over the project it was launched under`(@TempDir dir: Path) {
+        val store = RecordingRunStore()
+        val declaring = validDescriptor.replace("name: \"demo\"", "name: \"demo\"\n  project: \"platform\"")
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, declaring)
+        activate(file, "web-ui", declaring)
+
+        triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
+
+        assertTrue(store.writes.all { it.project == "platform" }, "the descriptor's `project:` key takes precedence")
+    }
+
+    @Test
+    fun `leaves the project unset when nothing is active and the descriptor declares none`(@TempDir dir: Path) {
+        val store = RecordingRunStore()
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, validDescriptor)
+
+        triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
+
+        // No invented owner: the reader still falls back to the repo's short name (039).
+        assertTrue(store.writes.all { it.project == null })
+    }
+
+    @Test
+    fun `records the declared stage breakdown before the run produces any result`(@TempDir dir: Path) {
+        val store = RecordingRunStore()
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, stagedDescriptor)
+
+        triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
+
+        val running = store.writes.first()
+        assertEquals("Running", running.status)
+        val stage = running.stages.single()
+        assertEquals("build", stage.name)
+        assertEquals("Pending", stage.status)
+        val step = stage.steps.single()
+        assertEquals("assemble", step.name)
+        assertEquals("Pending", step.status)
+        assertNull(step.startedAt, "a step that has not started carries no start time")
     }
 }

@@ -218,6 +218,31 @@ export async function mockPipeline(page: Page): Promise<void> {
 	);
 }
 
+/**
+ * Serve `/api/runs/{id}/pipeline` echoing the id back as the response's `runId`, so a test can assert
+ * WHICH run the pipeline screen chose to describe rather than only that it rendered something.
+ */
+export async function mockPipelineEcho(page: Page): Promise<void> {
+	await page.route(/\/api\/runs\/[^/?]+\/pipeline/, (route) => {
+		const path = new URL(route.request().url()).pathname;
+		const id = decodeURIComponent(path.split('/').slice(-2)[0]);
+		return route.fulfill({
+			json: {
+				runId: id,
+				stages: [
+					{
+						id: 's1',
+						name: 'BUILD',
+						tasks: [
+							{ id: 'assemble', name: 'assemble', tool: 'gradle', status: 'success', progress: 100, deps: [] }
+						]
+					}
+				]
+			}
+		});
+	});
+}
+
 /** Serve the deploy stub for the deploy screen. */
 export async function mockDeploy(page: Page): Promise<void> {
 	await page.route(/\/api\/deploy/, (route) =>
