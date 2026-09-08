@@ -49,7 +49,8 @@ All server settings use Spring's relaxed binding — set them as JVM properties 
 | `kontinuance.auth.username` | `KONTINUANCE_AUTH_USERNAME` | _(unset)_ | Operator login name. Set **with** the password to enforce authentication; see [Authentication](#authentication). |
 | `kontinuance.auth.password` | `KONTINUANCE_AUTH_PASSWORD` | _(unset)_ | Operator password. Never commit the value. Both must be set to enforce auth; both unset ⇒ open mode + startup warning; **only one set ⇒ startup failure**. |
 | `kontinuance.auth.required` | `KONTINUANCE_AUTH_REQUIRED` | `false` | Assert that authentication is mandatory: missing credentials become a startup failure instead of open mode. Set it on any deployment that must never run open. |
-| `kontinuance.store` | `KONTINUANCE_STORE` | `~/.kontinuance/runs` | Directory of run history (the file-backed run store). |
+| `kontinuance.store` | `KONTINUANCE_STORE` | `~/.kontinuance/runs` | State directory holding run history and its per-run output. |
+| `kontinuance.store.backend` | `KONTINUANCE_STORE_BACKEND` | `sqlite` | Which store backs the history: `sqlite` keeps runs and output in one embedded database, `<store>/kontinuance.db`; `file` keeps the original file-per-run JSON layout. An unrecognised name is a **startup failure** rather than a silent fallback. See [Run history](#run-history). |
 | `kontinuance.config.descriptor` | `KONTINUANCE_CONFIG_DESCRIPTOR` | `kontinuance.yml` | Pipeline descriptor loaded for `/api/config` and for triggered/resumed runs. |
 | `kontinuance.coverage.report` | `KONTINUANCE_COVERAGE_REPORT` | `build/reports/kover/report.xml` | Kover XML surfaced by the coverage screen. |
 | `kontinuance.stream.poll-interval-ms` | `KONTINUANCE_STREAM_POLL_INTERVAL_MS` | `1000` | How often the live stream re-reads the store for new runs. |
@@ -80,6 +81,33 @@ Two things are worth knowing before you connect:
   always takes precedence over a stored token.
 
 The standalone CLI still works and reads the same files, so an existing deployment needs no change.
+
+### Run history
+
+Every run's record and its recorded output live under `KONTINUANCE_STORE`. Two backends serve them, and
+`KONTINUANCE_STORE_BACKEND` picks:
+
+| Backend | Layout under `KONTINUANCE_STORE` | Notes |
+|---|---|---|
+| `sqlite` (default) | one `kontinuance.db` | Back it up by copying that file; read it with the stock `sqlite3` CLI. Writes are atomic and listings are indexed. |
+| `file` | `<id>.json` per run, `logs/<id>.log` per run | The original 006/018 layout. Every record is a text file you can `cat`. |
+
+Starting on `sqlite` over a directory that already holds a file history **imports it once** — runs and
+their output — and leaves every file where it was. So the switch needs no migration step, and setting the
+backend back to `file` returns to exactly the previous state. The import only ever runs into an empty
+database, so it cannot duplicate a run or overwrite one recorded since.
+
+If you also run the standalone `kontinuance-ci` CLI, give it the **same** `KONTINUANCE_STORE` and
+`KONTINUANCE_STORE_BACKEND` as the server. It resolves the history through the same code, so matching the
+two variables is all it takes; mismatch them and the poller records runs the dashboard cannot see.
+
+A misspelled backend name fails startup with a message naming it, rather than quietly serving an empty
+history.
+
+Neither backend changes what is durable across a restart — see
+[Durability](#durability-only-paused-runs-survive-a-restart) below. Registered project descriptors,
+event-source configuration, and the poll cursors stay as files beside the history either way; the
+sign-in session registry is in memory and is cleared by a restart in both.
 
 ### Secrets
 

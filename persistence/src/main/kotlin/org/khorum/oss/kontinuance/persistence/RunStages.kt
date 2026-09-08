@@ -1,8 +1,10 @@
 package org.khorum.oss.kontinuance.persistence
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -50,6 +52,21 @@ private fun kotlinx.serialization.json.JsonArrayBuilder.addStep(step: StepRecord
     step.tool?.let { put("tool", it) }
     step.startedAt?.let { put("startedAt", it.toString()) }
     step.endedAt?.let { put("endedAt", it.toString()) }
+}
+
+/**
+ * The `stages` array on its own, as a JSON object (`{"stages":[…]}`), or null when there are none. The
+ * SQLite backend stores the nested breakdown in one column while the scalars it can query live in real
+ * columns; both directions go through the same serialization as the file store, so a record written by
+ * one backend reads back identically from the other.
+ */
+internal fun stagesToJson(stages: List<StageRecord>): String? =
+    if (stages.isEmpty()) null else buildJsonObject { putStages(stages) }.toString()
+
+/** Parses a `{"stages":[…]}` document written by [stagesToJson]; empty when null, blank, or malformed. */
+internal fun stagesFromJson(json: String?): List<StageRecord> {
+    if (json.isNullOrBlank()) return emptyList()
+    return runCatching { parseStages(Json.parseToJsonElement(json).jsonObject) }.getOrDefault(emptyList())
 }
 
 /** Parses the optional `stages` array from a record JSON object; empty when absent (older records). */
