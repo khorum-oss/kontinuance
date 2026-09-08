@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError } from '$lib/api/client';
 	import { runStream } from '$lib/api/live';
-	import { mergeNewestFirst, runProject } from '$lib/api/present';
+	import { mergeNewestFirst, runFingerprint, runProject } from '$lib/api/present';
 	import type { Pipeline, RunRecord } from '$lib/api/types';
 	import PipelineScreen from '$lib/screens/Pipeline.svelte';
 
@@ -88,7 +88,9 @@
 				? s.runs.find((r) => r.id === pin)
 				: mergeNewestFirst(s.runs).find((r) => inScope === 'all' || runProject(r) === inScope);
 			if (!relevant) return;
-			const signature = `${relevant.id}:${relevant.status}`;
+			// Keyed off the whole visible state, not just `status`: a run stays `Running` from its first
+			// step to its last, so a status-only key would leave the flow frozen for the whole build.
+			const signature = runFingerprint(relevant);
 			if (signature === seen) return;
 			seen = signature;
 			void load(true);
