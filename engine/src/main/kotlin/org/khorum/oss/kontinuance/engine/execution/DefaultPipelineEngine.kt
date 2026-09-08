@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.supervisorScope
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.logging.StdoutLogSink
@@ -58,8 +57,16 @@ class DefaultPipelineEngine(
     /** All status events across runs, primarily for observation and testing. */
     val events: SharedFlow<StatusEvent> = eventStream.asSharedFlow()
 
+    /**
+     * Transitions for [runId], subscribable before the run starts.
+     *
+     * The flow is created on first mention — by this call or by [run], whichever comes first — because a
+     * caller that wants to follow a run has to be able to subscribe without racing it. Returning an empty
+     * flow to whoever asked a moment too early made the timing decide whether any progress was observed
+     * at all. Late subscribers are covered by the flow's replay buffer instead.
+     */
     override fun statuses(runId: RunId): Flow<StatusEvent> =
-        runFlows[runId]?.asSharedFlow() ?: emptyFlow()
+        runFlows.computeIfAbsent(runId) { newRunFlow() }.asSharedFlow()
 
     override suspend fun cancel(runId: RunId) {
         activeRuns[runId]?.cancel()
@@ -79,8 +86,8 @@ class DefaultPipelineEngine(
         val resolvedRunId = runId ?: runIdFactory()
         // Per-invocation sink override (e.g. the server records one run's output); null keeps the default.
         val sink = logSink ?: this.logSink
-        val flow = newRunFlow()
-        runFlows[resolvedRunId] = flow
+        // Reuses the flow if something already subscribed to this run's transitions (see `statuses`).
+        val flow = runFlows.computeIfAbsent(resolvedRunId) { newRunFlow() }
 
         validate(pipeline, secrets)
 

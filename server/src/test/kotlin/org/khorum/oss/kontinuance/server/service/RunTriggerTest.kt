@@ -3,11 +3,15 @@ package org.khorum.oss.kontinuance.server.service
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.yield
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.execution.StatusEvent
+import org.khorum.oss.kontinuance.engine.execution.Target
 import org.khorum.oss.kontinuance.engine.logging.LogSink
 import org.khorum.oss.kontinuance.engine.model.GitStep
 import org.khorum.oss.kontinuance.engine.model.Pipeline
@@ -56,7 +60,51 @@ class RunTriggerTest {
             return Run(runId ?: RunId("engine-generated"), pipeline, outcome, emptyList())
         }
 
+        /** This fake executes nothing step by step, so it reports no transitions. */
+        override fun statuses(runId: RunId): Flow<StatusEvent> = emptyFlow()
+        override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
+    }
+
+    /** An engine whose status stream is unusable — progress tracking must not turn that into a failed run. */
+    private class NoStatusesEngine : PipelineEngine {
+        override suspend fun run(
+            pipeline: Pipeline,
+            secrets: SecretSource,
+            completedStages: List<StageRun>,
+            logSink: LogSink?,
+            runId: RunId?,
+        ): Run = Run(runId ?: RunId("engine-generated"), pipeline, PipelineStatus.Success, emptyList())
+
         override fun statuses(runId: RunId): Flow<StatusEvent> = throw UnsupportedOperationException()
+        override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
+    }
+
+    /**
+     * An engine that reports transitions as a real one does: the step starts, then finishes, before the
+     * run returns. Its flow exists before `run` is called, which is what lets a collector subscribe
+     * without racing the run.
+     */
+    private class EmittingEngine(private val stage: String, private val step: String) : PipelineEngine {
+        private val events = MutableSharedFlow<StatusEvent>(replay = 16, extraBufferCapacity = 16)
+
+        override suspend fun run(
+            pipeline: Pipeline,
+            secrets: SecretSource,
+            completedStages: List<StageRun>,
+            logSink: LogSink?,
+            runId: RunId?,
+        ): Run {
+            val target = Target.StepTarget(pipeline.name, stage, step)
+            events.emit(StatusEvent(target, PipelineStatus.Running))
+            // A real engine does the step's work here; yielding is what gives the collector its turn,
+            // and without it this fake would report the whole run in one indivisible burst.
+            yield()
+            events.emit(StatusEvent(target, PipelineStatus.Success))
+            yield()
+            return Run(runId ?: RunId("engine-generated"), pipeline, PipelineStatus.Success, emptyList())
+        }
+
+        override fun statuses(runId: RunId): Flow<StatusEvent> = events
         override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
     }
 
@@ -75,7 +123,7 @@ class RunTriggerTest {
             return Run(runId ?: RunId("engine-generated"), pipeline, PipelineStatus.Success, emptyList())
         }
 
-        override fun statuses(runId: RunId): Flow<StatusEvent> = throw UnsupportedOperationException()
+        override fun statuses(runId: RunId): Flow<StatusEvent> = emptyFlow()
         override suspend fun cancel(runId: RunId): Unit = throw UnsupportedOperationException()
     }
 
@@ -301,6 +349,38 @@ class RunTriggerTest {
         val terminal = store.writes.last()
         assertEquals("Failed", terminal.status)
         assertEquals("abc1234", terminal.sha, "the failure record keeps the commit too")
+    }
+
+    @Test
+    fun `a step going Running is persisted while the run is still in flight`(@TempDir dir: Path) = runTest {
+        // The symptom this exists for: every step read `Pending` at 0% for the whole build and then
+        // jumped to done, so a running pipeline never looked like it was running.
+        val store = RecordingRunStore()
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, stagedDescriptor)
+
+        triggerFor(store, EmittingEngine(stage = "build", step = "assemble"), file).trigger()
+
+        val midRun = store.writes.filter { it.status == "Running" }
+        val sawStepRunning = midRun.any { record ->
+            record.stages.any { stage -> stage.steps.any { it.name == "assemble" && it.status == "Running" } }
+        }
+        assertTrue(sawStepRunning, "a running step should reach the store before the run finishes")
+        assertEquals("Success", assertNotNull(store.get(store.writes.last().id)).status)
+    }
+
+    @Test
+    fun `an unusable status stream leaves the run alone`(@TempDir dir: Path) = runTest {
+        // Progress reporting is observability. If the engine cannot hand over a stream, the run still
+        // runs and still records its result — it just does so untracked.
+        val store = RecordingRunStore()
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, validDescriptor)
+
+        val result = triggerFor(store, NoStatusesEngine(), file).trigger()
+
+        assertTrue(result is RunTrigger.Result.Accepted)
+        assertEquals("Success", assertNotNull(store.get(result.id)).status)
     }
 
     @Test

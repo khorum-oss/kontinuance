@@ -1,17 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	descriptorCheckMessage,
-	descriptorOriginLabel,
-	filterRuns,
-	lastRunAge,
-	matchesRunFilter,
-	mergeNewestFirst,
-	runMessage,
-	runRef,
-	runWorkSummary,
-	sourceCheckoutOnlyNote,
-	toRunView
-} from './present';
+import { descriptorCheckMessage, descriptorOriginLabel, filterRuns, lastRunAge, matchesRunFilter, mergeNewestFirst, runFingerprint, runMessage, runRef, runWorkSummary, sourceCheckoutOnlyNote, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -343,5 +331,41 @@ describe('descriptorCheckMessage', () => {
 
 	it('is null when nothing was checked', () => {
 		expect(descriptorCheckMessage(undefined)).toBeNull();
+	});
+});
+
+describe('runFingerprint', () => {
+	const base = { id: 'run-1', pipeline: 'demo', status: 'Running' };
+
+	it('changes when a step advances even though the run status does not', () => {
+		// The pipeline view refreshes on this. A run is `Running` from its first step to its last, so a
+		// status-only key would freeze the flow for the whole build.
+		const before = runFingerprint({
+			...base,
+			stages: [{ name: 'build', status: 'Running', steps: [{ name: 'compile', status: 'Pending' }] }]
+		});
+		const after = runFingerprint({
+			...base,
+			stages: [{ name: 'build', status: 'Running', steps: [{ name: 'compile', status: 'Running' }] }]
+		});
+
+		expect(after).not.toBe(before);
+	});
+
+	it('is stable for an unchanged record', () => {
+		const record = {
+			...base,
+			stages: [{ name: 'build', status: 'Running', steps: [{ name: 'compile', status: 'Running' }] }]
+		};
+
+		expect(runFingerprint(record)).toBe(runFingerprint({ ...record }));
+	});
+
+	it('changes when the run status changes', () => {
+		expect(runFingerprint({ ...base, status: 'Success' })).not.toBe(runFingerprint(base));
+	});
+
+	it('handles a record with no recorded stages', () => {
+		expect(runFingerprint(base)).toBe('run-1:Running:');
 	});
 });

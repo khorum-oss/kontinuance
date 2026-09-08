@@ -169,6 +169,21 @@ export function filterRuns(records: RunRecord[], f: RunFilter): RunRecord[] {
 	return records.filter((r) => matchesRunFilter(r, f));
 }
 
+/**
+ * A fingerprint of everything a viewer would see change about [r]: its status and, when the server has
+ * recorded one, each step's status within each stage.
+ *
+ * The pipeline view follows a run while it executes, and a run's `status` stays `Running` from the first
+ * step to the last — so keying a refresh on status alone means a build's steps never appear to advance.
+ * Pure.
+ */
+export function runFingerprint(r: RunRecord): string {
+	const stages = (r.stages ?? [])
+		.map((s) => `${s.name}:${s.status}:${(s.steps ?? []).map((t) => `${t.name}=${t.status}`).join(',')}`)
+		.join('|');
+	return `${r.id}:${r.status}:${stages}`;
+}
+
 /** Merge records by id (later wins) and return them newest-first. */
 export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
 	const byId = new Map<string, RunRecord>();
