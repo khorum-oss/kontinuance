@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The behaviour every [RunLogStore] backend owes its callers, run against each one (041). */
+/** The behaviour every [RunLogStore] backend owes its callers, run against each one (042). */
 abstract class RunLogStoreContractTest {
 
     /** Opens the backend under test over [dir]. Called more than once per test to model a restart. */

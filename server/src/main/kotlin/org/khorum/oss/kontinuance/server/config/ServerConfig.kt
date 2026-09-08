@@ -4,6 +4,8 @@ import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.persistence.RunStores
 import org.khorum.oss.kontinuance.server.domain.RunApi
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
+import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.service.RunChangeNotifier
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import org.khorum.oss.kontinuance.server.store.NotifyingRunLogStore
@@ -20,7 +22,7 @@ import java.nio.file.Path
  * the same directory the `kontinuance-ci` service writes to.
  *
  * `kontinuance.store.backend` (`KONTINUANCE_STORE_BACKEND`) picks the durable implementation: `sqlite`,
- * the default, keeps runs and their output in one embedded database under that directory (041), while
+ * the default, keeps runs and their output in one embedded database under that directory (042), while
  * `file` keeps the original file-per-run layout. Both are opened through [RunStores] rather than named
  * here, so the CLI resolves the same store from the same two variables. An unrecognised name fails
  * startup with a message instead of quietly serving an empty history.
@@ -68,4 +70,22 @@ class ServerConfig {
     private fun storeDirectory(configured: String?): Path =
         configured?.takeIf { it.isNotBlank() }?.let { Path.of(it) }
             ?: Path.of(System.getProperty("user.home"), ".kontinuance", "runs")
+
+    /**
+     * Descriptor resolution for the manual trigger path (041). Note the two distinct paths: the live
+     * descriptor is a file on this server, while `descriptorPath` is a filename looked up *inside* a
+     * project's repository.
+     */
+    @Bean
+    fun descriptorResolver(
+        projects: ProjectStore,
+        clients: GitHubClientProvider,
+        @Value("\${kontinuance.config.descriptor:kontinuance.yml}") liveDescriptorPath: String,
+        @Value("\${kontinuance.project.descriptorPath:kontinuance.yml}") repoDescriptorPath: String,
+    ): DescriptorResolver = DescriptorResolver(
+        projects = projects,
+        liveDescriptor = Path.of(liveDescriptorPath),
+        descriptorPath = repoDescriptorPath,
+        clients = clients,
+    )
 }

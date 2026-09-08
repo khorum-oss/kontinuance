@@ -9,6 +9,10 @@ import kotlin.time.Duration.Companion.minutes
 
 class PipelineDescriptorTest {
 
+    // A pipeline must declare at least one stage, so tests whose subject lies elsewhere in the
+    // descriptor still need one. Flow style keeps that filler to a single line.
+    private val fillerStage = """stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]"""
+
     @Test
     fun `parses a valid descriptor into the model`() {
         val yaml = """
@@ -46,11 +50,39 @@ class PipelineDescriptorTest {
     }
 
     @Test
+    fun `a descriptor with no stages key is rejected`() {
+        // Previously this parsed into a stage-less pipeline that completed Success having run nothing —
+        // and with a project source attached, the synthesized checkout made it look like a run that had
+        // started and then hung. Failing here makes the omission visible before anything is triggered.
+        val yaml = """
+            pipeline:
+              name: "test"
+        """.trimIndent()
+
+        val error = assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
+
+        assertTrue(error.message!!.contains("stage"), error.message)
+    }
+
+    @Test
+    fun `a descriptor whose stages list is empty is rejected`() {
+        val yaml = """
+            pipeline:
+              name: "test"
+              stages: []
+        """.trimIndent()
+
+        val error = assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
+
+        assertTrue(error.message!!.contains("stage"), error.message)
+    }
+
+    @Test
     fun `concurrency defaults to 1 when omitted`() {
         val yaml = """
             pipeline:
               name: "p"
-              stages: []
+              $fillerStage
         """.trimIndent()
         assertEquals(1, PipelineDescriptor.parse(yaml).concurrency)
     }
@@ -122,7 +154,7 @@ class PipelineDescriptorTest {
             pipeline:
               name: "relikquary-pr"
               project: "relikquary"
-              stages: []
+              $fillerStage
         """.trimIndent()
 
         assertEquals("relikquary", PipelineDescriptor.parse(yaml).project)
@@ -133,7 +165,7 @@ class PipelineDescriptorTest {
         val yaml = """
             pipeline:
               name: "relikquary-pr"
-              stages: []
+              $fillerStage
         """.trimIndent()
 
         assertEquals(null, PipelineDescriptor.parse(yaml).project)
@@ -145,7 +177,7 @@ class PipelineDescriptorTest {
             pipeline:
               name: "relikquary-pr"
               projekt: "relikquary"
-              stages: []
+              $fillerStage
         """.trimIndent()
 
         val error = assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
@@ -158,7 +190,7 @@ class PipelineDescriptorTest {
             pipeline:
               name: "relikquary-pr"
               project: "  "
-              stages: []
+              $fillerStage
         """.trimIndent()
 
         assertFailsWith<DescriptorException> { PipelineDescriptor.parse(yaml) }
@@ -168,7 +200,7 @@ class PipelineDescriptorTest {
         pipeline:
           name: "relikquary-pr"
           project: "$project"
-          stages: []
+          $fillerStage
     """.trimIndent()
 
     @Test

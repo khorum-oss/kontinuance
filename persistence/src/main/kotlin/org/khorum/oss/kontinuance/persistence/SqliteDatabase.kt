@@ -9,7 +9,7 @@ import java.sql.DriverManager
 import java.sql.Types
 
 /**
- * The embedded SQLite database behind [SqliteRunStore] and [SqliteRunLogStore] (041) — one file, no
+ * The embedded SQLite database behind [SqliteRunStore] and [SqliteRunLogStore] (042) — one file, no
  * server process, inspectable with the ordinary `sqlite3` CLI.
  *
  * A connection is opened per operation rather than pooled: the workload is a handful of writes per run

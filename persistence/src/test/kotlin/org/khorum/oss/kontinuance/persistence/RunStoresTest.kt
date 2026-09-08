@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Backend selection and the one-time import that carries an existing file history into the database (041). */
+/** Backend selection and the one-time import that carries an existing file history into the database (042). */
 class RunStoresTest {
 
     private fun record(id: String) = RunRecord(id = id, pipeline = "demo", status = "Success")

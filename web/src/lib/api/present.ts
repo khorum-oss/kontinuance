@@ -2,7 +2,7 @@
 // Kept separate from the transport so components stay presentational.
 
 import { normalizeStatus, type Status } from '../theme/tokens';
-import type { RunRecord } from './types';
+import type { DescriptorCheck, RunRecord } from './types';
 
 export interface RunView {
 	id: string;
@@ -89,6 +89,45 @@ export function runSortKey(r: RunRecord): string {
 	return r.endedAt ?? r.startedAt ?? '';
 }
 
+// ----- what a run actually executed -----
+
+function plural(n: number, noun: string): string {
+	return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * A one-line roll-up of the work a run performed, e.g. "2 stages · 3 steps". Empty when the record
+ * carries no stage roll-up — older records predate it, and the server omits the array when empty —
+ * so the caller can drop the line rather than render a misleading "0 stages". Pure.
+ */
+export function runWorkSummary(r: RunRecord): string {
+	const stages = r.stages ?? [];
+	if (!stages.length) return '';
+	const steps = stages.reduce((n, s) => n + (s.steps?.length ?? 0), 0);
+	return `${plural(stages.length, 'stage')} · ${plural(steps, 'step')}`;
+}
+
+/**
+ * Explains a run whose only stage was the checkout synthesized from the project source (033) — the
+ * signature of a descriptor that declared no stages of its own. Such a run clones the repository,
+ * finds nothing to do and reports Success, which reads far more like a run that stalled than one
+ * that finished.
+ *
+ * The parser now rejects a stage-less descriptor outright, so this is here for runs already on
+ * disk. It matches the exact shape `ProjectSourceInjector` prepends: a lone stage named `checkout`
+ * holding a single `git` step of the same name. A hand-written pipeline could in principle collide
+ * with that shape, in which case the note is still true — only a source checkout did run. Pure.
+ */
+export function sourceCheckoutOnlyNote(r: RunRecord): string | null {
+	const stages = r.stages ?? [];
+	if (stages.length !== 1) return null;
+	const [stage] = stages;
+	if (stage.name !== 'checkout' || stage.steps?.length !== 1) return null;
+	const [step] = stage.steps;
+	if (step.name !== 'checkout' || step.tool !== 'git') return null;
+	return 'this pipeline declared no stages — only the source checkout ran';
+}
+
 // ----- runs list filtering (037) -----
 
 /** The runs-list filter criteria: a free-text query plus status/trigger/project facets ("all" = no facet).
@@ -135,6 +174,36 @@ export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
 	const byId = new Map<string, RunRecord>();
 	for (const r of records) byId.set(r.id, r);
 	return [...byId.values()].sort((a, b) => runSortKey(b).localeCompare(runSortKey(a)));
+}
+
+// ----- descriptor provenance (041) -----
+
+/** Where the descriptor the server would run came from, in words. Pure. */
+export function descriptorOriginLabel(config: { origin?: string; overridden?: boolean }): string {
+	if (config.overridden) return 'overriding the repository';
+	switch (config.origin) {
+		case 'repo':
+			return 'from the repository';
+		case 'stored':
+			return 'stored on this server';
+		default:
+			return "from this server's descriptor file";
+	}
+}
+
+/** The add-time descriptor check as a tone + line, or null when nothing was checked. Pure. */
+export function descriptorCheckMessage(
+	check: DescriptorCheck | undefined
+): { tone: 'ok' | 'warn'; text: string } | null {
+	if (!check) return null;
+	if (check.ok) {
+		const stages = check.stages ?? 0;
+		return {
+			tone: 'ok',
+			text: `found kontinuance.yml — pipeline '${check.pipeline ?? 'the descriptor'}', ${stages} stage${stages === 1 ? '' : 's'}`
+		};
+	}
+	return { tone: 'warn', text: check.message ?? 'the descriptor could not be read' };
 }
 
 /** Project a record into its display view. [nowMs] lets callers/tests pin "now". */

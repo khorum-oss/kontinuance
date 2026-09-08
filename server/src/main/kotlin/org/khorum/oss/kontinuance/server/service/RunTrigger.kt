@@ -1,43 +1,46 @@
 package org.khorum.oss.kontinuance.server.service
 
-import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSourceInjector
+import org.khorum.oss.kontinuance.server.domain.project.Rejected
+import org.khorum.oss.kontinuance.server.domain.project.Resolved
 import org.khorum.oss.kontinuance.server.store.ProjectStore
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.nio.file.Files
-import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
 
 /**
- * Manually triggers a pipeline run. Loads the configured descriptor, records a `Running` [RunRecord]
- * immediately (so the run appears live in the UI's runs list via the SSE stream), then hands off to
- * [RunLauncher] to execute the pipeline in the background under the same id — recording the terminal
- * record when it finishes, or a paused `WaitingOnApproval` record if it reaches an approval gate.
- * Secrets are resolved from the environment. No auth yet (consistent with the MVP's no-auth stance).
+ * Manually triggers a pipeline run. Asks [DescriptorResolver] what pipeline the active project runs
+ * (041), records a `Running` [RunRecord] immediately (so the run appears live in the UI's runs list via
+ * the SSE stream), then hands off to [RunLauncher] to execute the pipeline in the background under the
+ * same id — recording the terminal record when it finishes, or a paused `WaitingOnApproval` record if it
+ * reaches an approval gate. Secrets are resolved from the environment. No auth yet (consistent with the
+ * MVP's no-auth stance).
  */
 @Component
 class RunTrigger(
     private val store: RunStore,
     private val launcher: RunLauncher,
     private val projects: ProjectStore,
-    @Value("\${kontinuance.config.descriptor:kontinuance.yml}") descriptorPath: String,
+    private val resolver: DescriptorResolver,
 ) {
-    private val descriptor: Path = Path.of(descriptorPath)
 
-    fun trigger(): Result {
-        if (!Files.isRegularFile(descriptor)) return Result.Rejected("no pipeline descriptor at $descriptor")
-        val parsed = runCatching { PipelineDescriptor.load(descriptor) }
-            .getOrElse { return Result.Rejected("invalid descriptor: ${it.message}") }
+    suspend fun trigger(): Result {
+        val resolution = resolver.resolve()
+        val resolved = when (resolution) {
+            is Rejected -> return Result.Rejected(resolution.reason)
+            is Resolved -> resolution
+        }
 
-        // Drive the checkout from the active project's source (033): override the descriptor's first `git:`
-        // step (or add a checkout when it has none). A project with no source leaves the pipeline unchanged.
+        // Drive the checkout from the active project's source (033). For a repo-hosted descriptor the
+        // resolved commit is passed as the source value, which ProjectSourceInjector's existing SHA rule
+        // pins as `sha` (034) — so the descriptor and the code always come from one commit.
         val activeProject = projects.activeName()
-        val source = activeProject?.let { projects.source(it) }
-        val pipeline = ProjectSourceInjector.apply(parsed, source)
+        val stored = activeProject?.let { projects.source(it) }
+        val source = stored?.let { it.copy(branch = resolved.sha ?: it.branch) }
+        val pipeline = ProjectSourceInjector.apply(resolved.pipeline, source)
         val repo = source?.repo?.takeIf { it.isNotBlank() }
 
         // Which project this run belongs to (039). The descriptor's own `project:` key still wins; failing
@@ -56,6 +59,7 @@ class RunTrigger(
                 status = "Running",
                 startedAt = startedAt,
                 repo = repo,
+                sha = resolved.sha,
                 trigger = "manual",
                 project = project,
                 // The pipeline as declared, every step Pending: the run's shape is known now, so the

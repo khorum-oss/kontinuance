@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController
 class TriggerController(private val trigger: RunTrigger) {
 
     @PostMapping("/api/runs/trigger")
-    fun trigger(): ResponseEntity<*> = when (val result = trigger.trigger()) {
+    suspend fun trigger(): ResponseEntity<*> = when (val result = trigger.trigger()) {
         is RunTrigger.Result.Accepted ->
             ResponseEntity.status(HttpStatus.ACCEPTED).body(RunIdResponse(result.id))
         is RunTrigger.Result.Rejected ->

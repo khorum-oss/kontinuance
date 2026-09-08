@@ -4,7 +4,7 @@ import java.nio.file.Path
 import kotlin.io.path.exists
 
 /**
- * Opens the run history for a state directory, choosing between the two backends (041).
+ * Opens the run history for a state directory, choosing between the two backends (042).
  *
  * Everything that persists run state — the server and the standalone `kontinuance-ci` CLI — opens it
  * here rather than naming a backend itself, so the two can never end up reading different stores of the
@@ -24,7 +24,7 @@ object RunStores {
         /** One JSON file per run plus one log file per run — the original layout (006/018). */
         FILE,
 
-        /** An embedded SQLite database, `kontinuance.db`, holding both (041). */
+        /** An embedded SQLite database, `kontinuance.db`, holding both (042). */
         SQLITE,
         ;
 

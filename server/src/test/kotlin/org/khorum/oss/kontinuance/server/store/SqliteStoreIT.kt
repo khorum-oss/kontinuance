@@ -18,7 +18,7 @@ import kotlin.io.path.exists
 import kotlin.test.assertTrue
 
 /**
- * The default wiring end to end (041): with no backend named, the server opens an embedded SQLite
+ * The default wiring end to end (042): with no backend named, the server opens an embedded SQLite
  * database under the configured store directory, and what it records there is what `/api/runs` and
  * `/api/runs/{id}/logs` serve.
  *

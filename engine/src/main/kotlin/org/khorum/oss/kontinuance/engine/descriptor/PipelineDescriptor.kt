@@ -26,6 +26,10 @@ import kotlin.io.path.readText
  * Parsing is **strict** — unknown keys, missing required keys, or malformed values raise a
  * [DescriptorException] identifying the location, and no step executes (FR-003). The produced
  * model is identical to the equivalent Kotlin-DSL definition (FR-002, SC-002).
+ *
+ * One rule is stricter here than in the model: a descriptor must declare **at least one stage**.
+ * [Pipeline] itself still permits a stage-less pipeline, but a *descriptor* that declares none can
+ * only be an oversight, so it is rejected at parse time rather than run to a hollow Success.
  */
 @Suppress("TooManyFunctions") // a cohesive strict parser — one small parse function per descriptor shape
 object PipelineDescriptor {
@@ -69,6 +73,16 @@ object PipelineDescriptor {
         val project = pipelineMap["project"]?.let { asString(it, "pipeline.project") }
         val stages = asListOrEmpty(pipelineMap["stages"], "pipeline.stages")
             .mapIndexed { i, raw -> parseStage(raw, "pipeline.stages[$i]") }
+        // The model permits a stage-less [Pipeline] (the DSL and the engine both honour it), but a
+        // descriptor that declares none is a mistake every time: it parses, runs nothing, and reports
+        // Success. With a project source attached it is worse still — the synthesized checkout is the
+        // only thing that executes, so the run looks like one that started and then stalled.
+        if (stages.isEmpty()) {
+            throw DescriptorException(
+                "pipeline.stages: a pipeline must declare at least one stage; " +
+                    "a stage-less descriptor would run nothing and report Success",
+            )
+        }
 
         return construct("pipeline") { Pipeline(name, stages, concurrency, project) }
     }

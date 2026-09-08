@@ -9,6 +9,7 @@ import org.gradle.api.plugins.JavaApplication
 // serialization-json + snakeyaml-engine (already used by :engine, already verified).
 plugins {
     id("io.gitlab.arturbosch.detekt")
+    id("java-test-fixtures")
 }
 
 group = "org.khorum.oss.kontinuance"
@@ -24,6 +25,11 @@ dependencies {
     testImplementation(rootProject.libs.mockk)
     testImplementation(rootProject.libs.coroutines.test)
 }
+
+// `java-test-fixtures` (a built-in Gradle plugin, not a new external artifact — FR-012 stays satisfied)
+// exposes RecordingGitHubClient (src/testFixtures) so :server's tests can use the same fake GitHubClient
+// (041) rather than re-implementing it. In-module tests keep using it exactly as before: the plugin
+// auto-wires this module's own `test` source set to depend on `testFixtures`.
 
 // The `application` plugin is applied to every module by the root build; point this module's launcher
 // at the event-source runner so `./gradlew :github:run --args="<config.yaml>"` and installDist work.
@@ -72,6 +78,13 @@ detekt {
 
 tasks.withType<Detekt>().configureEach {
     jvmTarget = JavaVersion.VERSION_21.majorVersion
+}
+
+// `detekt` (the task `check` depends on by default) only scans src/{main,test}; it does not pick up
+// src/testFixtures added by the `java-test-fixtures` plugin above. Wire the plugin's own
+// `detektTestFixtures` task into `check` so RecordingGitHubClient stays linted.
+tasks.named("check") {
+    dependsOn("detektTestFixtures")
 }
 
 tasks.withType<DetektCreateBaselineTask>().configureEach {

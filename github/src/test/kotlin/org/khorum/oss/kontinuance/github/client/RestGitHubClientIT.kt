@@ -62,6 +62,7 @@ class RestGitHubClientIT {
             server.on("GET", "/repos/.+/commits/.+", body = """{"sha":"branchsha","commit":{}}""")
             val client = RestGitHubClient(token = "t", baseUrl = server.baseUrl)
             assertEquals("branchsha", client.branchHead(repo, "main"))
+            assertEquals(listOf("application/vnd.github+json"), server.requests.single().accept)
         }
     }
 
@@ -83,6 +84,44 @@ class RestGitHubClientIT {
             val error = assertFailsWith<GitHubApiException> {
                 client.createCommitStatus(repo, "sha", CommitStatus(CommitStatus.State.PENDING, "c", "d"))
             }
+            assertEquals(500, error.statusCode)
+        }
+    }
+
+    @Test
+    fun `fetches a file's contents at a ref`() = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/contents/.+", body = "pipeline:\n  name: \"demo\"\n")
+            val client = RestGitHubClient(token = "t0k3n", baseUrl = server.baseUrl)
+
+            val text = client.fileAt(repo, "kontinuance.yml", "abc123")
+
+            assertEquals("pipeline:\n  name: \"demo\"\n", text)
+            val request = server.requests.single()
+            assertEquals("/repos/khorum-oss/kontinuance/contents/kontinuance.yml", request.path)
+            assertTrue(request.rawUri.contains("ref=abc123"), request.rawUri)
+            assertEquals("Bearer t0k3n", request.authorization)
+            assertEquals(listOf("application/vnd.github.raw"), request.accept)
+        }
+    }
+
+    @Test
+    fun `returns null when the file does not exist at that ref`() = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/contents/.+", status = 404, body = """{"message":"Not Found"}""")
+            val client = RestGitHubClient(token = "t0k3n", baseUrl = server.baseUrl)
+
+            assertNull(client.fileAt(repo, "kontinuance.yml", "abc123"))
+        }
+    }
+
+    @Test
+    fun `raises on a non-404 failure rather than reporting an absent file`() = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/contents/.+", status = 500, body = """{"message":"boom"}""")
+            val client = RestGitHubClient(token = "t0k3n", baseUrl = server.baseUrl)
+
+            val error = assertFailsWith<GitHubApiException> { client.fileAt(repo, "kontinuance.yml", "abc") }
             assertEquals(500, error.statusCode)
         }
     }

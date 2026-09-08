@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The behaviour every [RunStore] backend owes its callers, run against each one (041).
+ * The behaviour every [RunStore] backend owes its callers, run against each one (042).
  *
  * Written once and inherited rather than duplicated per backend: the point of the seam is that the
  * server cannot tell which store it was handed, and a contract that only one implementation is held to

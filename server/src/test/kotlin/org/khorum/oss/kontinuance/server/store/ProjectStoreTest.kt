@@ -123,6 +123,50 @@ class ProjectStoreTest {
     }
 
     @Test
+    fun `a repo-only project (source sidecar, no descriptor) is listed and exists`() {
+        // 041's core story: an operator connects a project with just a repo, so there is never a
+        // <name>.yml — only the <name>.meta.json sidecar. list() and exists() must still see it.
+        val store = ProjectStore(dir)
+        store.saveSource("repo-only", ProjectSource("https://example.test/repo-only", "main"))
+
+        assertEquals(listOf("repo-only"), store.list())
+        assertTrue(store.exists("repo-only"))
+    }
+
+    @Test
+    fun `get stays null for a repo-only project even though it exists`() {
+        // Load-bearing: DescriptorResolver treats a null get() as "go fetch from GitHub instead". Widening
+        // get() to also see the source sidecar would break that signal, so this must never change.
+        val store = ProjectStore(dir)
+        store.saveSource("repo-only", ProjectSource("https://example.test/repo-only", "main"))
+
+        assertNull(store.get("repo-only"))
+    }
+
+    @Test
+    fun `list unions descriptor and source names without duplicating one present in both`() {
+        val store = ProjectStore(dir)
+        store.save("both", "x")
+        store.saveSource("both", ProjectSource("https://example.test/both", "main"))
+        store.saveSource("source-only", ProjectSource("https://example.test/source-only", "main"))
+        store.save("descriptor-only", "y")
+
+        assertEquals(listOf("both", "descriptor-only", "source-only"), store.list())
+    }
+
+    @Test
+    fun `a name containing a suffix-like substring is not mangled by suffix stripping`() {
+        // "foo.meta" as a project name produces sidecar file "foo.meta.meta.json" — removeSuffix must
+        // strip only the trailing SOURCE_SUFFIX, not be confused by the embedded ".meta" in the name.
+        val store = ProjectStore(dir)
+        store.saveSource("foo.meta", ProjectSource("https://example.test/foo-meta", "main"))
+
+        assertEquals(listOf("foo.meta"), store.list())
+        assertTrue(store.exists("foo.meta"))
+        assertNull(store.get("foo.meta"))
+    }
+
+    @Test
     fun `isValidName accepts slugs and rejects paths and empties`() {
         assertTrue(ProjectStore.isValidName("kontinuance-service"))
         assertTrue(ProjectStore.isValidName("infra_charts.v2"))

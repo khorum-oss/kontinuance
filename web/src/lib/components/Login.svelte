@@ -11,6 +11,7 @@
 	import { api, ApiError } from '$lib/api/client';
 	import { lastRunAge } from '$lib/api/present';
 	import type { Project } from '$lib/api/types';
+	import AddProject from './AddProject.svelte';
 
 	let {
 		requireSignIn = false,
@@ -43,12 +44,6 @@
 
 	// add-project panel state
 	let addOpen = $state(false);
-	let newName = $state('');
-	let newText = $state('');
-	let newRepo = $state('');
-	let newBranch = $state('');
-	let adding = $state(false);
-	let addError = $state<string | null>(null);
 
 	// per-card source editor state (033) — one project open at a time
 	let sourceEditing = $state<string | null>(null);
@@ -107,25 +102,6 @@
 		} catch (e) {
 			projectsError = e instanceof ApiError ? e.message : (e as Error).message;
 			selecting = null;
-		}
-	}
-
-	async function addProject() {
-		if (adding || !newName.trim() || !newText.trim()) return;
-		adding = true;
-		addError = null;
-		try {
-			await api.addProject(newName.trim(), newText, newRepo.trim(), newBranch.trim());
-			addOpen = false;
-			newName = '';
-			newText = '';
-			newRepo = '';
-			newBranch = '';
-			await loadProjects();
-		} catch (e) {
-			addError = e instanceof ApiError ? e.message : (e as Error).message;
-		} finally {
-			adding = false;
 		}
 	}
 
@@ -216,56 +192,10 @@
 
 			<!-- add project panel -->
 			{#if addOpen}
-				<div class="add-panel">
-					<div class="add-top">
-						<span class="k-mono add-title">ADD PROJECT</span>
-						<button class="k-mono link close" onclick={() => (addOpen = false)}>✕ CLOSE</button>
-					</div>
-					<input
-						class="k-mono field"
-						placeholder="project name — e.g. my-service"
-						spellcheck="false"
-						bind:value={newName}
-					/>
-					<div class="src-row">
-						<input
-							class="k-mono field"
-							aria-label="new project repo"
-							placeholder="repo URL (optional) — https://…"
-							spellcheck="false"
-							bind:value={newRepo}
-						/>
-						<input
-							class="k-mono field"
-							aria-label="new project branch"
-							placeholder="branch, tag, or commit SHA (optional)"
-							spellcheck="false"
-							bind:value={newBranch}
-						/>
-					</div>
-					<textarea
-						class="k-mono editor"
-						aria-label="descriptor source"
-						placeholder="pipeline:&#10;  name: &quot;my-service&quot;&#10;  stages: …"
-						spellcheck="false"
-						bind:value={newText}
-					></textarea>
-					{#if addError}
-						<div class="k-mono add-err" role="alert">{addError}</div>
-					{/if}
-					<div class="add-row">
-						<button
-							class="k-mono add-btn"
-							disabled={adding || !newName.trim() || !newText.trim()}
-							onclick={addProject}
-						>
-							{adding ? 'SAVING…' : 'SAVE PROJECT'}
-						</button>
-					</div>
-					<div class="k-mono add-help">
-						the descriptor is validated by the engine parser — an invalid one is rejected, not stored
-					</div>
-				</div>
+				<AddProject
+					onadded={() => loadProjects()}
+					onclose={() => (addOpen = false)}
+				/>
 			{/if}
 
 			<!-- project grid -->
@@ -578,58 +508,10 @@
 	.tool-hint code {
 		color: var(--k-muted-3);
 	}
-	.add-panel {
-		flex: none;
-		margin: 0 32px 16px;
-		padding: 20px;
-		border: 1px solid rgba(94, 234, 212, 0.3);
-		background: rgba(94, 234, 212, 0.03);
-		border-radius: 8px;
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-	}
-	.add-top {
-		display: flex;
-		align-items: center;
-	}
-	.add-title {
-		font-size: 10px;
-		letter-spacing: 2px;
-		color: var(--k-teal);
-	}
-	.close {
-		margin-left: auto;
-		font-size: 10px;
-	}
-	.close:hover {
-		color: var(--k-fail);
-	}
-	.editor {
-		width: 100%;
-		box-sizing: border-box;
-		min-height: 160px;
-		resize: vertical;
-		padding: 12px 16px;
-		background: var(--k-surface-2);
-		border: 1px solid var(--k-border);
-		border-radius: 5px;
-		color: var(--k-text);
-		font-size: 11.5px;
-		line-height: 1.7;
-		outline: none;
-	}
-	.editor:focus {
-		border-color: rgba(94, 234, 212, 0.55);
-	}
 	.add-err {
 		font-size: 10px;
 		color: var(--k-fail);
 		white-space: pre-wrap;
-	}
-	.add-row {
-		display: flex;
-		gap: 10px;
 	}
 	.add-btn {
 		flex: none;
@@ -648,10 +530,6 @@
 	.add-btn:disabled {
 		opacity: 0.5;
 		cursor: default;
-	}
-	.add-help {
-		font-size: 9.5px;
-		color: var(--k-faint);
 	}
 	.ws-body {
 		flex: 1;
@@ -718,14 +596,6 @@
 		flex-direction: column;
 		gap: 8px;
 		padding: 0 18px 16px;
-	}
-	.src-row {
-		display: flex;
-		gap: 10px;
-	}
-	.src-row .field {
-		flex: 1;
-		min-width: 0;
 	}
 	.src-edit .add-btn {
 		align-self: flex-start;

@@ -68,7 +68,9 @@ test('the project select names its scope even when that scope has zero matching 
 	await expect(page.getByLabel('filter by project')).toHaveValue('relikquary');
 });
 
-test('disables the trigger for a project with no descriptor and explains why', async ({ page }) => {
+test('disables the trigger for a project with neither a descriptor nor a source and explains why', async ({
+	page
+}) => {
 	await page.goto('/');
 	await page.getByPlaceholder('username').fill('mkuraja');
 	await page.getByPlaceholder('password').fill('s3cret');
@@ -77,6 +79,18 @@ test('disables the trigger for a project with no descriptor and explains why', a
 
 	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeDisabled();
 	await expect(page.getByText(/no descriptor registered for relikquary/i)).toBeVisible();
+});
+
+// FR-006 (041): a project with a source (repo + branch) reverses the 039 rule above — Kontinuance can
+// read kontinuance.yml out of the repo at trigger time, so it is runnable despite storing no descriptor.
+test('enables the trigger for a project with a source but no stored descriptor', async ({ page }) => {
+	await page.goto('/');
+	await page.getByPlaceholder('username').fill('mkuraja');
+	await page.getByPlaceholder('password').fill('s3cret');
+	await page.getByText('SIGN IN', { exact: true }).click();
+	await page.getByText('aurora-uplink', { exact: true }).click();
+
+	await expect(page.getByRole('button', { name: 'RUN PIPELINE' })).toBeEnabled();
 });
 
 test('enables the trigger for a registered project', async ({ page }) => {

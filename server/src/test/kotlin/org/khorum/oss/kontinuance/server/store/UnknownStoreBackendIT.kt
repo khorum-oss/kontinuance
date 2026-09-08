@@ -6,7 +6,7 @@ import org.springframework.boot.SpringApplication
 import kotlin.test.assertTrue
 
 /**
- * A misspelled `KONTINUANCE_STORE_BACKEND` refuses to start (041).
+ * A misspelled `KONTINUANCE_STORE_BACKEND` refuses to start (042).
  *
  * The alternative — falling back to the default — would start the server against a store the operator
  * did not choose, and they would discover it from a dashboard showing no history rather than from a

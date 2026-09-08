@@ -15,6 +15,7 @@ class RecordingGitHubClient(
     private val pulls: List<PullRequest> = emptyList(),
     private var failuresBeforeSuccess: Int = 0,
     private val branchHeads: Map<String, String> = emptyMap(),
+    private val files: Map<String, String> = emptyMap(),
 ) : GitHubClient {
 
     /** Every (repo, sha, status) successfully posted, in order. */
@@ -23,6 +24,8 @@ class RecordingGitHubClient(
     override suspend fun listOpenPullRequests(repo: RepoRef): List<PullRequest> = pulls
 
     override suspend fun branchHead(repo: RepoRef, branch: String): String? = branchHeads[branch]
+
+    override suspend fun fileAt(repo: RepoRef, path: String, ref: String): String? = files[path]
 
     override suspend fun createCommitStatus(repo: RepoRef, sha: String, status: CommitStatus) {
         if (failuresBeforeSuccess > 0) {

@@ -3,7 +3,7 @@ package org.khorum.oss.kontinuance.persistence
 import java.nio.file.Path
 
 /**
- * Durable [RunLogStore] backed by the same embedded SQLite database as [SqliteRunStore] (041), so a
+ * Durable [RunLogStore] backed by the same embedded SQLite database as [SqliteRunStore] (042), so a
  * run's record and its output live in one file that can be copied or backed up as a unit.
  *
  * Each line is a row carrying its position, and the position is chosen by the insert itself

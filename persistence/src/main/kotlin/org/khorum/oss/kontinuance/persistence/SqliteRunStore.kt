@@ -5,7 +5,7 @@ import java.sql.ResultSet
 import java.time.Instant
 
 /**
- * Durable [RunStore] backed by an embedded SQLite database (041) — the queryable alternative to
+ * Durable [RunStore] backed by an embedded SQLite database (042) — the queryable alternative to
  * [FileRunStore], reachable through the same interface so no caller changes.
  *
  * What the database buys over one JSON file per run: a write is atomic (a reader never sees a

@@ -275,40 +275,63 @@ const configPlan = {
 	deploy: 'argocd / kontinuance-stage'
 };
 
+const defaultConfigText =
+	'# kontinuance.yml — pipeline definition\nversion: 0.4\nproject: kontinuance-service';
+
 /**
- * Serve the config screen. `GET` returns the fixture descriptor; `PUT` (027) echoes the edited text back
- * as the refreshed config, or rejects it 400 when the text contains `BROKEN` (a stand-in for the server's
- * strict-parser validation) so the editor's inline-error path can be exercised.
+ * Serve the config screen. `GET` returns the fixture descriptor, tagged with its provenance (041):
+ * `origin: 'repo'`, not overridden, until a `PUT` (027) stores an edit — which flips it to
+ * `origin: 'stored'`/`overridden: true` — and `DELETE /api/config/override` reverts it back. A `PUT`
+ * rejects 400 when the text contains `BROKEN` (a stand-in for the server's strict-parser validation) so
+ * the editor's inline-error path can be exercised; a revert with nothing to revert answers 409.
  */
 export async function mockConfig(page: Page): Promise<void> {
-	await page.route(/\/api\/config/, (route) => {
+	let text = defaultConfigText;
+	let origin: 'repo' | 'stored' = 'repo';
+	let overridden = false;
+
+	await page.route(/\/api\/config\/override$/, (route) => {
+		if (route.request().method() !== 'DELETE') return route.fallback();
+		if (!overridden) {
+			return route.fulfill({ status: 409, json: { error: 'nothing to revert' } });
+		}
+		text = defaultConfigText;
+		origin = 'repo';
+		overridden = false;
+		return route.fulfill({ json: { source: 'kontinuance.yml', text, plan: configPlan, origin, overridden } });
+	});
+
+	await page.route(/\/api\/config$/, (route) => {
 		if (route.request().method() === 'PUT') {
 			const body = JSON.parse(route.request().postData() ?? '{}') as { text?: string };
-			const text = body.text ?? '';
-			if (text.includes('BROKEN')) {
+			const edited = body.text ?? '';
+			if (edited.includes('BROKEN')) {
 				return route.fulfill({
 					status: 400,
 					json: { error: 'pipeline.stages[0]: unknown key(s) [BROKEN]' }
 				});
 			}
-			return route.fulfill({ json: { source: 'kontinuance.yml', text, plan: configPlan } });
+			text = edited;
+			origin = 'stored';
+			overridden = true;
+			return route.fulfill({ json: { source: 'kontinuance.yml', text, plan: configPlan, origin, overridden } });
 		}
-		return route.fulfill({
-			json: {
-				source: 'kontinuance.yml',
-				text: '# kontinuance.yml — pipeline definition\nversion: 0.4\nproject: kontinuance-service',
-				plan: configPlan
-			}
-		});
+		return route.fulfill({ json: { source: 'kontinuance.yml', text, plan: configPlan, origin, overridden } });
 	});
 }
 
 /**
- * Serve the named-project registry (032): the project list + add + activate. Seeded with two projects
- * (`kontinuance-service` active, `infra-charts` available). `POST /api/projects` appends a project —
- * rejecting a bad-slug name (400), a duplicate (409), and a descriptor containing `BROKEN` (400, a
- * stand-in for the server's strict-parser validation). Activate flips which project is active. State is
- * in-memory so the add + reload flow reflects the new project.
+ * Serve the named-project registry (032): the project list + add + activate. Seeded with three projects,
+ * each exercising exactly one runnability shape (039/041):
+ *   - `kontinuance-service` (active) and `infra-charts`: a stored descriptor, so runnable regardless of
+ *     source.
+ *   - `relikquary`: NEITHER a stored descriptor NOR a source — discovered from run history alone, not
+ *     runnable.
+ *   - `aurora-uplink`: a source (repo + branch) but NO stored descriptor — runnable per FR-006 (041),
+ *     since Kontinuance reads `kontinuance.yml` out of the repo at trigger time.
+ * `POST /api/projects` appends a project — rejecting a bad-slug name (400), a duplicate (409), and a
+ * descriptor containing `BROKEN` (400, a stand-in for the server's strict-parser validation). Activate
+ * flips which project is active. State is in-memory so the add + reload flow reflects the new project.
  */
 export async function mockProjects(page: Page): Promise<void> {
 	const projects: {
@@ -323,7 +346,8 @@ export async function mockProjects(page: Page): Promise<void> {
 	}[] = [
 		{ name: 'kontinuance-service', active: true, runnable: true },
 		{ name: 'infra-charts', active: false, runnable: true },
-		// A project discovered from run history alone (039): builds, but no registered descriptor.
+		// A project discovered from run history alone (039): builds, but no registered descriptor, and no
+		// source either — the "neither" shape, still not runnable under FR-006.
 		{
 			name: 'relikquary',
 			active: false,
@@ -332,6 +356,16 @@ export async function mockProjects(page: Page): Promise<void> {
 			runCount: 12,
 			lastStatus: 'Success',
 			lastRunAt: '2026-07-17T00:00:00Z'
+		},
+		// A project with a source (repo + branch) but no stored descriptor (041, FR-006): Kontinuance can
+		// read kontinuance.yml out of the repo at trigger time, so this IS runnable despite having nothing
+		// stored.
+		{
+			name: 'aurora-uplink',
+			active: false,
+			runnable: true,
+			repo: 'khorum-oss/aurora-uplink',
+			branch: 'main'
 		}
 	];
 	await page.route(/\/api\/projects\/[^/?]+\/activate$/, (route) => {
@@ -373,7 +407,13 @@ export async function mockProjects(page: Page): Promise<void> {
 			const repo = (body.repo ?? '').trim() || undefined;
 			const branch = repo ? (body.branch ?? '').trim() || undefined : undefined;
 			projects.push({ name, active: false, repo, branch });
-			return route.fulfill({ json: { name } });
+			// A repo-backed project gets an advisory descriptor check (041) — the server read
+			// kontinuance.yml out of the repository at add time. Stand in with a deterministic result
+			// derived from the repo's short name so the fixture stays predictable across tests.
+			const descriptor = repo
+				? { ok: true, pipeline: `${repo.split('/').pop()}-ci`, stages: 3 }
+				: undefined;
+			return route.fulfill({ json: { name, descriptor } });
 		}
 		const active = projects.find((p) => p.active)?.name ?? null;
 		// `runWindow` mirrors the real server: the window its run counts were derived over, which the

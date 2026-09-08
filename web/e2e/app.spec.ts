@@ -80,12 +80,35 @@ test.describe('authentication', () => {
 		await page.getByPlaceholder(/project name/).fill('billing-api');
 		await page.getByLabel('new project repo').fill('https://example.test/billing');
 		await page.getByLabel('new project branch').fill('main');
+		await page.getByText('paste a descriptor instead').click();
 		await page
 			.getByLabel('descriptor source')
-			.fill('pipeline:\n  name: "billing-api"\n  stages: []');
+			.fill(
+				'pipeline:\n  name: "billing-api"\n  stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]'
+			);
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 		await expect(page.getByText('billing-api', { exact: true })).toBeVisible();
 		await expect(page.getByText('https://example.test/billing · main')).toBeVisible();
+	});
+
+	test('connects a project from a repository with no descriptor', async ({ page }) => {
+		await mockApi(page);
+		await page.goto('/');
+		await page.getByPlaceholder('username').fill('mkuraja');
+		await page.getByPlaceholder('password').fill('s3cret');
+		await page.getByText('SIGN IN', { exact: true }).click();
+
+		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
+		await page.getByPlaceholder(/project name/).fill('spektr');
+		await page.getByLabel('new project repo').fill('https://github.com/khorum-oss/spektr');
+		await page.getByLabel('new project branch').fill('main');
+
+		// The descriptor box is not shown until asked for.
+		await expect(page.getByLabel('descriptor source')).toBeHidden();
+
+		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
+		await expect(page.getByText(/found kontinuance\.yml/)).toBeVisible();
+		await expect(page.getByText('spektr', { exact: true })).toBeVisible();
 	});
 
 	test('sets a source on an existing project inline', async ({ page }) => {
@@ -115,6 +138,7 @@ test.describe('authentication', () => {
 
 		await page.getByRole('button', { name: '+ ADD PROJECT', exact: true }).click();
 		await page.getByPlaceholder(/project name/).fill('bad-one');
+		await page.getByText('paste a descriptor instead').click();
 		await page.getByLabel('descriptor source').fill('BROKEN: not a pipeline');
 		await page.getByRole('button', { name: 'SAVE PROJECT', exact: true }).click();
 
@@ -399,6 +423,29 @@ test.describe('config screen', () => {
 		await expect(page.getByText('RESOLVED PLAN')).toBeVisible();
 		await expect(page.getByText(/max parallelism/)).toBeVisible();
 		await expect(page.getByText('KONTINUANCE DSL')).toBeVisible();
+	});
+
+	test('shows where the descriptor came from and reverts an override', async ({ page }) => {
+		await mockApi(page);
+		await mockConfig(page);
+		await page.goto('/config');
+		await enterApp(page);
+
+		await expect(page.getByText('from the repository')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'REVERT TO REPO', exact: true })).toBeHidden();
+
+		await page.getByRole('button', { name: 'EDIT', exact: true }).click();
+		await page
+			.getByLabel('descriptor source')
+			.fill(
+				'pipeline:\n  name: "patched"\n  stages: [{ name: "s", steps: [{ name: "x", run: "true" }] }]'
+			);
+		await page.getByRole('button', { name: 'SAVE', exact: true }).click();
+
+		await expect(page.getByText('OVERRIDDEN')).toBeVisible();
+		await page.getByRole('button', { name: 'REVERT TO REPO', exact: true }).click();
+		await expect(page.getByText('from the repository')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'REVERT TO REPO', exact: true })).toBeHidden();
 	});
 
 	test('edits the descriptor and saves it, and shows a validation error for a bad edit', async ({ page }) => {
