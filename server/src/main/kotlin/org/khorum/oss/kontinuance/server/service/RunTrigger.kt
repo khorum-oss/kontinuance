@@ -67,7 +67,7 @@ class RunTrigger(
                 stages = RunRecord.skeleton(pipeline),
             ),
         )
-        launcher.launch(id, pipeline, startedAt, context = RunContext(repo, project))
+        launcher.launch(id, pipeline, startedAt, context = RunContext(repo, project, resolved.sha))
         return Result.Accepted(id)
     }
 

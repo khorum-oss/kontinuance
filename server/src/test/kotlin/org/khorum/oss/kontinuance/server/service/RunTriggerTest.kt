@@ -263,6 +263,47 @@ class RunTriggerTest {
     }
 
     @Test
+    fun `finishing a run keeps the commit and start time the trigger recorded`(@TempDir dir: Path) = runTest {
+        // Each record replaces the last by id, so a field the engine cannot report is not merely absent
+        // from the terminal write — it erases what the `Running` record already had. That is how a run
+        // lost its commit the moment it finished.
+        val store = RecordingRunStore()
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val client = RecordingGitHubClient(
+            branchHeads = mapOf("main" to "abc1234"),
+            files = mapOf("kontinuance.yml" to validDescriptor),
+        )
+
+        triggerFor(store, FakeEngine(PipelineStatus.Success), dir.resolve("live.yml"), projects, client).trigger()
+
+        assertEquals(2, store.writes.size, "expected a running record and a terminal record")
+        assertTrue(store.writes.all { it.sha == "abc1234" }, "every record should name the commit it ran")
+        assertTrue(store.writes.all { it.repo != null }, "every record should name the repository")
+        assertTrue(store.writes.all { it.startedAt != null }, "the terminal record keeps a start time")
+    }
+
+    @Test
+    fun `a run that fails before any step keeps its commit`(@TempDir dir: Path) = runTest {
+        val store = RecordingRunStore()
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val client = RecordingGitHubClient(
+            branchHeads = mapOf("main" to "abc1234"),
+            files = mapOf("kontinuance.yml" to validDescriptor),
+        )
+        val engine = FakeEngine(failWith = IllegalStateException("boom"))
+
+        triggerFor(store, engine, dir.resolve("live.yml"), projects, client).trigger()
+
+        val terminal = store.writes.last()
+        assertEquals("Failed", terminal.status)
+        assertEquals("abc1234", terminal.sha, "the failure record keeps the commit too")
+    }
+
+    @Test
     fun `records the declared stage breakdown before the run produces any result`(@TempDir dir: Path) = runTest {
         val store = RecordingRunStore()
         val file = dir.resolve("kontinuance.yml")
