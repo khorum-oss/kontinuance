@@ -44,7 +44,9 @@ import java.nio.file.Path
  *   check never blocks creation.
  * - `POST /api/projects/{name}/activate` — make a project active: write its descriptor to the server's live
  *   descriptor file (so the trigger and Config screen use it) and record it as active; `404` if unknown.
- * - `POST /api/projects/{name}/source` — set/update a project's source (repo/branch, 033); `404` if unknown.
+ * - `POST /api/projects/{name}/source` — set/update a project's source (repo/branch, 033); `404` if
+ *   unknown, and `409` when clearing the repo of a project that has no stored descriptor, whose source
+ *   sidecar is the only thing registering it (041).
  *
  * Handlers return typed DTOs the Jackson codec serializes.
  */
@@ -86,8 +88,10 @@ class ProjectController(
                     branch = src?.branch,
                     derived = name !in registered,
                     // Runnable when there is something to run: a stored descriptor, or a source to read
-                    // one from (041). A derived project with neither stays non-runnable.
-                    runnable = name in registered || src != null,
+                    // one from (041) — `registered` covers both, since ProjectStore.list() reports a
+                    // project carrying only a source sidecar. A derived project (039), which has neither
+                    // and exists solely as a projection over run history, stays non-runnable.
+                    runnable = name in registered,
                     runCount = stat?.count ?: 0,
                     lastStatus = stat?.status,
                     lastRunAt = stat?.at,
@@ -236,6 +240,17 @@ class ProjectController(
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse("no such project: $name"))
         }
         val source = ProjectSource(request?.repo, request?.branch)
+        // Clearing the repo deletes the sidecar, which since 041 may be the project's ONLY registration
+        // file — a repo-only project would vanish from /api/projects on a 200, taking any `.active`
+        // pointer at it with it. Refuse instead: there is nothing left to run afterwards.
+        if (!source.hasRepo && withContext(Dispatchers.IO) { store.get(name) } == null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ErrorResponse(
+                    "'$name' is registered only by its repository — clearing it would delete the project. " +
+                        "Store a descriptor for it first, or point it at another repository.",
+                ),
+            )
+        }
         withContext(Dispatchers.IO) { store.saveSource(name, source) }
         return ResponseEntity.ok(
             if (source.hasRepo) {

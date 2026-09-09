@@ -151,7 +151,8 @@ export interface Coverage {
 // A named pipeline descriptor the server stores and can run (032). `active` marks the one in effect.
 // `repo`/`branch` are the project's optional source (033): when set, a run of the project checks them out.
 // `derived` marks a project computed from run history rather than a registered descriptor (039);
-// `runnable` is false exactly when there is no descriptor to run.
+// `runnable` is false only when there is neither a descriptor nor a source — since 041 a project with a
+// source alone is runnable, because its descriptor is read from the repository at trigger time.
 export interface Project {
 	name: string;
 	active: boolean;
