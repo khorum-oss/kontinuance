@@ -25,9 +25,11 @@ import java.nio.file.Path
 /**
  * Serves and edits `/api/config`. `GET` asks [DescriptorResolver] what would actually run (041, FR-008)
  * and renders the response from exactly that — its own text and its own parsed pipeline — so `source`,
- * `text`, and `origin` can never disagree; only when nothing resolved does it fall back to reading a real
- * Kontinuance descriptor off local disk (parsed by [DescriptorConfigReader]), or fixture data if even that
- * is absent. `PUT` (027) accepts an edited descriptor `{ "text": … }`, validates it with the engine's
+ * `text`, and `origin` can never disagree. When resolution fails for the *active project* it reports
+ * `origin: "unresolved"` and the resolver's reason instead of a descriptor; only with no active project
+ * does it fall back to reading a real Kontinuance descriptor off local disk (parsed by
+ * [DescriptorConfigReader]), or fixture data if even that is absent. `PUT` (027) accepts an edited
+ * descriptor `{ "text": … }`, validates it with the engine's
  * strict parser via [DescriptorConfigWriter], and — only if it parses — writes it to the descriptor file
  * *and* to the active project's stored slot (so an edit against a repo-hosted project becomes a visible
  * override rather than a one-off change to the live file), returning the refreshed projection; an invalid
@@ -47,7 +49,27 @@ class ConfigController(
     @GetMapping("/api/config")
     suspend fun config(): ConfigResponse = when (val resolution = resolver.resolve()) {
         is Resolved -> withContext(Dispatchers.IO) { renderResolved(resolution) }
-        is Rejected -> withContext(Dispatchers.IO) { DescriptorConfigReader.read(descriptor) } ?: StubFixtures.config()
+        is Rejected -> withContext(Dispatchers.IO) { rejected(resolution) }
+    }
+
+    /**
+     * What to show when nothing resolved.
+     *
+     * With an active project, the answer is the resolver's reason and no descriptor at all. Falling back
+     * to the live descriptor file here would show whichever project was activated last — or, on a fresh
+     * server, fabricated fixture content — under this project's name, and an EDIT + SAVE would then store
+     * that unrelated pipeline as this project's override. It would also contradict `RunTrigger`, which
+     * refuses with exactly this reason.
+     *
+     * With no active project there is no project whose resolution could be said to have failed: the live
+     * file is legitimately what a plain single-descriptor deployment runs (FR-009a), so that path keeps
+     * its pre-041 behaviour, fixture content included.
+     */
+    private fun rejected(rejection: Rejected): ConfigResponse {
+        val active = projects.activeName()
+            ?: return DescriptorConfigReader.read(descriptor) ?: StubFixtures.config()
+        return DescriptorConfigReader.project(source = active, text = "", pipeline = null)
+            .copy(origin = "unresolved", reason = rejection.reason)
     }
 
     /**

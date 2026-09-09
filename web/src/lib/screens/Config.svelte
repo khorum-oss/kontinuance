@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { descriptorOriginLabel } from '$lib/api/present';
+	import { descriptorOriginLabel, descriptorProblem } from '$lib/api/present';
 	import type { Config } from '$lib/api/types';
 
 	let {
@@ -28,6 +28,8 @@
 	} = $props();
 
 	const lines = $derived(config ? config.text.split('\n') : []);
+	// Nothing resolved: there is no descriptor to show or edit, only the reason.
+	const problem = $derived(config ? descriptorProblem(config) : null);
 
 	let editing = $state(false);
 	let draft = $state('');
@@ -76,7 +78,9 @@
 					<button class="act save" onclick={save} disabled={saving}>{saving ? 'SAVING…' : 'SAVE'}</button>
 				{:else}
 					<span class="origin">{descriptorOriginLabel(config)}</span>
-					<button class="act edit" onclick={startEdit}>EDIT</button>
+					{#if !problem}
+						<button class="act edit" onclick={startEdit}>EDIT</button>
+					{/if}
 				{/if}
 			</div>
 			{#if config.overridden}
@@ -92,7 +96,16 @@
 					<div class="save-err k-mono" role="alert">{revertError}</div>
 				{/if}
 			{/if}
-			{#if editing}
+			{#if problem}
+				<div class="unresolved k-mono" role="alert">
+					<div class="unresolved-head">DESCRIPTOR UNRESOLVED</div>
+					<div class="unresolved-why">{problem}</div>
+					<div class="unresolved-note">
+						a run of this project is refused for the same reason — no descriptor is shown here,
+						because saving one that isn't this project's would store it as an override
+					</div>
+				</div>
+			{:else if editing}
 				<textarea
 					class="editor k-mono"
 					aria-label="descriptor source"
@@ -252,6 +265,28 @@
 		font-size: 12px;
 		line-height: 1.85;
 		box-sizing: border-box;
+	}
+	.unresolved {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 22px 16px 26px;
+	}
+	.unresolved-head {
+		font-size: 10px;
+		letter-spacing: 2px;
+		color: var(--k-fail);
+	}
+	.unresolved-why {
+		font-size: 11.5px;
+		line-height: 1.7;
+		color: var(--k-muted);
+		white-space: pre-wrap;
+	}
+	.unresolved-note {
+		font-size: 9.5px;
+		line-height: 1.7;
+		color: var(--k-faint);
 	}
 	.save-err {
 		padding: 10px 16px;

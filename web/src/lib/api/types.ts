@@ -249,6 +249,9 @@ export interface Config {
 	text: string;
 	plan: PlanSummary;
 	// Where this descriptor came from, and whether a stored one is shadowing a repo that also has one (041).
+	// `origin: 'unresolved'` means the active project's descriptor could not be resolved at all: `text` is
+	// empty and `reason` says why, rather than the server showing some other project's descriptor here.
 	origin?: string;
 	overridden?: boolean;
+	reason?: string;
 }

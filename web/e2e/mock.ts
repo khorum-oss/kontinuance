@@ -321,6 +321,25 @@ export async function mockConfig(page: Page): Promise<void> {
 }
 
 /**
+ * Serve `GET /api/config` for an active project whose descriptor could not be resolved (041): no text,
+ * `origin: 'unresolved'`, and the resolver's reason — the shape a deleted branch, an expired token, or an
+ * exhausted rate limit produces.
+ */
+export async function mockUnresolvedConfig(page: Page, reason: string): Promise<void> {
+	await page.route(/\/api\/config$/, (route) =>
+		route.fulfill({
+			json: {
+				source: 'spektr',
+				text: '',
+				plan: { stages: 0, tasks: 0, maxParallel: 1, toolchain: '—', publish: '—', deploy: '—' },
+				origin: 'unresolved',
+				reason
+			}
+		})
+	);
+}
+
+/**
  * Serve the named-project registry (032): the project list + add + activate. Seeded with three projects,
  * each exercising exactly one runnability shape (039/041):
  *   - `kontinuance-service` (active) and `infra-charts`: a stored descriptor, so runnable regardless of

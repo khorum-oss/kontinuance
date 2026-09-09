@@ -193,17 +193,37 @@ export function mergeNewestFirst(records: Iterable<RunRecord>): RunRecord[] {
 
 // ----- descriptor provenance (041) -----
 
+/** What `/api/config` says about the descriptor it is (or is not) showing. */
+export interface DescriptorProvenance {
+	origin?: string;
+	overridden?: boolean;
+	/** Why resolution failed, present only with `origin: 'unresolved'`. */
+	reason?: string;
+}
+
 /** Where the descriptor the server would run came from, in words. Pure. */
-export function descriptorOriginLabel(config: { origin?: string; overridden?: boolean }): string {
+export function descriptorOriginLabel(config: DescriptorProvenance): string {
 	if (config.overridden) return 'overriding the repository';
 	switch (config.origin) {
 		case 'repo':
 			return 'from the repository';
 		case 'stored':
 			return 'stored on this server';
+		case 'unresolved':
+			return 'could not be resolved';
 		default:
 			return "from this server's descriptor file";
 	}
+}
+
+/**
+ * Why the active project has no descriptor to show, or null when one resolved. The screen renders this
+ * in place of the descriptor and hides EDIT: showing some other project's pipeline here would invite an
+ * operator to save it as this project's override. Pure.
+ */
+export function descriptorProblem(config: DescriptorProvenance): string | null {
+	if (config.origin !== 'unresolved') return null;
+	return config.reason ?? 'the descriptor for this project could not be resolved';
 }
 
 /** The add-time descriptor check as a tone + line, or null when nothing was checked. Pure. */

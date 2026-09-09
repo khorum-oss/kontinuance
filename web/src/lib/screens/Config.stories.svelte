@@ -18,5 +18,20 @@
 {/snippet}
 
 <Story name="Populated" args={{ config: sampleConfig }} {template} />
+<!-- The active project's descriptor could not be resolved (041): the reason stands in for the
+     descriptor, and EDIT is withheld so an unrelated pipeline cannot be saved as its override. -->
+<Story
+	name="Unresolved"
+	args={{
+		config: {
+			...sampleConfig,
+			source: 'spektr',
+			text: '',
+			origin: 'unresolved',
+			reason: "branch 'main' not found on khorum-oss/spektr"
+		}
+	}}
+	{template}
+/>
 <Story name="Loading" args={{ loading: true }} {template} />
 <Story name="Error" args={{ error: 'request failed: 500' }} {template} />
