@@ -113,7 +113,7 @@ class DescriptorResolver(
     /**
      * Parses [text], naming [failurePrefix] (which source it came from) in any rejection (FR-005).
      *
-     * Every failure is caught, not just [DescriptorException]: two parser paths raise a bare
+     * Every failure is caught, not just `DescriptorException`: two parser paths raise a bare
      * `IllegalArgumentException` / `NumberFormatException` (an empty `secrets:` entry, a timeout too
      * large for `Long`), and a repository's descriptor is untrusted input, so narrowing this catch turns
      * one of those into a 500 out of `POST /api/runs/trigger` instead of a clean refusal. `runCatching`

@@ -136,17 +136,20 @@
 		</div>
 
 		<div class="side">
-			<div class="card">
-				<div class="k-mono label">RESOLVED PLAN</div>
-				<div class="plan">
-					{config.plan.stages} stages · {config.plan.tasks} tasks · max parallelism
-					<span class="hl k-mono">{config.plan.maxParallel} lanes</span>
+			<!-- Nothing resolved, so there is no plan: an all-zero summary would read as a real one. -->
+			{#if !problem}
+				<div class="card">
+					<div class="k-mono label">RESOLVED PLAN</div>
+					<div class="plan">
+						{config.plan.stages} stages · {config.plan.tasks} tasks · max parallelism
+						<span class="hl k-mono">{config.plan.maxParallel} lanes</span>
+					</div>
+					<div class="k-mono meta">
+						toolchain {config.plan.toolchain}<br />publish → {config.plan.publish}<br />deploy → {config
+							.plan.deploy}
+					</div>
 				</div>
-				<div class="k-mono meta">
-					toolchain {config.plan.toolchain}<br />publish → {config.plan.publish}<br />deploy → {config
-						.plan.deploy}
-				</div>
-			</div>
+			{/if}
 			<div class="card dsl">
 				<div class="dsl-head">
 					<span class="k-mono label">KONTINUANCE DSL</span>

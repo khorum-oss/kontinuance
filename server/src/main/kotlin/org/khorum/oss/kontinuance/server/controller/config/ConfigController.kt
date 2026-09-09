@@ -29,11 +29,11 @@ import java.nio.file.Path
  * `origin: "unresolved"` and the resolver's reason instead of a descriptor; only with no active project
  * does it fall back to reading a real Kontinuance descriptor off local disk (parsed by
  * [DescriptorConfigReader]), or fixture data if even that is absent. `PUT` (027) accepts an edited
- * descriptor `{ "text": … }`, validates it with the engine's
- * strict parser via [DescriptorConfigWriter], and — only if it parses — writes it to the descriptor file
- * *and* to the active project's stored slot (so an edit against a repo-hosted project becomes a visible
- * override rather than a one-off change to the live file), returning the refreshed projection; an invalid
- * edit is rejected `400` with the parser's message and never overwrites anything. `DELETE
+ * descriptor `{ "text": … }`, validates it with the engine's strict parser via [DescriptorConfigWriter],
+ * and — only if it parses — writes it to the descriptor file *and* to the active project's stored slot
+ * (so an edit against a repo-hosted project becomes a visible override rather than a one-off change to
+ * the live file), returning the refreshed projection; an invalid edit is rejected `400` with the
+ * parser's message and never overwrites anything. `DELETE
  * /api/config/override` deletes the active project's stored descriptor, reverting it to its repository;
  * it is `409` when there is nothing to revert. The descriptor path comes from
  * `kontinuance.config.descriptor` (default `kontinuance.yml`, relative to the server's working directory).

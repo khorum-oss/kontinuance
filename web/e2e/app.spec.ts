@@ -460,8 +460,9 @@ test.describe('config screen', () => {
 		await expect(page.getByText('could not be resolved')).toBeVisible();
 		await expect(page.getByRole('alert')).toContainText("branch 'main' not found");
 		// No descriptor is shown, so there is nothing to edit — and nothing to save as this project's
-		// override by mistake.
+		// override by mistake — and no all-zero "resolved plan" pretending one resolved.
 		await expect(page.getByRole('button', { name: 'EDIT', exact: true })).toBeHidden();
+		await expect(page.getByText('RESOLVED PLAN')).toBeHidden();
 	});
 
 	test('edits the descriptor and saves it, and shows a validation error for a bad edit', async ({ page }) => {
