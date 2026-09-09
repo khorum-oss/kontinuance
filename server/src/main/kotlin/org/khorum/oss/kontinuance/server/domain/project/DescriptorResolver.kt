@@ -92,6 +92,11 @@ class DescriptorResolver(
             // Never reached GitHub at all (DNS, connection refused, TLS, timeout) — the one cause
             // FR-005 calls out by name, so it must land here rather than escape resolve().
             Rejected("GitHub unreachable — ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            // The branch is operator-typed and reaches the client as a URL path segment. The REST client
+            // encodes it, but this resolver takes any GitHubClient — belt and braces, so a request that
+            // still cannot be addressed rejects rather than escaping as a 500.
+            Rejected("could not address branch '$branch' on ${repo.slug}: ${e.message}")
         }
     }
 

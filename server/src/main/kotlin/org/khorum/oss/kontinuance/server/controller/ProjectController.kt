@@ -186,6 +186,11 @@ class ProjectController(
             // Never reached GitHub at all (DNS, connection refused, TLS, timeout) — a routine outcome for
             // an add-time check, since a token or network may not be ready yet (FR-007).
             DescriptorCheck(false, message = "GitHub unreachable — ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            // The branch is operator-typed and reaches the client as a URL path segment. The REST client
+            // encodes it, but this check takes any GitHubClient — belt and braces, so a request that
+            // still cannot be addressed is a warning, never a 500 that leaves the project uncreated.
+            DescriptorCheck(false, message = "could not address branch '$target' on ${ref.slug}: ${e.message}")
         }
     }
 

@@ -10,7 +10,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.URI
-import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -50,17 +49,18 @@ class RestGitHubClient(
     }
 
     override suspend fun branchHead(repo: RepoRef, branch: String): String? {
-        val response = send(get("$root/repos/${repo.slug}/commits/$branch"))
+        val response = send(get("$root/repos/${repo.slug}/commits/${encodePath(branch)}"))
         if (response.statusCode() == NOT_FOUND) return null
         requireSuccess(response)
         return Json.parseToJsonElement(response.body()).jsonObject.getValue("sha").jsonPrimitive.content
     }
 
     override suspend fun fileAt(repo: RepoRef, path: String, ref: String): String? {
-        val encodedPath = path.split('/').joinToString("/") { URLEncoder.encode(it, StandardCharsets.UTF_8) }
-        val encodedRef = URLEncoder.encode(ref, StandardCharsets.UTF_8)
+        // The ref is a single query value, so it is encoded whole — a `/` in it becomes %2F rather than
+        // splitting the parameter in two.
+        val target = "$root/repos/${repo.slug}/contents/${encodePath(path)}?ref=${encodeSegment(ref)}"
         // The raw media type returns file contents verbatim, so no base64 decode step is needed.
-        val request = baseRequest("$root/repos/${repo.slug}/contents/$encodedPath?ref=$encodedRef", RAW_ACCEPT)
+        val request = baseRequest(target, RAW_ACCEPT)
             .GET()
             .build()
         val response = send(request)
@@ -110,3 +110,39 @@ class RestGitHubClient(
         const val RAW_ACCEPT = "application/vnd.github.raw"
     }
 }
+
+/** RFC 3986 §2.3 unreserved characters — the only ones that never need escaping in a URI. */
+private val UNRESERVED = (('a'..'z') + ('A'..'Z') + ('0'..'9') + listOf('-', '.', '_', '~')).toSet()
+private const val HEX = "0123456789ABCDEF"
+private const val HEX_SHIFT = 4
+private const val HEX_MASK = 0xF
+
+/**
+ * Percent-encodes [value] as one URI path segment, RFC 3986 rules: everything outside the unreserved set
+ * is escaped. Deliberately **not** [java.net.URLEncoder], which is *form* encoding and turns a space into
+ * `+` — a character GitHub would read literally.
+ *
+ * Values reaching here are operator-typed (a branch from the connect form) and git permits plenty of
+ * characters that are illegal in a URI — `%`, a space, `|`, `{}` — so without this `URI.create` throws
+ * before a request is ever sent.
+ */
+private fun encodeSegment(value: String): String {
+    // A segment of only dots is a URI dot-segment, not a name: left raw, a branch like
+    // "x/../../../user/repos" would walk the authenticated API to another endpoint. Git forbids ".." in a
+    // ref anyway, so encoding it costs nothing real.
+    if (value.isNotEmpty() && value.all { it == '.' }) return value.replace(".", "%2E")
+    val encoded = StringBuilder(value.length)
+    for (byte in value.toByteArray(StandardCharsets.UTF_8)) {
+        val code = byte.toInt()
+        val char = code.toChar()
+        if (char in UNRESERVED) {
+            encoded.append(char)
+        } else {
+            encoded.append('%').append(HEX[(code shr HEX_SHIFT) and HEX_MASK]).append(HEX[code and HEX_MASK])
+        }
+    }
+    return encoded.toString()
+}
+
+/** [encodeSegment] applied per `/`-separated segment, so `feature/foo` stays two path segments. */
+private fun encodePath(value: String): String = value.split('/').joinToString("/") { encodeSegment(it) }

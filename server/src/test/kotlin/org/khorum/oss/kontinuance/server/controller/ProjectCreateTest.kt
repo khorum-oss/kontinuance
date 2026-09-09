@@ -149,6 +149,30 @@ class ProjectCreateTest {
     }
 
     @Test
+    fun `creates the project anyway when the branch cannot be put in a URL, with a warning`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // The client percent-encodes the branch now, but this check is handed whatever GitHubClient the
+        // server was wired with — belt and braces, since "the project is created either way" (FR-007)
+        // must hold even for a branch no URL can carry.
+        val unencodable = object : GitHubClient by RecordingGitHubClient() {
+            override suspend fun branchHead(repo: RepoRef, branch: String): String? =
+                throw IllegalArgumentException("Illegal character in path")
+        }
+        val controller = controllerWithClient(dir, unencodable)
+
+        val response = controller.create(
+            CreateProjectRequest(name = "spektr", repo = "https://github.com/khorum-oss/spektr", branch = "100%done"),
+        )
+
+        assertEquals(200, response.statusCode.value())
+        val body = response.body as CreatedProject
+        assertEquals(false, body.descriptor?.ok)
+        assertTrue(body.descriptor?.message!!.contains("100%done"), body.descriptor?.message!!)
+        assertTrue(ProjectStore(dir.resolve("projects")).source("spektr") != null)
+    }
+
+    @Test
     fun `creates the project anyway when GitHub is unreachable, with a warning`(@TempDir dir: Path) = runTest {
         // No HTTP response at all — DNS failure, connection refused, TLS failure, timeout — surfaces as
         // an IOException, not a GitHubApiException (which only exists once GitHub answered).

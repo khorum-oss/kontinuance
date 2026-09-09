@@ -266,6 +266,24 @@ class DescriptorResolverTest {
     }
 
     @Test
+    fun `rejects rather than raising when the branch cannot be put in a URL`(@TempDir dir: Path) = runTest {
+        val projects = ProjectStore(dir.resolve("projects"))
+        // A branch the operator typed. The client percent-encodes it now, but this resolver is handed
+        // whatever GitHubClient implementation the server was wired with — belt and braces, so a URL
+        // that still cannot be built is a rejection, not a 500 out of POST /api/runs/trigger.
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "100%done"))
+        projects.setActive("spektr")
+        val unencoded = object : GitHubClient by RecordingGitHubClient() {
+            override suspend fun branchHead(repo: RepoRef, branch: String): String? =
+                throw IllegalArgumentException("Illegal character in path")
+        }
+
+        val result = resolverFor(dir, unencoded).resolve()
+
+        assertTrue(assertIs<Rejected>(result).reason.contains("100%done"), result.toString())
+    }
+
+    @Test
     fun `rejects when there is no active project and no live descriptor`(@TempDir dir: Path) = runTest {
         // Fourth FR-009a outcome: no active project, and the live-descriptor fallback also has nothing.
         val result = resolverFor(dir, client = null, live = dir.resolve("no-such-file.yml")).resolve()
