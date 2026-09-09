@@ -2,7 +2,6 @@ package org.khorum.oss.kontinuance.server.controller
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
 import org.khorum.oss.kontinuance.github.client.RepoRef
@@ -168,8 +167,18 @@ class ProjectController(
                 ?: return DescriptorCheck(false, message = "branch '$target' not found on ${ref.slug}")
             val text = client.fileAt(ref, descriptorFileName, sha)
                 ?: return DescriptorCheck(false, message = "no $descriptorFileName on '$target' at ${ref.slug}")
-            val pipeline = PipelineDescriptor.parse(text)
-            DescriptorCheck(true, pipeline = pipeline.name, stages = pipeline.stages.size)
+            // Every parse failure, not just DescriptorException: two parser paths raise a bare
+            // IllegalArgumentException / NumberFormatException (an empty `secrets:` entry, a timeout too
+            // large for Long), and this check must never stop the project being created (FR-007).
+            runCatching { PipelineDescriptor.parse(text) }.fold(
+                onSuccess = { DescriptorCheck(true, pipeline = it.name, stages = it.stages.size) },
+                onFailure = {
+                    DescriptorCheck(
+                        false,
+                        message = "invalid descriptor from ${ref.slug}@$target:$descriptorFileName: ${it.message}",
+                    )
+                },
+            )
         } catch (e: GitHubApiException) {
             // Reached GitHub, but it said no (bad token, rate limit, server error, ...).
             DescriptorCheck(false, message = "GitHub API returned HTTP ${e.statusCode} for ${ref.slug}")
@@ -177,8 +186,6 @@ class ProjectController(
             // Never reached GitHub at all (DNS, connection refused, TLS, timeout) — a routine outcome for
             // an add-time check, since a token or network may not be ready yet (FR-007).
             DescriptorCheck(false, message = "GitHub unreachable — ${e.message}")
-        } catch (e: DescriptorException) {
-            DescriptorCheck(false, message = "invalid descriptor from ${ref.slug}@$target:$descriptorFileName: ${e.message}")
         }
     }
 

@@ -53,6 +53,34 @@ class RunnerTest {
     }
 
     @Test
+    fun `returns 2 when the descriptor's parse failure is not a DescriptorException`(@TempDir dir: Path) {
+        // Two parser paths raise a bare IllegalArgumentException / NumberFormatException instead of a
+        // DescriptorException: an empty secret name, and a timeout too large for Long. "Descriptor
+        // wouldn't load" is exit 2 whichever way the parser said so — never a stack trace.
+        val emptySecret = dir.resolve("secret.yaml")
+        Files.writeString(
+            emptySecret,
+            """
+            pipeline:
+              name: "cli-test"
+              stages: [{ name: "s", steps: [{ name: "step", run: "true", secrets: [""] }] }]
+            """.trimIndent(),
+        )
+        assertEquals(2, Runner.run(arrayOf("--check", emptySecret.toString())))
+
+        val hugeTimeout = dir.resolve("timeout.yaml")
+        Files.writeString(
+            hugeTimeout,
+            """
+            pipeline:
+              name: "cli-test"
+              stages: [{ name: "s", steps: [{ name: "step", run: "true", timeout: "99999999999999999999s" }] }]
+            """.trimIndent(),
+        )
+        assertEquals(2, Runner.run(arrayOf("--check", hugeTimeout.toString())))
+    }
+
+    @Test
     fun `check parses without executing (would-fail pipeline still returns 0)`(@TempDir dir: Path) {
         // The step command exits non-zero; --check must NOT run it, so the result is 0, not 1.
         assertEquals(0, Runner.run(arrayOf("--check", descriptorWith(dir, "false"))))

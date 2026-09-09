@@ -174,6 +174,60 @@ class DescriptorResolverTest {
     }
 
     @Test
+    fun `rejects a descriptor whose parse failure is not a DescriptorException — an empty secret`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // `SecretRef(asString(...))` is evaluated outside the parser's `construct { }` wrapper, so an
+        // empty secret name raises a bare IllegalArgumentException rather than a DescriptorException.
+        // Resolution must still reject: RunTrigger refuses before a run record exists only if nothing
+        // thrown by the parser can escape resolve().
+        val result = resolveRepoDescriptor(
+            dir,
+            """
+                pipeline:
+                  name: "demo"
+                  stages: [{ name: "s", steps: [{ name: "x", run: "true", secrets: [""] }] }]
+            """.trimIndent(),
+        )
+
+        val reason = assertIs<Rejected>(result).reason
+        assertTrue(reason.contains("khorum-oss/spektr@main:kontinuance.yml"), reason)
+    }
+
+    @Test
+    fun `rejects a descriptor whose parse failure is not a DescriptorException — an oversized timeout`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // The duration regex matches any run of digits, then `toLong()` overflows with a
+        // NumberFormatException — again not a DescriptorException.
+        val result = resolveRepoDescriptor(
+            dir,
+            """
+                pipeline:
+                  name: "demo"
+                  stages:
+                    - name: "s"
+                      steps: [{ name: "x", run: "true", timeout: "99999999999999999999s" }]
+            """.trimIndent(),
+        )
+
+        val reason = assertIs<Rejected>(result).reason
+        assertTrue(reason.contains("khorum-oss/spektr@main:kontinuance.yml"), reason)
+    }
+
+    /** An active repo-hosted project whose repository serves [descriptor], resolved. */
+    private suspend fun resolveRepoDescriptor(dir: Path, descriptor: String): Resolution {
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val client = RecordingGitHubClient(
+            branchHeads = mapOf("main" to "abc123"),
+            files = mapOf("kontinuance.yml" to descriptor),
+        )
+        return resolverFor(dir, client).resolve()
+    }
+
+    @Test
     fun `rejects rather than raising when the API fails`(@TempDir dir: Path) = runTest {
         val projects = ProjectStore(dir.resolve("projects"))
         projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))

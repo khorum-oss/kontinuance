@@ -1,6 +1,5 @@
 package org.khorum.oss.kontinuance.server.domain.project
 
-import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
@@ -106,11 +105,18 @@ class DescriptorResolver(
         return parse(text, sha = null, origin = Origin.Live, failurePrefix = "invalid descriptor at $liveDescriptor")
     }
 
-    /** Parses [text], naming [failurePrefix] (which source it came from) in any rejection (FR-005). */
+    /**
+     * Parses [text], naming [failurePrefix] (which source it came from) in any rejection (FR-005).
+     *
+     * Every failure is caught, not just [DescriptorException]: two parser paths raise a bare
+     * `IllegalArgumentException` / `NumberFormatException` (an empty `secrets:` entry, a timeout too
+     * large for `Long`), and a repository's descriptor is untrusted input, so narrowing this catch turns
+     * one of those into a 500 out of `POST /api/runs/trigger` instead of a clean refusal. `runCatching`
+     * over a plain non-suspend call has no `CancellationException` to swallow.
+     */
     private fun parse(text: String, sha: String?, origin: Origin, failurePrefix: String): Resolution =
-        try {
-            Resolved(PipelineDescriptor.parse(text), sha, origin, text)
-        } catch (e: DescriptorException) {
-            Rejected("$failurePrefix: ${e.message}")
-        }
+        runCatching { PipelineDescriptor.parse(text) }.fold(
+            onSuccess = { Resolved(it, sha, origin, text) },
+            onFailure = { Rejected("$failurePrefix: ${it.message}") },
+        )
 }
