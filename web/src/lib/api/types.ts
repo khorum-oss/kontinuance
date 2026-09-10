@@ -151,7 +151,8 @@ export interface Coverage {
 // A named pipeline descriptor the server stores and can run (032). `active` marks the one in effect.
 // `repo`/`branch` are the project's optional source (033): when set, a run of the project checks them out.
 // `derived` marks a project computed from run history rather than a registered descriptor (039);
-// `runnable` is false exactly when there is no descriptor to run.
+// `runnable` is false only when there is neither a descriptor nor a source — since 041 a project with a
+// source alone is runnable, because its descriptor is read from the repository at trigger time.
 export interface Project {
 	name: string;
 	active: boolean;
@@ -248,6 +249,9 @@ export interface Config {
 	text: string;
 	plan: PlanSummary;
 	// Where this descriptor came from, and whether a stored one is shadowing a repo that also has one (041).
+	// `origin: 'unresolved'` means the active project's descriptor could not be resolved at all: `text` is
+	// empty and `reason` says why, rather than the server showing some other project's descriptor here.
 	origin?: string;
 	overridden?: boolean;
+	reason?: string;
 }

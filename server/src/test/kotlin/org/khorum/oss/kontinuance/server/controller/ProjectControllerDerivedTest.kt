@@ -106,7 +106,9 @@ class ProjectControllerDerivedTest {
     @Test
     fun `a project with a source but no stored descriptor is runnable (041 reverses 039)`(@TempDir dir: Path) = runTest {
         // A source sidecar alone registers the project (Task 6c) — no run is needed to give it an entry
-        // in the listing, unlike before that fix.
+        // in the listing, unlike before that fix. That is also where FR-006 now lives: the controller
+        // simply reports every registered project as runnable, so this case fails outright (no such
+        // entry in the listing) if ProjectStore ever goes back to keying registration off the `.yml`.
         val store = ProjectStore(dir.resolve("projects"))
         // A source, but never a stored descriptor — 039 would call this non-runnable; 041's FR-006 says
         // otherwise, because the trigger can read kontinuance.yml out of the repo instead.

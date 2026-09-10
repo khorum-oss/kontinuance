@@ -13,6 +13,7 @@ import {
 	mockSource,
 	mockSourceConnect,
 	mockStream,
+	mockUnresolvedConfig,
 	mockWaitingRun,
 	githubRun,
 	sampleRuns
@@ -446,6 +447,22 @@ test.describe('config screen', () => {
 		await page.getByRole('button', { name: 'REVERT TO REPO', exact: true }).click();
 		await expect(page.getByText('from the repository')).toBeVisible();
 		await expect(page.getByRole('button', { name: 'REVERT TO REPO', exact: true })).toBeHidden();
+	});
+
+	test('reports why a descriptor could not be resolved instead of showing an unrelated one', async ({
+		page
+	}) => {
+		await mockApi(page);
+		await mockUnresolvedConfig(page, "branch 'main' not found on khorum-oss/spektr");
+		await page.goto('/config');
+		await enterApp(page);
+
+		await expect(page.getByText('could not be resolved')).toBeVisible();
+		await expect(page.getByRole('alert')).toContainText("branch 'main' not found");
+		// No descriptor is shown, so there is nothing to edit — and nothing to save as this project's
+		// override by mistake — and no all-zero "resolved plan" pretending one resolved.
+		await expect(page.getByRole('button', { name: 'EDIT', exact: true })).toBeHidden();
+		await expect(page.getByText('RESOLVED PLAN')).toBeHidden();
 	});
 
 	test('edits the descriptor and saves it, and shows a validation error for a bad edit', async ({ page }) => {

@@ -79,13 +79,19 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    project view.
 2. **Pick a project.** The project view (032) lists the **named pipeline descriptors ("projects")** the
    server stores, with the active one badged `ACTIVE`. Click **+ ADD PROJECT** to register a new one — give
-   it a name and paste a pipeline descriptor; the server validates it with the engine parser and only stores
-   it if it parses (a bad descriptor is rejected inline, not saved). **Click a project to activate it** — the
-   server points its live descriptor at that project (so the trigger and Config screen run it) — and enter
-   mission control. Your signed-in name shows in the sidebar; **EXIT** returns you here (the project view)
-   without ending your session, and **SIGN OUT** (on this screen, when auth is enforced) ends the session and
-   returns to sign-in. On a fresh server that already has a descriptor on disk, a `default` project is seeded
-   from it the first time you open this view, so there is always one to select.
+   it a name, a repository, and a branch (041): Kontinuance reads `kontinuance.yml` out of that repository
+   when the project runs, so there is no descriptor to paste. The form reports what it found at that branch
+   — the pipeline's name and stage count, or a specific warning — but **registers the project either way**,
+   so you can connect one before the file is committed or before a token is set. Pasting a descriptor is
+   still there behind **paste a descriptor instead**, for a repository you cannot commit to (or none at
+   all); a pasted one is validated with the engine parser and only stored if it parses (a bad descriptor is
+   rejected inline, not saved). **Click a project to activate it** — the trigger and Config screen follow
+   the active project, running its stored descriptor when it has one and otherwise reading its repository's
+   at trigger time — and enter mission control. Your signed-in name shows in the sidebar; **EXIT** returns
+   you here (the project view) without ending your session, and **SIGN OUT** (on this screen, when auth is
+   enforced) ends the session and returns to sign-in. On a fresh server that already has a descriptor on
+   disk, a `default` project is seeded from it the first time you open this view, so there is always one to
+   select.
 3. **Give a project a source (033).** A project can carry a **repo + branch** — set them when adding a project,
    or edit them on any existing project via **SET SOURCE** / **EDIT SOURCE** on its card (the seeded `default`
    included). When a project has a source, a run of it checks out that repo/branch: the source **overrides**
@@ -93,7 +99,9 @@ different address, set `KONTINUANCE_API` before `pnpm --dir web dev`.
    ahead of the pipeline — so you point a project at a repo in the UI instead of hand-editing the descriptor.
    The source value can be a **branch, a tag, or an exact commit SHA** (034 — a hex value of 7–40 chars is
    fetched and checked out as that commit; anything else is a branch/tag). A project with no source runs the
-   descriptor exactly as written, and a project-triggered run records its repo in the runs list.
+   descriptor exactly as written, and a project-triggered run records its repo in the runs list. For a
+   project whose descriptor comes from its repository (041), the checkout is pinned to the exact commit
+   that descriptor was read from, so a run's pipeline and its code always come from one commit.
 4. **Runs.** The runs list live-updates over the stream. Click **RUN PIPELINE** to trigger the configured
    pipeline; the new run appears immediately. **Filter and search the list (037):** narrow it by **status**
    or **trigger** (manual / push / pull-request) and **search** by run id, pipeline, repo, or commit — the
@@ -245,8 +253,10 @@ supports a branch/tag `ref` or an exact commit `sha` (034).)
 
 ## Authoring a pipeline
 
-The server runs the pipeline from its configured descriptor (`kontinuance.config.descriptor`, default
-`kontinuance.yml`). A gated pipeline that checks out its source, builds it, and gates before deploy:
+With no project active, the server runs the pipeline from its configured descriptor
+(`kontinuance.config.descriptor`, default `kontinuance.yml`); with one active, it runs that project's
+stored descriptor, else the one in its repository (041). Either way the file looks the same. A gated
+pipeline that checks out its source, builds it, and gates before deploy:
 
 ```yaml
 pipeline:
@@ -329,18 +339,22 @@ Kontinuance is pre-1.0; some UI/UX pieces are still presentational. Known gaps, 
 **UI**
 - **Light & dark themes with a brightness control** — toggle from the top bar; the choice follows your OS
   preference by default and is remembered per browser.
-- **The entry screen is a real project picker (032/033).** It lists the named descriptors ("projects") the
-  server stores, adds one (name + descriptor, validated by the engine parser), sets/edits each project's
-  **source** (repo + branch) inline, and activates one on click — repointing the live descriptor at it and
-  driving the checkout from the source. *Planned: richer project metadata and descriptor locking.*
+- **The entry screen is a real project picker (032/033/041).** It lists the projects the server knows,
+  connects one from a **name + repository + branch** (its descriptor is read from the repository, and a
+  pasted descriptor is the exception rather than the price of entry), sets/edits each project's **source**
+  inline, and activates one on click — driving the checkout from the source. *Planned: richer project
+  metadata and descriptor locking.*
 
 **Pipeline configuration**
 - **Edit `kontinuance.yml` in the UI (027).** The **Config** screen is editable: click **EDIT**, change the
   descriptor, and **SAVE**. The server validates the edit with the engine's strict parser and only writes it
   if it parses — an invalid edit is rejected with the parser's message shown inline and never overwrites the
-  file. A saved descriptor is the one the next triggered run uses (no restart). **Per-project descriptors are
-  real (032):** the entry screen stores named descriptors and activates one on selection, and editing here
-  keeps the active project's stored snapshot in sync. *Planned: descriptor locking.*
+  file. A saved descriptor is the one the next triggered run uses (no restart). **The screen says where the
+  descriptor it shows came from (041)** — the repository, a descriptor stored on this server, or the
+  server's own file — and when resolution fails (an unknown branch, no token, an unreadable file) it shows
+  that reason instead of some other descriptor, with **EDIT** withheld. Saving an edit against a
+  repo-hosted project stores it as a **visible override**: a banner says so, and **REVERT TO REPO** deletes
+  the stored copy to go back to the repository's. *Planned: descriptor locking.*
 
 **Engine/ops**
 - Only runs **paused at an approval gate** survive a restart; an actively-executing run does not (in-process

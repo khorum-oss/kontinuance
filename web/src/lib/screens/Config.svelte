@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { descriptorOriginLabel } from '$lib/api/present';
+	import { descriptorOriginLabel, descriptorProblem } from '$lib/api/present';
 	import type { Config } from '$lib/api/types';
 
 	let {
@@ -28,6 +28,8 @@
 	} = $props();
 
 	const lines = $derived(config ? config.text.split('\n') : []);
+	// Nothing resolved: there is no descriptor to show or edit, only the reason.
+	const problem = $derived(config ? descriptorProblem(config) : null);
 
 	let editing = $state(false);
 	let draft = $state('');
@@ -76,7 +78,9 @@
 					<button class="act save" onclick={save} disabled={saving}>{saving ? 'SAVING…' : 'SAVE'}</button>
 				{:else}
 					<span class="origin">{descriptorOriginLabel(config)}</span>
-					<button class="act edit" onclick={startEdit}>EDIT</button>
+					{#if !problem}
+						<button class="act edit" onclick={startEdit}>EDIT</button>
+					{/if}
 				{/if}
 			</div>
 			{#if config.overridden}
@@ -92,7 +96,16 @@
 					<div class="save-err k-mono" role="alert">{revertError}</div>
 				{/if}
 			{/if}
-			{#if editing}
+			{#if problem}
+				<div class="unresolved k-mono" role="alert">
+					<div class="unresolved-head">DESCRIPTOR UNRESOLVED</div>
+					<div class="unresolved-why">{problem}</div>
+					<div class="unresolved-note">
+						a run of this project is refused for the same reason — no descriptor is shown here,
+						because saving one that isn't this project's would store it as an override
+					</div>
+				</div>
+			{:else if editing}
 				<textarea
 					class="editor k-mono"
 					aria-label="descriptor source"
@@ -123,17 +136,20 @@
 		</div>
 
 		<div class="side">
-			<div class="card">
-				<div class="k-mono label">RESOLVED PLAN</div>
-				<div class="plan">
-					{config.plan.stages} stages · {config.plan.tasks} tasks · max parallelism
-					<span class="hl k-mono">{config.plan.maxParallel} lanes</span>
+			<!-- Nothing resolved, so there is no plan: an all-zero summary would read as a real one. -->
+			{#if !problem}
+				<div class="card">
+					<div class="k-mono label">RESOLVED PLAN</div>
+					<div class="plan">
+						{config.plan.stages} stages · {config.plan.tasks} tasks · max parallelism
+						<span class="hl k-mono">{config.plan.maxParallel} lanes</span>
+					</div>
+					<div class="k-mono meta">
+						toolchain {config.plan.toolchain}<br />publish → {config.plan.publish}<br />deploy → {config
+							.plan.deploy}
+					</div>
 				</div>
-				<div class="k-mono meta">
-					toolchain {config.plan.toolchain}<br />publish → {config.plan.publish}<br />deploy → {config
-						.plan.deploy}
-				</div>
-			</div>
+			{/if}
 			<div class="card dsl">
 				<div class="dsl-head">
 					<span class="k-mono label">KONTINUANCE DSL</span>
@@ -252,6 +268,28 @@
 		font-size: 12px;
 		line-height: 1.85;
 		box-sizing: border-box;
+	}
+	.unresolved {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 22px 16px 26px;
+	}
+	.unresolved-head {
+		font-size: 10px;
+		letter-spacing: 2px;
+		color: var(--k-fail);
+	}
+	.unresolved-why {
+		font-size: 11.5px;
+		line-height: 1.7;
+		color: var(--k-muted);
+		white-space: pre-wrap;
+	}
+	.unresolved-note {
+		font-size: 9.5px;
+		line-height: 1.7;
+		color: var(--k-faint);
 	}
 	.save-err {
 		padding: 10px 16px;

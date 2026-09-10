@@ -174,6 +174,60 @@ class DescriptorResolverTest {
     }
 
     @Test
+    fun `rejects a descriptor whose parse failure is not a DescriptorException — an empty secret`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // `SecretRef(asString(...))` is evaluated outside the parser's `construct { }` wrapper, so an
+        // empty secret name raises a bare IllegalArgumentException rather than a DescriptorException.
+        // Resolution must still reject: RunTrigger refuses before a run record exists only if nothing
+        // thrown by the parser can escape resolve().
+        val result = resolveRepoDescriptor(
+            dir,
+            """
+                pipeline:
+                  name: "demo"
+                  stages: [{ name: "s", steps: [{ name: "x", run: "true", secrets: [""] }] }]
+            """.trimIndent(),
+        )
+
+        val reason = assertIs<Rejected>(result).reason
+        assertTrue(reason.contains("khorum-oss/spektr@main:kontinuance.yml"), reason)
+    }
+
+    @Test
+    fun `rejects a descriptor whose parse failure is not a DescriptorException — an oversized timeout`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // The duration regex matches any run of digits, then `toLong()` overflows with a
+        // NumberFormatException — again not a DescriptorException.
+        val result = resolveRepoDescriptor(
+            dir,
+            """
+                pipeline:
+                  name: "demo"
+                  stages:
+                    - name: "s"
+                      steps: [{ name: "x", run: "true", timeout: "99999999999999999999s" }]
+            """.trimIndent(),
+        )
+
+        val reason = assertIs<Rejected>(result).reason
+        assertTrue(reason.contains("khorum-oss/spektr@main:kontinuance.yml"), reason)
+    }
+
+    /** An active repo-hosted project whose repository serves [descriptor], resolved. */
+    private suspend fun resolveRepoDescriptor(dir: Path, descriptor: String): Resolution {
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val client = RecordingGitHubClient(
+            branchHeads = mapOf("main" to "abc123"),
+            files = mapOf("kontinuance.yml" to descriptor),
+        )
+        return resolverFor(dir, client).resolve()
+    }
+
+    @Test
     fun `rejects rather than raising when the API fails`(@TempDir dir: Path) = runTest {
         val projects = ProjectStore(dir.resolve("projects"))
         projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
@@ -209,6 +263,24 @@ class DescriptorResolverTest {
         val reason = assertIs<Rejected>(result).reason
         assertTrue(reason.contains("unreachable"), reason)
         assertTrue(reason.contains("connection refused"), reason)
+    }
+
+    @Test
+    fun `rejects rather than raising when the branch cannot be put in a URL`(@TempDir dir: Path) = runTest {
+        val projects = ProjectStore(dir.resolve("projects"))
+        // A branch the operator typed. The client percent-encodes it now, but this resolver is handed
+        // whatever GitHubClient implementation the server was wired with — belt and braces, so a URL
+        // that still cannot be built is a rejection, not a 500 out of POST /api/runs/trigger.
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "100%done"))
+        projects.setActive("spektr")
+        val unencoded = object : GitHubClient by RecordingGitHubClient() {
+            override suspend fun branchHead(repo: RepoRef, branch: String): String? =
+                throw IllegalArgumentException("Illegal character in path")
+        }
+
+        val result = resolverFor(dir, unencoded).resolve()
+
+        assertTrue(assertIs<Rejected>(result).reason.contains("100%done"), result.toString())
     }
 
     @Test

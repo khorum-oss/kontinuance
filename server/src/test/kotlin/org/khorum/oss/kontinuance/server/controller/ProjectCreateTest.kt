@@ -84,6 +84,48 @@ class ProjectCreateTest {
     }
 
     @Test
+    fun `warns rather than raising when the descriptor's parse failure is not a DescriptorException`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // Two parser paths bypass the wrapper that turns a validation failure into a DescriptorException:
+        // an empty secret name raises IllegalArgumentException, an oversized timeout NumberFormatException.
+        // The add-time check "creates the project either way" (FR-007), so neither may escape as a 500.
+        val descriptors = listOf(
+            """
+                pipeline:
+                  name: "demo"
+                  stages: [{ name: "s", steps: [{ name: "x", run: "true", secrets: [""] }] }]
+            """.trimIndent(),
+            """
+                pipeline:
+                  name: "demo"
+                  stages:
+                    - name: "s"
+                      steps: [{ name: "x", run: "true", timeout: "99999999999999999999s" }]
+            """.trimIndent(),
+        )
+
+        descriptors.forEachIndexed { i, descriptor ->
+            val controller = controllerFor(
+                dir.resolve("case$i").also { it.toFile().mkdirs() },
+                branchHeads = mapOf("main" to "abc"),
+                files = mapOf("kontinuance.yml" to descriptor),
+            )
+
+            val response = controller.create(
+                CreateProjectRequest(name = "spektr", repo = "https://github.com/khorum-oss/spektr", branch = "main"),
+            )
+
+            assertEquals(200, response.statusCode.value())
+            val body = response.body as CreatedProject
+            assertEquals(false, body.descriptor?.ok)
+            val message = body.descriptor?.message!!
+            assertTrue(message.contains("khorum-oss/spektr"), message)
+            assertTrue(ProjectStore(dir.resolve("case$i").resolve("projects")).source("spektr") != null)
+        }
+    }
+
+    @Test
     fun `creates the project anyway when GitHub rejects the request, with a warning naming the status`(
         @TempDir dir: Path,
     ) = runTest {
@@ -103,6 +145,30 @@ class ProjectCreateTest {
         val message = body.descriptor?.message!!
         assertTrue(message.contains("khorum-oss/spektr"), message)
         assertTrue(message.contains("500"), message)
+        assertTrue(ProjectStore(dir.resolve("projects")).source("spektr") != null)
+    }
+
+    @Test
+    fun `creates the project anyway when the branch cannot be put in a URL, with a warning`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // The client percent-encodes the branch now, but this check is handed whatever GitHubClient the
+        // server was wired with — belt and braces, since "the project is created either way" (FR-007)
+        // must hold even for a branch no URL can carry.
+        val unencodable = object : GitHubClient by RecordingGitHubClient() {
+            override suspend fun branchHead(repo: RepoRef, branch: String): String? =
+                throw IllegalArgumentException("Illegal character in path")
+        }
+        val controller = controllerWithClient(dir, unencodable)
+
+        val response = controller.create(
+            CreateProjectRequest(name = "spektr", repo = "https://github.com/khorum-oss/spektr", branch = "100%done"),
+        )
+
+        assertEquals(200, response.statusCode.value())
+        val body = response.body as CreatedProject
+        assertEquals(false, body.descriptor?.ok)
+        assertTrue(body.descriptor?.message!!.contains("100%done"), body.descriptor?.message!!)
         assertTrue(ProjectStore(dir.resolve("projects")).source("spektr") != null)
     }
 

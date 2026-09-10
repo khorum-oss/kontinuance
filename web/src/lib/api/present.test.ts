@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { descriptorCheckMessage, descriptorOriginLabel, filterRuns, lastRunAge, matchesRunFilter, mergeNewestFirst, runFingerprint, runMessage, runRef, runWorkSummary, sourceCheckoutOnlyNote, toRunView } from './present';
+import { descriptorCheckMessage, descriptorOriginLabel, descriptorProblem, filterRuns, lastRunAge, matchesRunFilter, mergeNewestFirst, runFingerprint, runMessage, runRef, runWorkSummary, sourceCheckoutOnlyNote, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -290,6 +290,30 @@ describe('descriptorOriginLabel', () => {
 		expect(descriptorOriginLabel({ origin: 'stored', overridden: true })).toBe(
 			'overriding the repository'
 		);
+	});
+
+	it('says so when the descriptor could not be resolved at all', () => {
+		expect(descriptorOriginLabel({ origin: 'unresolved' })).toBe('could not be resolved');
+	});
+});
+
+describe('descriptorProblem', () => {
+	it('is the reason resolution failed, so the screen shows it instead of a descriptor', () => {
+		expect(descriptorProblem({ origin: 'unresolved', reason: "branch 'main' not found" })).toBe(
+			"branch 'main' not found"
+		);
+	});
+
+	it('still explains itself when the server sent no reason', () => {
+		expect(descriptorProblem({ origin: 'unresolved' })).toBe(
+			'the descriptor for this project could not be resolved'
+		);
+	});
+
+	it('is null whenever a descriptor did resolve', () => {
+		expect(descriptorProblem({ origin: 'repo' })).toBeNull();
+		expect(descriptorProblem({ origin: 'stored', overridden: true })).toBeNull();
+		expect(descriptorProblem({})).toBeNull();
 	});
 });
 

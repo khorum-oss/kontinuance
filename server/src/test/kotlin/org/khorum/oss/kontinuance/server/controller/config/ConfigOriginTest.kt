@@ -124,6 +124,91 @@ class ConfigOriginTest {
     }
 
     @Test
+    fun `reports why resolution failed instead of showing an unrelated descriptor`(@TempDir dir: Path) = runTest {
+        // A repo-hosted project whose branch was deleted (or token expired, or rate limit exhausted).
+        // Falling back to the server's live descriptor file shows whichever project was activated last,
+        // labelled as this project's — and one EDIT + SAVE later that unrelated pipeline is this
+        // project's stored override. Meanwhile RunTrigger refuses with the reason, so the two surfaces
+        // would be describing the same project differently.
+        val projects = ProjectStore(dir.resolve("projects"))
+        projects.saveSource("spektr", ProjectSource("https://github.com/khorum-oss/spektr", "main"))
+        projects.setActive("spektr")
+        val staleLocal = """
+            pipeline:
+              name: "stale-local"
+              stages: [{ name: "only-stage", steps: [{ name: "x", run: "true" }] }]
+        """.trimIndent()
+        dir.resolve("live.yml").writeText(staleLocal)
+        // No branch heads: the branch is gone, so resolution rejects.
+        val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = dir.resolve("live.yml"),
+            descriptorPath = "kontinuance.yml",
+            clients = GitHubClientProvider { RecordingGitHubClient() },
+        )
+        val controller = ConfigController(
+            descriptorPath = dir.resolve("live.yml").toString(),
+            projects = projects,
+            resolver = resolver,
+        )
+
+        val response = controller.config()
+
+        assertEquals("unresolved", response.origin)
+        assertTrue(response.reason?.contains("main") == true, response.reason.toString())
+        assertFalse(response.text.contains("stale-local"), "must not show an unrelated descriptor")
+        assertFalse(response.overridden)
+    }
+
+    @Test
+    fun `a server with no active project still serves its live descriptor file`(@TempDir dir: Path) = runTest {
+        // FR-009a: the plain single-descriptor deployment must be untouched by any of this.
+        val projects = ProjectStore(dir.resolve("projects"))
+        dir.resolve("live.yml").writeText(valid)
+        val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = dir.resolve("live.yml"),
+            descriptorPath = "kontinuance.yml",
+            clients = GitHubClientProvider { null },
+        )
+        val controller = ConfigController(
+            descriptorPath = dir.resolve("live.yml").toString(),
+            projects = projects,
+            resolver = resolver,
+        )
+
+        val response = controller.config()
+
+        assertEquals("live", response.origin)
+        assertEquals(valid, response.text)
+    }
+
+    @Test
+    fun `a fresh server with nothing to show falls back to fixture content, not an error`(
+        @TempDir dir: Path,
+    ) = runTest {
+        // No active project and no descriptor on disk: the pre-041 behaviour of showing fixture content
+        // is kept, because there is no project whose resolution could be said to have failed.
+        val projects = ProjectStore(dir.resolve("projects"))
+        val resolver = DescriptorResolver(
+            projects = projects,
+            liveDescriptor = dir.resolve("live.yml"),
+            descriptorPath = "kontinuance.yml",
+            clients = GitHubClientProvider { null },
+        )
+        val controller = ConfigController(
+            descriptorPath = dir.resolve("live.yml").toString(),
+            projects = projects,
+            resolver = resolver,
+        )
+
+        val response = controller.config()
+
+        assertEquals("live", response.origin)
+        assertEquals(null, response.reason)
+    }
+
+    @Test
     fun `shows the repository's descriptor rather than a stale local file, for a repo-hosted project`(
         @TempDir dir: Path,
     ) = runTest {

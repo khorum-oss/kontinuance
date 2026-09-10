@@ -1,7 +1,6 @@
 package org.khorum.oss.kontinuance.engine.cli
 
 import kotlinx.coroutines.runBlocking
-import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.Pipeline
@@ -55,13 +54,16 @@ object Runner {
             usage("missing descriptor path")
             return null
         }
-        return try {
-            PipelineDescriptor.load(Path.of(path))
-        } catch (e: DescriptorException) {
-            usage("invalid descriptor '$path': ${e.message}")
-            null
-        } catch (e: IOException) {
-            usage("cannot read descriptor '$path': ${e.message}")
+        // Every failure, not just DescriptorException: two parser paths raise a bare
+        // IllegalArgumentException / NumberFormatException (an empty `secrets:` entry, a timeout too
+        // large for Long). "The descriptor wouldn't load" is exit 2 however the parser says so, never a
+        // stack trace on the way out of main().
+        return runCatching { PipelineDescriptor.load(Path.of(path)) }.getOrElse { e ->
+            if (e is IOException) {
+                usage("cannot read descriptor '$path': ${e.message}")
+            } else {
+                usage("invalid descriptor '$path': ${e.message}")
+            }
             null
         }
     }

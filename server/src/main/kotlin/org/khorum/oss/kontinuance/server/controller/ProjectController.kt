@@ -2,7 +2,6 @@ package org.khorum.oss.kontinuance.server.controller
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.khorum.oss.kontinuance.engine.descriptor.DescriptorException
 import org.khorum.oss.kontinuance.engine.descriptor.PipelineDescriptor
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
 import org.khorum.oss.kontinuance.github.client.RepoRef
@@ -45,7 +44,9 @@ import java.nio.file.Path
  *   check never blocks creation.
  * - `POST /api/projects/{name}/activate` — make a project active: write its descriptor to the server's live
  *   descriptor file (so the trigger and Config screen use it) and record it as active; `404` if unknown.
- * - `POST /api/projects/{name}/source` — set/update a project's source (repo/branch, 033); `404` if unknown.
+ * - `POST /api/projects/{name}/source` — set/update a project's source (repo/branch, 033); `404` if
+ *   unknown, and `409` when clearing the repo of a project that has no stored descriptor, whose source
+ *   sidecar is the only thing registering it (041).
  *
  * Handlers return typed DTOs the Jackson codec serializes.
  */
@@ -87,8 +88,10 @@ class ProjectController(
                     branch = src?.branch,
                     derived = name !in registered,
                     // Runnable when there is something to run: a stored descriptor, or a source to read
-                    // one from (041). A derived project with neither stays non-runnable.
-                    runnable = name in registered || src != null,
+                    // one from (041) — `registered` covers both, since ProjectStore.list() reports a
+                    // project carrying only a source sidecar. A derived project (039), which has neither
+                    // and exists solely as a projection over run history, stays non-runnable.
+                    runnable = name in registered,
                     runCount = stat?.count ?: 0,
                     lastStatus = stat?.status,
                     lastRunAt = stat?.at,
@@ -168,8 +171,18 @@ class ProjectController(
                 ?: return DescriptorCheck(false, message = "branch '$target' not found on ${ref.slug}")
             val text = client.fileAt(ref, descriptorFileName, sha)
                 ?: return DescriptorCheck(false, message = "no $descriptorFileName on '$target' at ${ref.slug}")
-            val pipeline = PipelineDescriptor.parse(text)
-            DescriptorCheck(true, pipeline = pipeline.name, stages = pipeline.stages.size)
+            // Every parse failure, not just DescriptorException: two parser paths raise a bare
+            // IllegalArgumentException / NumberFormatException (an empty `secrets:` entry, a timeout too
+            // large for Long), and this check must never stop the project being created (FR-007).
+            runCatching { PipelineDescriptor.parse(text) }.fold(
+                onSuccess = { DescriptorCheck(true, pipeline = it.name, stages = it.stages.size) },
+                onFailure = {
+                    DescriptorCheck(
+                        false,
+                        message = "invalid descriptor from ${ref.slug}@$target:$descriptorFileName: ${it.message}",
+                    )
+                },
+            )
         } catch (e: GitHubApiException) {
             // Reached GitHub, but it said no (bad token, rate limit, server error, ...).
             DescriptorCheck(false, message = "GitHub API returned HTTP ${e.statusCode} for ${ref.slug}")
@@ -177,8 +190,11 @@ class ProjectController(
             // Never reached GitHub at all (DNS, connection refused, TLS, timeout) — a routine outcome for
             // an add-time check, since a token or network may not be ready yet (FR-007).
             DescriptorCheck(false, message = "GitHub unreachable — ${e.message}")
-        } catch (e: DescriptorException) {
-            DescriptorCheck(false, message = "invalid descriptor from ${ref.slug}@$target:$descriptorFileName: ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            // The branch is operator-typed and reaches the client as a URL path segment. The REST client
+            // encodes it, but this check takes any GitHubClient — belt and braces, so a request that
+            // still cannot be addressed is a warning, never a 500 that leaves the project uncreated.
+            DescriptorCheck(false, message = "could not address branch '$target' on ${ref.slug}: ${e.message}")
         }
     }
 
@@ -224,6 +240,17 @@ class ProjectController(
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse("no such project: $name"))
         }
         val source = ProjectSource(request?.repo, request?.branch)
+        // Clearing the repo deletes the sidecar, which since 041 may be the project's ONLY registration
+        // file — a repo-only project would vanish from /api/projects on a 200, taking any `.active`
+        // pointer at it with it. Refuse instead: there is nothing left to run afterwards.
+        if (!source.hasRepo && withContext(Dispatchers.IO) { store.get(name) } == null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ErrorResponse(
+                    "'$name' is registered only by its repository — clearing it would delete the project. " +
+                        "Store a descriptor for it first, or point it at another repository.",
+                ),
+            )
+        }
         withContext(Dispatchers.IO) { store.saveSource(name, source) }
         return ResponseEntity.ok(
             if (source.hasRepo) {
