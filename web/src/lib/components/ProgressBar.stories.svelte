@@ -18,3 +18,5 @@
 <Story name="Half" args={{ value: 50 }} {template} />
 <Story name="Full" args={{ value: 100 }} {template} />
 <Story name="Indeterminate" args={{ indeterminate: true }} {template} />
+<Story name="Active" args={{ value: 25, active: true }} {template} />
+<Story name="ActiveNearlyDone" args={{ value: 95, active: true }} {template} />

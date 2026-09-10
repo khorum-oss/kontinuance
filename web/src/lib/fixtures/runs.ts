@@ -10,8 +10,9 @@ export const sampleRunViews: RunView[] = [
 		status: 'running',
 		ref: 'khorum-oss/kontinuance · a3f19c2',
 		message: 'fix: gradle daemon flags',
-		progress: 66,
-		indeterminate: true,
+		progress: 50,
+		indeterminate: false,
+		active: true,
 		duration: '—',
 		age: '26s'
 	},
@@ -22,6 +23,7 @@ export const sampleRunViews: RunView[] = [
 		message: 'argo application manifest',
 		progress: 100,
 		indeterminate: false,
+		active: false,
 		duration: '5m 01s',
 		age: '1h'
 	},
@@ -32,6 +34,7 @@ export const sampleRunViews: RunView[] = [
 		message: 'integration tests: 2 failed',
 		progress: 100,
 		indeterminate: false,
+		active: false,
 		duration: '2m 47s',
 		age: '3h'
 	},
@@ -42,6 +45,7 @@ export const sampleRunViews: RunView[] = [
 		message: 'wip: dsl tokenizer',
 		progress: 100,
 		indeterminate: false,
+		active: false,
 		duration: '4m 55s',
 		age: '5h'
 	},
@@ -52,6 +56,7 @@ export const sampleRunViews: RunView[] = [
 		message: 'chore: bump jdk 21.0.3',
 		progress: 100,
 		indeterminate: false,
+		active: false,
 		duration: '3m 58s',
 		age: '8h'
 	}

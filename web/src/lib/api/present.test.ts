@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { descriptorCheckMessage, descriptorOriginLabel, descriptorProblem, filterRuns, lastRunAge, matchesRunFilter, mergeNewestFirst, runFingerprint, runMessage, runRef, runWorkSummary, sourceCheckoutOnlyNote, toRunView } from './present';
+import { descriptorCheckMessage, descriptorOriginLabel, descriptorProblem, filterRuns, lastRunAge, matchesRunFilter, mergeNewestFirst, runFingerprint, runMessage, runProgress, runRef, runWorkSummary, sourceCheckoutOnlyNote, toRunView } from './present';
 import type { RunRecord } from './types';
 
 const base: RunRecord = { id: '#KX-1', pipeline: 'kontinuance-service', status: 'Success' };
@@ -121,7 +121,90 @@ describe('runMessage', () => {
 	});
 });
 
+describe('runProgress', () => {
+	const stages = (...steps: string[]) => [
+		{ name: 'build', status: 'Running', steps: steps.map((status, i) => ({ name: `s${i}`, status })) }
+	];
+
+	it('reports nothing complete while every step is still pending', () => {
+		const p = runProgress({ ...base, status: 'Running', stages: stages('Pending', 'Pending') });
+		expect(p.progress).toBe(0);
+		expect(p.active).toBe(true);
+		expect(p.indeterminate).toBe(false);
+	});
+
+	it('reports the completed share part-way through a run', () => {
+		const p = runProgress({
+			...base,
+			status: 'Running',
+			stages: stages('Success', 'Success', 'Running', 'Pending')
+		});
+		expect(p.progress).toBe(50);
+		expect(p.active).toBe(true);
+	});
+
+	it('counts a step that ended badly as complete', () => {
+		// Progress measures work finished, not work that succeeded — a failed or skipped step is done.
+		const p = runProgress({ ...base, status: 'Running', stages: stages('Failed', 'Skipped', 'Pending', 'Pending') });
+		expect(p.progress).toBe(50);
+	});
+
+	it('reports a finished run as complete and no longer active', () => {
+		const p = runProgress({ ...base, status: 'Success', stages: stages('Success', 'Success') });
+		expect(p.progress).toBe(100);
+		expect(p.active).toBe(false);
+	});
+
+	it('counts steps across every stage, not within one', () => {
+		const p = runProgress({
+			...base,
+			status: 'Running',
+			stages: [
+				{ name: 'a', status: 'Success', steps: [{ name: 's', status: 'Success' }] },
+				{ name: 'b', status: 'Running', steps: [{ name: 't', status: 'Running' }] }
+			]
+		});
+		expect(p.progress).toBe(50);
+	});
+
+	it('falls back to the cycling bar when the record carries no stages', () => {
+		// Records written before the skeleton existed have no steps to count; a 0% bar would misreport
+		// them as not started, so they keep the indeterminate treatment.
+		const p = runProgress({ ...base, status: 'Running' });
+		expect(p.indeterminate).toBe(true);
+		expect(p.progress).toBeGreaterThan(0);
+	});
+
+	it('falls back when the stages carry no steps at all', () => {
+		const p = runProgress({ ...base, status: 'Running', stages: [{ name: 'a', status: 'Running' }] });
+		expect(p.indeterminate).toBe(true);
+	});
+});
+
 describe('toRunView', () => {
+	it('exposes real step progress for a running run that has stages', () => {
+		const v = toRunView({
+			...base,
+			status: 'Running',
+			startedAt: '2026-07-17T00:00:00Z',
+			stages: [
+				{
+					name: 'build',
+					status: 'Running',
+					steps: [
+						{ name: 'a', status: 'Success' },
+						{ name: 'b', status: 'Running' },
+						{ name: 'c', status: 'Pending' },
+						{ name: 'd', status: 'Pending' }
+					]
+				}
+			]
+		});
+		expect(v.progress).toBe(25);
+		expect(v.indeterminate).toBe(false);
+		expect(v.active).toBe(true);
+	});
+
 	it('marks a running run indeterminate with no age/duration when unfinished', () => {
 		const v = toRunView({ ...base, status: 'Running', startedAt: '2026-07-17T00:00:00Z' });
 		expect(v.status).toBe('running');

@@ -42,12 +42,17 @@ class RunStream(
     private val mode = StreamMode.from(modeRaw)
 
     fun updates(): Flow<RunRecord> = flow {
-        val seen = HashSet<String>()
+        // Keyed on the record, not merely its id: a run is not a one-shot announcement. Its steps advance
+        // while its `status` stays `Running` from the first to the last, so a stream that speaks once per
+        // id leaves every live consumer showing the run as it looked the moment it started — a progress
+        // view frozen at zero for the whole build. RunRecord is a data class, so structural equality is
+        // the change test; consumers merge by id, so a re-emitted run replaces its predecessor.
+        val seen = HashMap<String, RunRecord>()
         streamTriggers(mode, pollIntervalMs, notifier.runSignals()).collect {
-            // recent() is newest-first; emit the unseen oldest-first so the wire order is chronological.
+            // recent() is newest-first; emit changed records oldest-first so the wire order is chronological.
             val recent = withContext(Dispatchers.IO) { store.recent(snapshotLimit) }
             recent.asReversed().forEach { record ->
-                if (seen.add(record.id)) emit(record)
+                if (seen.put(record.id, record) != record) emit(record)
             }
         }
     }
