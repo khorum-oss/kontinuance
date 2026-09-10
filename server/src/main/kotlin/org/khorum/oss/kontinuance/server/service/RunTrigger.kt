@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.server.service
 
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
+import org.khorum.oss.kontinuance.server.domain.project.ProjectResolver
 import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSourceInjector
 import org.khorum.oss.kontinuance.server.domain.project.Rejected
@@ -43,12 +44,8 @@ class RunTrigger(
         val pipeline = ProjectSourceInjector.apply(resolved.pipeline, source)
         val repo = source?.repo?.takeIf { it.isNotBlank() }
 
-        // Which project this run belongs to (039). The descriptor's own `project:` key still wins; failing
-        // that the run belongs to the project it was launched under, which the reader cannot infer. Without
-        // this the record carries no project and the reader falls back to the repo's short name — so a run
-        // of project "foo" whose descriptor declares nothing, and whose source is "org/bar" or absent
-        // entirely, never appeared under "foo" in the runs list even though "foo" is what started it.
-        val project = pipeline.project ?: activeProject
+        // Which project this run belongs to (039) — one rule, shared with RunLauncher's terminal write.
+        val project = ProjectResolver.forLaunch(activeProject, pipeline.project)
 
         val id = "run-" + UUID.randomUUID().toString().substring(0, ID_LEN)
         val startedAt = Instant.now()

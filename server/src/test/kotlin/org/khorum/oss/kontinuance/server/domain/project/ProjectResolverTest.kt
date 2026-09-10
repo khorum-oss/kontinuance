@@ -9,6 +9,28 @@ class ProjectResolverTest {
     private fun record(project: String? = null, repo: String? = null) =
         RunRecord(id = "r", pipeline = "p", status = "Success", repo = repo, project = project)
 
+    // --- forLaunch: the write-side rule, shared by RunTrigger and RunLauncher ---
+
+    @Test
+    fun `forLaunch prefers the project the run was launched under`() {
+        assertEquals("spektr-dsl", ProjectResolver.forLaunch(activeProject = "spektr-dsl", descriptorProject = "spektr"))
+    }
+
+    @Test
+    fun `forLaunch falls back to the descriptor when nothing is active`() {
+        assertEquals("spektr", ProjectResolver.forLaunch(activeProject = null, descriptorProject = "spektr"))
+    }
+
+    @Test
+    fun `forLaunch treats a blank active project as absent`() {
+        assertEquals("spektr", ProjectResolver.forLaunch(activeProject = "   ", descriptorProject = "spektr"))
+    }
+
+    @Test
+    fun `forLaunch resolves to none when neither names a project`() {
+        assertEquals(null, ProjectResolver.forLaunch(activeProject = null, descriptorProject = null))
+    }
+
     @Test
     fun `prefers the explicit project`() {
         assertEquals("relikquary", ProjectResolver.resolve(record(project = "relikquary", repo = "khorum-oss/other")))

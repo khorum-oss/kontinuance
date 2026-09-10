@@ -16,6 +16,23 @@ import org.khorum.oss.kontinuance.server.store.ProjectStore
  */
 object ProjectResolver {
 
+    /**
+     * Which project a run being launched belongs to — the **write** side of the same question [resolve]
+     * answers for readers. The project the run was launched under wins; a descriptor's own `project:` key
+     * only names a run that nothing was active for.
+     *
+     * This exists so the precedence lives in exactly one place. It was previously spelled out separately in
+     * `RunTrigger` and again in `RunLauncher`, the two disagreed, and the launcher's terminal write re-filed
+     * every run under the descriptor's name — so a run executed, persisted, reported Success, and never
+     * appeared in the runs list, which is scoped to the active project by exact match. Every writer calls
+     * this; none re-derives it.
+     *
+     * A repo-hosted descriptor (041) lives in a repository the operator may not control, which is why its
+     * key does not get to decide where the operator's runs are filed.
+     */
+    fun forLaunch(activeProject: String?, descriptorProject: String?): String? =
+        activeProject?.trim()?.ifEmpty { null } ?: descriptorProject?.trim()?.ifEmpty { null }
+
     fun resolve(record: RunRecord): String? {
         val explicit = record.project?.trim()?.ifEmpty { null }
         val fromRepo = record.repo?.substringAfterLast('/')?.trim()?.ifEmpty { null }

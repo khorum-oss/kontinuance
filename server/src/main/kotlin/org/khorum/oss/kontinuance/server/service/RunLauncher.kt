@@ -19,6 +19,7 @@ import org.khorum.oss.kontinuance.persistence.StageRecord
 import org.khorum.oss.kontinuance.server.domain.RecordingLogSink
 import org.springframework.stereotype.Component
 import java.time.Instant
+import org.khorum.oss.kontinuance.server.domain.project.ProjectResolver
 
 /**
  * Runs a pipeline on the engine in the background under a caller-chosen run id and records the result
@@ -73,7 +74,9 @@ class RunLauncher(
                         id = id,
                         repo = context.repo,
                         sha = context.sha,
-                        project = recorded.project ?: context.project,
+                        // `recorded` re-derives project from the descriptor (RunRecord.from), so this
+                        // write must apply the same rule the trigger did or it re-files the run.
+                        project = ProjectResolver.forLaunch(context.project, recorded.project),
                         startedAt = recorded.startedAt ?: startedAt,
                     )
                 }
