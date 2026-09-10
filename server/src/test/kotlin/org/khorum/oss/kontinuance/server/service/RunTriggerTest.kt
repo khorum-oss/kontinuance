@@ -286,7 +286,7 @@ class RunTriggerTest {
     }
 
     @Test
-    fun `the descriptor's own project wins over the project it was launched under`(@TempDir dir: Path) = runTest {
+    fun `the project it was launched under wins over the descriptor's own project`(@TempDir dir: Path) = runTest {
         val store = RecordingRunStore()
         val declaring = validDescriptor.replace("name: \"demo\"", "name: \"demo\"\n  project: \"platform\"")
         val file = dir.resolve("kontinuance.yml")
@@ -295,7 +295,25 @@ class RunTriggerTest {
 
         triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
 
-        assertTrue(store.writes.all { it.project == "platform" }, "the descriptor's `project:` key takes precedence")
+        // The launching project owns the run. A descriptor lives in a repository the operator may not
+        // control, so letting its `project:` key win files the run under a name nobody is looking at —
+        // the runs list is scoped to the active project, so the run executes, persists, and is invisible.
+        // Losing a run to a silent filter is worse than ignoring a key the descriptor cannot justify.
+        assertTrue(store.writes.all { it.project == "web-ui" }, "the launching project takes precedence")
+    }
+
+    @Test
+    fun `falls back to the descriptor's project when no project is active`(@TempDir dir: Path) = runTest {
+        val store = RecordingRunStore()
+        val declaring = validDescriptor.replace("name: \"demo\"", "name: \"demo\"\n  project: \"platform\"")
+        val file = dir.resolve("kontinuance.yml")
+        Files.writeString(file, declaring)
+
+        triggerFor(store, FakeEngine(PipelineStatus.Success), file).trigger()
+
+        // Nothing was launched under, so the descriptor's key is the only owner on offer — it still names
+        // the run rather than leaving it to the repo-name fallback.
+        assertTrue(store.writes.all { it.project == "platform" }, "the descriptor names the run when nothing is active")
     }
 
     @Test
