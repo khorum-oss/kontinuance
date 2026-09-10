@@ -19,7 +19,12 @@
 	<span class="ref k-mono">{run.ref}</span>
 	<span class="msg">{run.message}</span>
 	<div class="prog">
-		<ProgressBar value={run.progress} indeterminate={run.indeterminate} fill={statusColor(run.status)} />
+		<ProgressBar
+			value={run.progress}
+			indeterminate={run.indeterminate}
+			active={run.active}
+			fill={statusColor(run.status)}
+		/>
 	</div>
 	<span class="dur k-mono">{run.duration}</span>
 	<span class="age k-mono">{run.age}</span>

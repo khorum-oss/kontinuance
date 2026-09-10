@@ -10,7 +10,8 @@ export interface RunView {
 	ref: string;
 	message: string;
 	progress: number; // 0..100
-	indeterminate: boolean; // running → animated bar
+	indeterminate: boolean; // no steps to count → whole-bar animation
+	active: boolean; // still working → live in-flight segment
 	duration: string;
 	age: string;
 }
@@ -49,6 +50,40 @@ function progressFor(status: Status): { progress: number; indeterminate: boolean
 		default:
 			return { progress: 0, indeterminate: false };
 	}
+}
+
+/** Step statuses meaning the step will do no more work — however it ended. */
+const STEP_DONE: ReadonlySet<Status> = new Set(['success', 'failed', 'timedout', 'cancelled', 'skipped']);
+
+/**
+ * How far a run has got, measured at the step boundary.
+ *
+ * A step runs an opaque command — there is no way to know how far `gradle classes` has got — but a
+ * pipeline's steps are declared before it starts, and the trigger records them all as `Pending`
+ * (RunRecord.skeleton). Counting the ones that have finished is real progress without inventing an
+ * estimate. `active` marks a run still working, so the bar can show the in-flight segment as live
+ * rather than freezing at the last boundary during a long step.
+ */
+export function runProgress(r: RunRecord): { progress: number; active: boolean; indeterminate: boolean } {
+	const status = normalizeStatus(r.status);
+	const steps = (r.stages ?? []).flatMap((s) => s.steps ?? []);
+
+	// A run that has stopped is complete however far it got. A run that fails before its first step still
+	// carries the untouched skeleton, and counting that would show a finished run with an empty bar.
+	if (status !== 'running' && status !== 'pending') {
+		return { progress: 100, active: false, indeterminate: false };
+	}
+	// Records written before the skeleton existed have nothing to count; 0% would misreport them as
+	// not started, so they keep the indeterminate bar.
+	if (steps.length === 0) {
+		return { ...progressFor(status), active: false };
+	}
+	const done = steps.filter((s) => STEP_DONE.has(normalizeStatus(s.status))).length;
+	return {
+		progress: Math.round((done / steps.length) * 100),
+		active: status === 'running',
+		indeterminate: false
+	};
 }
 
 function fmtDuration(ms: number): string {
@@ -244,7 +279,7 @@ export function descriptorCheckMessage(
 /** Project a record into its display view. [nowMs] lets callers/tests pin "now". */
 export function toRunView(r: RunRecord, nowMs: number = Date.now()): RunView {
 	const status = normalizeStatus(r.status);
-	const { progress, indeterminate } = progressFor(status);
+	const { progress, indeterminate, active } = runProgress(r);
 	const started = r.startedAt ? Date.parse(r.startedAt) : NaN;
 	const ended = r.endedAt ? Date.parse(r.endedAt) : NaN;
 	return {
@@ -254,6 +289,7 @@ export function toRunView(r: RunRecord, nowMs: number = Date.now()): RunView {
 		message: runMessage(r),
 		progress,
 		indeterminate,
+		active,
 		duration: Number.isFinite(started) && Number.isFinite(ended) ? fmtDuration(ended - started) : '—',
 		age: Number.isFinite(ended) ? fmtAge(ended, nowMs) : '—'
 	};

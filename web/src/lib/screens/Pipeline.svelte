@@ -98,7 +98,7 @@
 			</div>
 			<div class="progress">
 				<div class="k-mono plabel"><span>TOTAL PROGRESS</span><span class="teal">{overall}%</span></div>
-				<ProgressBar value={overall} indeterminate={runStatus === 'running'} />
+				<ProgressBar value={overall} active={runStatus === 'running'} />
 			</div>
 			<button class="k-mono replay" onclick={() => onretry?.()}>↻ REFRESH</button>
 		</div>
