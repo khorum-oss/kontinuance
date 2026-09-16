@@ -44,6 +44,9 @@ class RestGitHubClient(
                 headSha = head.getValue("sha").jsonPrimitive.content,
                 headRef = head.getValue("ref").jsonPrimitive.content,
                 baseRef = pr.getValue("base").jsonObject.getValue("ref").jsonPrimitive.content,
+                // `head.repo` is null once a fork has been deleted. Empty then — which matches no binding
+                // and is therefore skipped, the safe direction for a field that gates code execution.
+                headRepo = head["repo"]?.jsonObject?.get("full_name")?.jsonPrimitive?.content.orEmpty(),
             )
         }
     }

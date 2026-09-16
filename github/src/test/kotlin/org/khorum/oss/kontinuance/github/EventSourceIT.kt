@@ -47,8 +47,28 @@ class EventSourceIT {
         return file
     }
 
-    private fun pullsBody() =
-        """[{"number":1,"head":{"sha":"$headSha","ref":"feature"},"base":{"ref":"main"}}]"""
+    /**
+     * A PR list shaped like GitHub's, including `head.repo.full_name` — the field that distinguishes a
+     * branch on the watched repository from one on a fork. Defaults to the watched repo (the ordinary
+     * same-repo PR these tests exercise); [headRepo] overrides it to simulate a fork.
+     */
+    private fun pullsBody(headRepo: String = repo.slug) =
+        """[{"number":1,"head":{"sha":"$headSha","ref":"feature","repo":{"full_name":"$headRepo"}},""" +
+            """"base":{"ref":"main"}}]"""
+
+    @Test
+    fun `a fork PR is neither built nor reported`(@TempDir dir: Path) = runBlocking {
+        FakeGitHubServer().use { server ->
+            server.on("GET", "/repos/.+/pulls", body = pullsBody(headRepo = "stranger/kontinuance"))
+            server.on("POST", "/repos/.+/statuses/.+", status = 201, body = "{}")
+            val source = eventSource(server, descriptor(dir, "pr.yaml", "true"))
+
+            val runs = source.pollAndRun()
+
+            assertTrue(runs.isEmpty(), "a fork PR must not be built on the runner host")
+            assertTrue(statusPostsFor(server).isEmpty(), "nor reported as though it had been")
+        }
+    }
 
     private fun statusPostsFor(server: FakeGitHubServer) =
         server.requests.filter { it.method == "POST" && it.path.endsWith("/statuses/$headSha") }

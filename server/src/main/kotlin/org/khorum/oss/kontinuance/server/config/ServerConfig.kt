@@ -4,6 +4,7 @@ import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.persistence.RunStores
 import org.khorum.oss.kontinuance.server.domain.RunApi
+import org.khorum.oss.kontinuance.server.domain.ci.CiBindings
 import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
 import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
 import org.khorum.oss.kontinuance.server.service.RunChangeNotifier
@@ -66,6 +67,22 @@ class ServerConfig {
     fun projectStore(
         @Value("\${kontinuance.store:#{null}}") storeDir: String?,
     ): ProjectStore = ProjectStore(storeDirectory(storeDir).resolve("projects"))
+
+    /**
+     * The CI dispatch allow-list: the event-source config whose `repositories` are the only ones
+     * `POST /api/ci/dispatch` may build.
+     *
+     * Named by `kontinuance.ci.config` (`KONTINUANCE_CI_CONFIG`) — deliberately the same variable the
+     * `kontinuance-ci` wrapper already exports for the poll CLI, so a host running both keeps one file
+     * describing which repositories Kontinuance is allowed to build.
+     */
+    @Bean
+    fun ciBindings(
+        @Value("\${kontinuance.ci.config:#{null}}") configPath: String?,
+    ): CiBindings = CiBindings(
+        configPath?.takeIf { it.isNotBlank() }?.let { Path.of(it) }
+            ?: Path.of(System.getProperty("user.home"), ".kontinuance", "ci.yaml"),
+    )
 
     private fun storeDirectory(configured: String?): Path =
         configured?.takeIf { it.isNotBlank() }?.let { Path.of(it) }
