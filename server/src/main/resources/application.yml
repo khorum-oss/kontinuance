@@ -44,6 +44,10 @@ kontinuance:
     heartbeat: ${KONTINUANCE_GITHUB_HEARTBEAT:${user.home}/.kontinuance/github-heartbeat.properties}
     token-file: ${KONTINUANCE_GITHUB_TOKEN_FILE:${user.home}/.kontinuance/github-token}
     autostart: ${KONTINUANCE_GITHUB_AUTOSTART:true}
+  # CI dispatch (POST /api/ci/dispatch): the event-source config whose `repositories` are the only ones a
+  # dispatch may build. Shares KONTINUANCE_CI_CONFIG with the poll CLI so one file governs both paths.
+  ci:
+    config: ${KONTINUANCE_CI_CONFIG:${user.home}/.kontinuance/ci.yaml}
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.
   stream:

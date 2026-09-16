@@ -65,11 +65,11 @@ class RunLauncher(
                     }
                     // The terminal record REPLACES the `Running` one by id, so anything the engine cannot
                     // report has to be restored here or finishing a run erases it. The engine knows
-                    // nothing about the repository (033), the commit the checkout was pinned to (041), or
+                    // nothing about the repository (033), the commit the checkout was pinned to (041),
                     // the project the run was launched under beyond the descriptor's own `project:` key
-                    // (039) — and `startedAt`, which it derives from step timings, is absent for a run
-                    // whose steps never started.
-                    val recorded = RunRecord.from(run, Instant.now(), trigger = "manual")
+                    // (039), or how the run was started — and `startedAt`, which it derives from step
+                    // timings, is absent for a run whose steps never started.
+                    val recorded = RunRecord.from(run, Instant.now(), trigger = context.trigger)
                     recorded.copy(
                         id = id,
                         repo = context.repo,
@@ -90,7 +90,7 @@ class RunLauncher(
                     endedAt = Instant.now(),
                     repo = context.repo,
                     sha = context.sha,
-                    trigger = "manual",
+                    trigger = context.trigger,
                     project = context.project,
                     stages = RunRecord.skeleton(pipeline),
                 )
@@ -160,7 +160,7 @@ class RunLauncher(
         startedAt = startedAt,
         repo = context.repo,
         sha = context.sha,
-        trigger = "manual",
+        trigger = context.trigger,
         project = context.project,
         stages = stages,
     )
