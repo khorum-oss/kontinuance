@@ -2,8 +2,10 @@ package org.khorum.oss.kontinuance.server.config
 
 import org.khorum.oss.kontinuance.server.domain.SessionResponse
 import org.khorum.oss.kontinuance.server.service.AuthCredentials
+import org.khorum.oss.kontinuance.server.service.CiToken
 import org.khorum.oss.kontinuance.server.store.SessionStore
 import org.springframework.core.Ordered
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
@@ -28,6 +30,7 @@ import tools.jackson.databind.ObjectMapper
 class AuthWebFilter(
     private val credentials: AuthCredentials,
     private val sessions: SessionStore,
+    private val ciToken: CiToken,
     private val mapper: ObjectMapper,
 ) : WebFilter, Ordered {
 
@@ -36,7 +39,7 @@ class AuthWebFilter(
     override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> {
         if (!credentials.enabled) return chain.filter(exchange)
         val path = exchange.request.path.pathWithinApplication().value()
-        return if (isPublic(path) || hasValidSession(exchange)) {
+        return if (isPublic(path) || hasValidSession(exchange) || hasCiToken(exchange, path)) {
             chain.filter(exchange)
         } else {
             unauthorized(exchange)
@@ -49,6 +52,20 @@ class AuthWebFilter(
     private fun hasValidSession(exchange: ServerWebExchange): Boolean {
         val token = exchange.request.cookies.getFirst(SessionStore.COOKIE)?.value ?: return false
         return sessions.usernameFor(token) != null
+    }
+
+    /**
+     * A valid CI bearer token, presented for a route [CiScope] allows.
+     *
+     * Scope is checked *before* the token so an out-of-scope route answers identically whether or not the
+     * presented token is real — otherwise the filter would be an oracle for probing a stolen token's
+     * validity against routes it cannot use.
+     */
+    private fun hasCiToken(exchange: ServerWebExchange, path: String): Boolean {
+        if (!CiScope.allows(path, exchange.request.method)) return false
+        val header = exchange.request.headers.getFirst(HttpHeaders.AUTHORIZATION) ?: return false
+        if (!header.startsWith(BEARER)) return false
+        return ciToken.matches(header.removePrefix(BEARER).trim())
     }
 
     private fun unauthorized(exchange: ServerWebExchange): Mono<Void> {
@@ -65,5 +82,7 @@ class AuthWebFilter(
         // in), the API health check, and actuator (health only is exposed). Matched as an exact path or a
         // `<prefix>/…` sub-path so `/api/authx` does NOT match `/api/auth`.
         val publicPaths = listOf("/api/auth", "/api/health", "/actuator")
+
+        const val BEARER = "Bearer "
     }
 }
