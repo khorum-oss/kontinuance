@@ -28,12 +28,21 @@ data class RepoRef(val owner: String, val name: String) {
     }
 }
 
-/** The minimal view of an open pull request the event source needs. */
+/**
+ * The minimal view of an open pull request the event source needs.
+ *
+ * [headRepo] is the `owner/name` of the repository the head branch lives in — which is **not** the watched
+ * repository when the PR comes from a fork. Required rather than defaulted on purpose: the poller checks
+ * this commit out and builds it on the runner host, so a producer that silently omitted the field would
+ * hand arbitrary code from a stranger's fork to a machine holding the operator's toolchain, registry
+ * credentials, and LAN access.
+ */
 data class PullRequest(
     val number: Int,
     val headSha: String,
     val headRef: String,
     val baseRef: String,
+    val headRepo: String,
 )
 
 /**

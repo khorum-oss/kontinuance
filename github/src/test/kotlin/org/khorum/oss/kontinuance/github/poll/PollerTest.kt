@@ -22,7 +22,7 @@ class PollerTest {
     @Test
     fun `a new PR head emits a pull-request event and records the cursor`() = runTest {
         val cursors = InMemoryCursorStore()
-        val events = poller(listOf(PullRequest(7, "sha-a", "feature", "main")), cursors).poll()
+        val events = poller(listOf(PullRequest(7, "sha-a", "feature", "main", headRepo = repo.slug)), cursors).poll()
 
         val event = events.single()
         assertEquals(TriggerEvent.Kind.PULL_REQUEST, event.kind)
@@ -34,7 +34,7 @@ class PollerTest {
     @Test
     fun `an already-seen head is not re-emitted`() = runTest {
         val cursors = InMemoryCursorStore()
-        val pulls = listOf(PullRequest(7, "sha-a", "feature", "main"))
+        val pulls = listOf(PullRequest(7, "sha-a", "feature", "main", headRepo = repo.slug))
 
         assertEquals(1, poller(pulls, cursors).poll().size)
         assertTrue(poller(pulls, cursors).poll().isEmpty(), "the same head must dedup on re-poll")
@@ -43,9 +43,9 @@ class PollerTest {
     @Test
     fun `a new push to an existing PR (new head SHA) emits a fresh event`() = runTest {
         val cursors = InMemoryCursorStore()
-        poller(listOf(PullRequest(7, "sha-a", "feature", "main")), cursors).poll()
+        poller(listOf(PullRequest(7, "sha-a", "feature", "main", headRepo = repo.slug)), cursors).poll()
 
-        val events = poller(listOf(PullRequest(7, "sha-b", "feature", "main")), cursors).poll()
+        val events = poller(listOf(PullRequest(7, "sha-b", "feature", "main", headRepo = repo.slug)), cursors).poll()
         assertEquals("sha-b", events.single().sha)
     }
 
@@ -75,5 +75,37 @@ class PollerTest {
         val delivery = RepositoryBinding(repo, Path.of("pr.yaml"), Path.of("deliver.yaml"))
         assertEquals(1, Poller(client, listOf(delivery), cursors).poll().count { it.kind == TriggerEvent.Kind.PUSH })
         assertTrue(Poller(client, listOf(delivery), cursors).poll().none { it.kind == TriggerEvent.Kind.PUSH })
+    }
+
+    @Test
+    fun `a fork PR is never emitted`() = runTest {
+        val cursors = InMemoryCursorStore()
+        val pulls = listOf(
+            PullRequest(7, "sha-a", "feature", "main", headRepo = repo.slug),
+            PullRequest(8, "sha-b", "attack", "main", headRepo = "stranger/kontinuance"),
+        )
+
+        val events = poller(pulls, cursors).poll()
+
+        assertEquals(listOf(7), events.map { it.pullNumber }, "only a same-repo PR may run on the runner")
+    }
+
+    @Test
+    fun `a fork PR records no cursor, so it is re-evaluated rather than silently marked handled`() = runTest {
+        val cursors = InMemoryCursorStore()
+        val pulls = listOf(PullRequest(8, "sha-b", "attack", "main", headRepo = "stranger/kontinuance"))
+
+        poller(pulls, cursors).poll()
+
+        assertEquals(null, cursors.lastSeen("${repo.slug}#pr-8"))
+    }
+
+    @Test
+    fun `a PR whose head repo is unknown is skipped rather than built`() = runTest {
+        // head.repo is null on GitHub when the fork has been deleted; the parser yields "".
+        val cursors = InMemoryCursorStore()
+        val pulls = listOf(PullRequest(9, "sha-c", "gone", "main", headRepo = ""))
+
+        assertTrue(poller(pulls, cursors).poll().isEmpty(), "unknown provenance must fail closed")
     }
 }

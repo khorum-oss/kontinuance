@@ -10,6 +10,9 @@ import org.khorum.oss.kontinuance.github.trigger.TriggerEvent
  * opened PR, or a new push to an existing one). It records the cursor as it emits, so a subsequent
  * poll of the same head does not re-emit (FR-001, dedup). Outbound only; no inbound exposure.
  *
+ * Pull requests whose head lives in a **different** repository (forks) are skipped entirely — see
+ * [pollPullRequests].
+ *
  * @param client the GitHub seam.
  * @param bindings the configured repositories to watch.
  * @param cursors remembers the last head SHA acted on per PR.
@@ -36,6 +39,11 @@ class Poller(
 
     private suspend fun pollPullRequests(binding: RepositoryBinding): List<TriggerEvent> =
         client.listOpenPullRequests(binding.repo).mapNotNull { pr ->
+            // A fork PR is never built here. The runner is a host carrying the operator's toolchain,
+            // registry credentials and LAN access; a PR from a fork is arbitrary code from a stranger, and
+            // on a public repository anyone can open one. Deliberately records NO cursor: skipping is not
+            // "handled", so the decision is re-made every poll rather than being remembered as done.
+            if (!pr.headRepo.equals(binding.repo.slug, ignoreCase = true)) return@mapNotNull null
             val key = "${binding.repo.slug}#pr-${pr.number}"
             if (cursors.lastSeen(key) == pr.headSha) return@mapNotNull null
             cursors.record(key, pr.headSha)
