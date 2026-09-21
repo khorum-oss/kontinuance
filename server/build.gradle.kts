@@ -25,6 +25,10 @@ dependencies {
     implementation(project(":persistence"))
     // Read-only reuse of the event source's own config parser + models for the /api/source view (035).
     implementation(project(":github"))
+    // Raises the transitive Netty floor to 4.2.17.Final (three advisories in the 4.2.15.Final that
+    // reactor-netty pins). Declared BEFORE the starters so the intent reads in dependency order; Gradle
+    // resolves by highest-version regardless. KOSS-26 / KOSS-28 / KOSS-29.
+    implementation(platform(rootProject.libs.netty.bom))
     implementation(rootProject.libs.spring.boot.starter.webflux)
     implementation(rootProject.libs.spring.boot.starter.actuator)
     // Jackson (already on the WebFlux classpath) is the JSON codec: controllers return typed DTOs and the

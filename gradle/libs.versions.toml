@@ -23,6 +23,12 @@ snakeyaml-engine = "2.6"
 # the native library for every platform we ship on, so nothing has to be installed in the image.
 sqlite-jdbc = "3.53.4.0"
 spring-boot = "4.1.0"
+# Netty arrives transitively via spring-boot-starter-webflux -> spring-boot-reactor-netty ->
+# reactor-netty-http, which pins 4.2.15.Final. That version carries three advisories, all fixed by
+# 4.2.17.Final: GHSA-c4c3-7fpv-j4q5 (Critical, SNI routing bypass via fragmented TLS ClientHello),
+# GHSA-558v-64gr-wgg4 (High, Bzip2Decoder infinite loop hangs the event loop) and GHSA-hpcc-26xq-25fv
+# (High, HTTP/3 reserved-frame memory exhaustion). See KOSS-26 / KOSS-29 / KOSS-28.
+netty = "4.2.17.Final"
 # Jackson 3 (tools.jackson) — the JSON codec Spring Boot 4.1 WebFlux already ships; pinned to match the
 # Spring-managed version so adding the Kotlin module never diverges from the resolved graph.
 jackson = "3.1.4"
@@ -65,6 +71,11 @@ snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "s
 
 # Embedded database
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+
+# netty-bom, imported as a platform purely to raise the transitive Netty floor above the advisories
+# listed by the `netty` version. It contains only io.netty modules — a group already trusted by PGP key
+# in verification-metadata.xml — so unlike the spring-boot BOM noted below it widens nothing.
+netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
 
 # Spring Boot (server runtime). Starters carry an explicit version rather than importing the
 # spring-boot-dependencies BOM as a platform: a BOM import forces Gradle to resolve every third-party
