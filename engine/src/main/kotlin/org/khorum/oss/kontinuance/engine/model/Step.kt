@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.engine.model
 
 import org.khorum.oss.konstellation.metaDsl.annotation.GeneratedDsl
 import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultEmptyList
+import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultEmptyMap
 import org.khorum.oss.konstellation.metaDsl.annotation.defaults.state.standard.DefaultTrue
 import kotlin.time.Duration
 
@@ -14,6 +15,10 @@ import kotlin.time.Duration
  * @param condition when `false` the step is SKIPPED (and its stage continues). v0 supports a
  *   plain boolean; richer expressions are a future extension.
  * @param secrets names of secrets injected into this step's scoped environment and masked in logs.
+ * @param env non-secret environment entries for this step. Distinct from [secrets] in exactly the way
+ *   that matters: these values are **not masked in logs**, so ordinary configuration (a checkout path, a
+ *   registry host) stays readable. Applied over the passthrough allow-list but **under** [secrets], so a
+ *   descriptor can never shadow a resolved secret with a plaintext value of its own.
  * @param workingDirHint optional relative subdirectory resolved **inside** the step's isolated
  *   working directory; it must never be absolute nor escape via `..`.
  * @param image optional container image; when set, the step's command runs **inside** that image
@@ -30,6 +35,8 @@ data class Step(
     val condition: Boolean = true,
     @DefaultEmptyList
     val secrets: List<SecretRef> = emptyList(),
+    @DefaultEmptyMap
+    val env: Map<String, String> = emptyMap(),
     val workingDirHint: String? = null,
     val image: String? = null,
     val runner: RunnerOptions? = null,
@@ -46,6 +53,10 @@ data class Step(
         }
         image?.let {
             require(it.isNotBlank()) { "step '$name' image must be non-blank when set" }
+        }
+        // A blank name cannot be exported, and an empty-named entry silently does nothing — fail loudly.
+        env.keys.forEach { key ->
+            require(key.isNotBlank()) { "step '$name' env has a blank variable name" }
         }
         // Guardrail: runner options are docker flags, so they only mean something inside a container.
         // Setting them without an image would silently run on the host with none of the isolation.

@@ -43,7 +43,7 @@ object PipelineDescriptor {
     private val DEFINITION_KEYS = setOf("run", "gradle", "docker", "npm", "approval", "git")
     // `image` here is a STEP-level runner image (isolation) — distinct from the nested docker.run `image`.
     private val STEP_KEYS =
-        setOf("name", "timeout", "when", "secrets", "workingDir", "image", "runner") + DEFINITION_KEYS
+        setOf("name", "timeout", "when", "secrets", "env", "workingDir", "image", "runner") + DEFINITION_KEYS
     private val RUNNER_KEYS = setOf("network", "pull", "mapUser")
     private val GRADLE_KEYS = setOf("tasks", "args", "useWrapper")
     private val DOCKER_KEYS = setOf("run", "build")
@@ -105,6 +105,9 @@ object PipelineDescriptor {
         val condition = map["when"]?.let { asBoolean(it, "$path.when") } ?: true
         val secrets = asListOrEmpty(map["secrets"], "$path.secrets")
             .mapIndexed { i, s -> SecretRef(asString(s, "$path.secrets[$i]")) }
+        // Non-secret configuration. Deliberately a separate key from `secrets`: values here are NOT
+        // masked in logs, so a path or host stays readable while a credential still does not.
+        val env = asStringMap(map["env"], "$path.env")
         val workingDir = map["workingDir"]?.let { asString(it, "$path.workingDir") }
         val image = map["image"]?.let { asString(it, "$path.image") }
         val runner = map["runner"]?.let { parseRunner(asMap(it, "$path.runner"), "$path.runner") }
@@ -115,6 +118,7 @@ object PipelineDescriptor {
                 timeout = timeout,
                 condition = condition,
                 secrets = secrets,
+                env = env,
                 workingDirHint = workingDir,
                 image = image,
                 runner = runner,

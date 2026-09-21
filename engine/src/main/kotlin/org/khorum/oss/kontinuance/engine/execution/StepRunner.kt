@@ -19,8 +19,9 @@ import java.nio.file.Path
  * - resolves the step's secrets (a missing secret fails fast with [UnresolvedSecretException]);
  * - runs in the run's shared [workspace] directory, resolving any `workingDir` hint **inside** it so it
  *   cannot escape to the host; all steps of a run share this directory (a checkout persists across steps);
- * - constructs a scoped environment from a small passthrough allow-list plus the resolved secrets,
- *   so arbitrary parent-process variables do not leak (FR-008);
+ * - constructs a scoped environment from a small passthrough allow-list, then the step's non-secret
+ *   `env`, then the resolved secrets, so arbitrary parent-process variables do not leak (FR-008) and no
+ *   descriptor-supplied value can shadow a secret;
  * - wraps the log sink in a [MaskingLogSink] so secrets are redacted in streamed output (SC-003);
  * - selects the executor from the [StepExecutorRegistry] and runs it.
  *
@@ -52,7 +53,10 @@ class StepRunner(
         val masker = SecretMasker(resolved.values)
         val maskingSink = MaskingLogSink(masker, logSink)
         val workingDir = resolveWorkingDir(workspace, step.workingDirHint)
-        val context = StepContext(step, workingDir, baseEnvironment + resolved, maskingSink)
+        // Order is a security property: env sits above the passthrough allow-list but BELOW secrets, so a
+        // descriptor cannot shadow a resolved secret with a plaintext value. Only `resolved` feeds the
+        // masker, so env values stay readable in the logs — which is the reason env exists at all.
+        val context = StepContext(step, workingDir, baseEnvironment + step.env + resolved, maskingSink)
         return registry.executorFor(step.definition).execute(context)
     }
 
