@@ -6,6 +6,7 @@ import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.Run
 import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
 import org.khorum.oss.kontinuance.engine.secret.SecretSource
+import org.khorum.oss.kontinuance.engine.secret.withCommitSha
 import org.khorum.oss.kontinuance.github.client.GitHubApiException
 import org.khorum.oss.kontinuance.github.client.RepoRef
 import org.khorum.oss.kontinuance.github.health.Heartbeat
@@ -101,12 +102,9 @@ class EventSource(
         return engine.run(pipeline, withSha(event.sha))
     }
 
-    private fun withSha(sha: String): SecretSource =
-        SecretSource { name -> if (name == KONTINUANCE_SHA) sha else baseSecrets.resolve(name) }
+    private fun withSha(sha: String): SecretSource = baseSecrets.withCommitSha(sha)
 
     companion object {
-        /** The immutable commit under delivery, injected into every run from the trigger event. */
-        const val KONTINUANCE_SHA = "KONTINUANCE_SHA"
         private const val MILLIS_PER_SECOND = 1000L
     }
 }

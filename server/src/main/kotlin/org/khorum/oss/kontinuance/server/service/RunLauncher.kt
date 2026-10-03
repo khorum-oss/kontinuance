@@ -12,6 +12,9 @@ import org.khorum.oss.kontinuance.engine.execution.PipelineEngine
 import org.khorum.oss.kontinuance.engine.model.Pipeline
 import org.khorum.oss.kontinuance.engine.model.RunId
 import org.khorum.oss.kontinuance.engine.model.StageRun
+import org.khorum.oss.kontinuance.engine.secret.EnvSecretSource
+import org.khorum.oss.kontinuance.engine.secret.SecretSource
+import org.khorum.oss.kontinuance.engine.secret.withCommitSha
 import org.khorum.oss.kontinuance.persistence.RunLogStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
@@ -35,6 +38,11 @@ import org.khorum.oss.kontinuance.server.domain.project.ProjectResolver
  * While the pipeline executes, the engine's per-stage/step transitions are collected into the run's
  * persisted breakdown (042), so the pipeline view shows a build progressing instead of every step sitting
  * `Pending` until the whole run lands at once.
+ *
+ * When [context] names a commit, it is exposed to the pipeline as `KONTINUANCE_SHA`. Doing it here rather
+ * than in each caller means the dashboard trigger and an external CI dispatch get what the GitHub poll
+ * loop always had: a delivery descriptor tagging images with the commit it is building resolves that
+ * commit whichever route started the run.
  */
 @Component
 class RunLauncher(
@@ -43,6 +51,10 @@ class RunLauncher(
     private val scope: CoroutineScope,
     private val logStore: RunLogStore,
 ) {
+    // The base from which run secrets resolve. Matches the engine's own default, so the only difference
+    // this class introduces is the commit overlay below.
+    private val baseSecrets: SecretSource = EnvSecretSource()
+
     fun launch(
         id: String,
         pipeline: Pipeline,
@@ -58,6 +70,7 @@ class RunLauncher(
                     val run = trackingProgress(id, pipeline, startedAt, context) {
                         engine.run(
                             pipeline,
+                            secrets = secretsFor(context),
                             completedStages = completedStages,
                             logSink = RecordingLogSink(id, logStore),
                             runId = RunId(id),
@@ -145,6 +158,16 @@ class RunLauncher(
             }
         }
     }
+
+    /**
+     * Secrets for a run of [context]: the base source, plus the commit when one is known.
+     *
+     * A run with no commit — the dashboard triggering a descriptor that checks out a branch — gets the base
+     * source unchanged, so a descriptor that declares `KONTINUANCE_SHA` still fails validation rather than
+     * building something and tagging it with a lie.
+     */
+    private fun secretsFor(context: RunContext): SecretSource =
+        context.sha?.let { baseSecrets.withCommitSha(it) } ?: baseSecrets
 
     /** The in-flight record: the run as launched, carrying [stages] as they stand right now. */
     private fun running(

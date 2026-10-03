@@ -39,9 +39,16 @@ class CiDispatcherTest {
     private val head = "a".repeat(40)
     private val store = InMemoryRunStore()
 
-    /** Records the pipeline it was handed, so a test can assert what the engine would actually execute. */
+    /**
+     * Records the pipeline **and the secret source** it was handed, so a test can assert both what the
+     * engine would execute and what it could resolve while doing so. Discarding `secrets` here is what
+     * hid the dispatch path's missing `KONTINUANCE_SHA` overlay: the engine validates declared secrets
+     * before the first step, so a descriptor needing one fails instantly in production while a test with
+     * a no-op engine sails through.
+     */
     private class CapturingEngine : PipelineEngine {
         var received: Pipeline? = null
+        var receivedSecrets: SecretSource? = null
 
         override suspend fun run(
             pipeline: Pipeline,
@@ -51,6 +58,7 @@ class CiDispatcherTest {
             runId: RunId?,
         ): Run {
             received = pipeline
+            receivedSecrets = secrets
             return Run(runId ?: RunId("engine-generated"), pipeline, PipelineStatus.Success, emptyList())
         }
 
@@ -217,5 +225,36 @@ class CiDispatcherTest {
         )
 
         assertIs<CiDispatcher.Result.Accepted>(dispatcher.dispatch(request(event = CiEvent.PUSH)))
+    }
+
+    @Test
+    fun `the dispatched commit is resolvable as KONTINUANCE_SHA`(@TempDir dir: Path) = runTest {
+        fixture(dir).dispatch(request())
+
+        assertEquals(
+            head,
+            engine.receivedSecrets!!.resolve("KONTINUANCE_SHA"),
+            "a descriptor declaring KONTINUANCE_SHA must resolve it to the commit being built",
+        )
+    }
+
+    @Test
+    fun `delivery resolves KONTINUANCE_SHA too, since its image tags are built from it`(
+        @TempDir dir: Path,
+    ) = runTest {
+        fixture(dir, push = true).dispatch(request(event = CiEvent.PUSH))
+
+        assertEquals(head, engine.receivedSecrets!!.resolve("KONTINUANCE_SHA"))
+    }
+
+    @Test
+    fun `other secrets still fall through to the base source`(@TempDir dir: Path) = runTest {
+        fixture(dir).dispatch(request())
+
+        assertEquals(
+            null,
+            engine.receivedSecrets!!.resolve("SOME_OTHER_SECRET"),
+            "the overlay must answer only for the commit, not shadow every lookup",
+        )
     }
 }
