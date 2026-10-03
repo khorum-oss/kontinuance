@@ -22,6 +22,7 @@ import org.khorum.oss.kontinuance.persistence.InMemoryRunStore
 import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.server.domain.ci.CiBindings
 import org.khorum.oss.kontinuance.server.domain.ci.CiDispatchRequest
+import org.khorum.oss.kontinuance.server.domain.ci.CiEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -71,8 +72,16 @@ class CiDispatcherTest {
                     ref: "main"
     """.trimIndent()
 
-    private fun fixture(dir: Path): CiDispatcher {
+    private val deliveryDescriptor = descriptor.replace("name: relikquary-pr", "name: relikquary-cd-stage")
+
+    /**
+     * A dispatcher over a one-repository allow-list. [push] adds a second allow-listed descriptor as that
+     * repository's `pushPipeline`, so a test can tell "no delivery is configured" apart from "delivery is
+     * configured and was selected".
+     */
+    private fun fixture(dir: Path, push: Boolean = false): CiDispatcher {
         Files.writeString(dir.resolve("relikquary-pr.yaml"), descriptor)
+        Files.writeString(dir.resolve("relikquary-cd-stage.yaml"), deliveryDescriptor)
         Files.writeString(
             dir.resolve("ci.yaml"),
             """
@@ -82,6 +91,7 @@ class CiDispatcherTest {
                 - owner: "khorum-oss"
                   name: "relikquary"
                   prPipeline: "relikquary-pr.yaml"
+            ${if (push) "      pushPipeline: \"relikquary-cd-stage.yaml\"" else ""}
             """.trimIndent(),
         )
         val launcher = RunLauncher(
@@ -93,8 +103,12 @@ class CiDispatcherTest {
         return CiDispatcher(store, launcher, CiBindings(dir.resolve("ci.yaml")))
     }
 
-    private fun request(repo: String = "khorum-oss/relikquary", sha: String = head, pipeline: String? = null) =
-        CiDispatchRequest(repo = repo, sha = sha, pipeline = pipeline)
+    private fun request(
+        repo: String = "khorum-oss/relikquary",
+        sha: String = head,
+        pipeline: String? = null,
+        event: CiEvent? = null,
+    ) = CiDispatchRequest(repo = repo, sha = sha, pipeline = pipeline, event = event)
 
     @Test
     fun `accepts a configured repo and records the run against its commit`(@TempDir dir: Path) = runTest {
@@ -155,5 +169,53 @@ class CiDispatcherTest {
             ),
         )
         assertIs<CiDispatcher.Result.Accepted>(dispatcher.dispatch(request()))
+    }
+
+    @Test
+    fun `a push dispatch runs the configured pushPipeline, not the gate`(@TempDir dir: Path) = runTest {
+        val accepted = assertIs<CiDispatcher.Result.Accepted>(
+            fixture(dir, push = true).dispatch(request(event = CiEvent.PUSH)),
+        )
+
+        assertEquals("relikquary-cd-stage", engine.received!!.name)
+        assertEquals("relikquary-cd-stage", store.get(accepted.id)!!.pipeline)
+    }
+
+    @Test
+    fun `a dispatch with no event still runs the gate`(@TempDir dir: Path) = runTest {
+        fixture(dir, push = true).dispatch(request())
+
+        assertEquals("relikquary-pr", engine.received!!.name, "an absent event must not change the gate")
+    }
+
+    @Test
+    fun `a push dispatch is refused when the repo has no pushPipeline configured`(@TempDir dir: Path) = runTest {
+        val result = fixture(dir).dispatch(request(event = CiEvent.PUSH))
+
+        val reason = assertIs<CiDispatcher.Result.Rejected>(result).reason
+        assertTrue(reason.contains("push"), "the refusal must say delivery is unconfigured, got: $reason")
+        assertEquals(null, engine.received, "a refused dispatch must not reach the engine")
+    }
+
+    @Test
+    fun `a push dispatch asserting the gate's descriptor is refused`(@TempDir dir: Path) = runTest {
+        val result = fixture(dir, push = true)
+            .dispatch(request(pipeline = "relikquary-pr.yaml", event = CiEvent.PUSH))
+
+        val reason = assertIs<CiDispatcher.Result.Rejected>(result).reason
+        assertTrue(reason.contains("relikquary-cd-stage.yaml"), "name the descriptor it would run, got: $reason")
+    }
+
+    @Test
+    fun `delivery and the gate for one commit are separate runs`(@TempDir dir: Path) = runTest {
+        val dispatcher = fixture(dir, push = true)
+        store.record(
+            RunRecord(
+                id = "run-gate", pipeline = "relikquary-pr", status = "Running",
+                repo = "khorum-oss/relikquary", sha = head, startedAt = Instant.now(),
+            ),
+        )
+
+        assertIs<CiDispatcher.Result.Accepted>(dispatcher.dispatch(request(event = CiEvent.PUSH)))
     }
 }

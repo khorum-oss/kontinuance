@@ -6,6 +6,7 @@ import org.khorum.oss.kontinuance.persistence.RunRecord
 import org.khorum.oss.kontinuance.persistence.RunStore
 import org.khorum.oss.kontinuance.server.domain.ci.CiBindings
 import org.khorum.oss.kontinuance.server.domain.ci.CiDispatchRequest
+import org.khorum.oss.kontinuance.server.domain.ci.CiEvent
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSource
 import org.khorum.oss.kontinuance.server.domain.project.ProjectSourceInjector
 import org.khorum.oss.kontinuance.github.trigger.RepositoryBinding
@@ -24,9 +25,10 @@ import kotlin.io.path.readText
  * project an operator happened to click last — that would be a live race between browsing the UI and a
  * build starting. The two share [RunLauncher]; nothing else.
  *
- * The repository's configured `prPipeline` is the only descriptor a dispatch can run. A supplied
- * `pipeline` is *confirmed* against it, never used to select one, so the endpoint cannot be walked into
- * running a delivery descriptor.
+ * A dispatch runs one of the repository's **configured** descriptors, chosen by the request's
+ * [CiEvent]: `prPipeline` for a pull request, `pushPipeline` for a push to the tracked branch. A supplied
+ * `pipeline` is *confirmed* against whichever that is, never used to select one, so the endpoint cannot be
+ * walked into running an arbitrary descriptor on the host.
  */
 @Component
 class CiDispatcher(
@@ -36,12 +38,13 @@ class CiDispatcher(
 ) {
 
     suspend fun dispatch(request: CiDispatchRequest): Result {
-        val binding = when (val resolution = resolve(request)) {
+        val bound = when (val resolution = resolve(request)) {
             is Refused -> return Result.Rejected(resolution.reason)
-            is Bound -> resolution.binding
+            is Bound -> resolution
         }
-        val declared = readPipeline(binding.prPipeline).getOrElse {
-            return Result.Rejected("could not read ${binding.prPipeline}: ${it.message}")
+        val binding = bound.binding
+        val declared = readPipeline(bound.descriptor).getOrElse {
+            return Result.Rejected("could not read ${bound.descriptor}: ${it.message}")
         }
 
         // Pin the checkout to the dispatched commit: the injector's SHA rule (034) rewrites the first git
@@ -56,7 +59,7 @@ class CiDispatcher(
         return Result.Accepted(start(binding.repo.slug, request.sha, pipeline))
     }
 
-    /** The binding this request may run, or why it may not. */
+    /** The binding and descriptor this request may run, or why it may not. */
     private fun resolve(request: CiDispatchRequest): Resolution {
         if (!SHA.matches(request.sha)) {
             return Refused("sha must be a full 40-character commit id, got '${request.sha}'")
@@ -67,14 +70,22 @@ class CiDispatcher(
         val binding = configured.firstOrNull { it.repo.slug.equals(request.repo, ignoreCase = true) }
             ?: return Refused("repository '${request.repo}' is not configured for dispatch")
 
+        // An unknown event kind arrives as null (CiEvent.from) and lands here as PR: an unrecognised kind
+        // runs the check that was already safe to run, and never delivery.
+        val descriptor = when (request.event ?: CiEvent.PR) {
+            CiEvent.PR -> binding.prPipeline
+            CiEvent.PUSH -> binding.pushPipeline
+                ?: return Refused("${binding.repo.slug} has no pushPipeline configured; push delivery is not enabled")
+        }
+
         val asked = request.pipeline
         if (asked != null) {
-            val name = binding.prPipeline.fileName.toString()
-            if (asked != name && asked != binding.prPipeline.toString()) {
+            val name = descriptor.fileName.toString()
+            if (asked != name && asked != descriptor.toString()) {
                 return Refused("'$asked' is not the pipeline configured for ${binding.repo.slug} (expected '$name')")
             }
         }
-        return Bound(binding)
+        return Bound(binding, descriptor)
     }
 
     /** Records the in-flight run and hands it to the engine; returns its id. */
@@ -123,7 +134,7 @@ class CiDispatcher(
 
     /** What [resolve] concluded: the binding to run, or the caller-facing refusal. */
     private sealed interface Resolution
-    private data class Bound(val binding: RepositoryBinding) : Resolution
+    private data class Bound(val binding: RepositoryBinding, val descriptor: Path) : Resolution
     private data class Refused(val reason: String) : Resolution
 
     sealed interface Result {
