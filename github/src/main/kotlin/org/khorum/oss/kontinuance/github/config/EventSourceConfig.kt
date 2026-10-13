@@ -17,12 +17,14 @@ import kotlin.io.path.readText
  *   tokenEnv: "GITHUB_TOKEN"              # env var holding the PAT (never inline the token)
  *   baseUrl: "https://api.github.com"     # optional; set for GitHub Enterprise
  *   pollIntervalSeconds: 30               # optional; default 60
+ *   cloneBase: "https://gitea.example"    # optional; where repositories are cloned from (default GitHub)
  *   repositories:
  *     - owner: "khorum-oss"
  *       name: "relikquary"
  *       prPipeline: "pipelines/pr.yaml"          # run for PRs (the gating check)
  *       pushPipeline: "pipelines/deliver.yaml"   # optional; run for a push to trackedBranch
  *       trackedBranch: "main"                    # optional; default "main"
+ *       cloneBase: "https://gitea.example"       # optional; overrides the source-level cloneBase
  * ```
  */
 data class EventSourceConfig(
@@ -54,6 +56,9 @@ data class EventSourceConfig(
             appendLine("      prPipeline: ${quote(binding.prPipeline.toString())}")
             binding.pushPipeline?.let { appendLine("      pushPipeline: ${quote(it.toString())}") }
             appendLine("      trackedBranch: ${quote(binding.trackedBranch)}")
+            if (binding.cloneBase != RepositoryBinding.DEFAULT_CLONE_BASE) {
+                appendLine("      cloneBase: ${quote(binding.cloneBase)}")
+            }
         }
     }
 
@@ -73,16 +78,17 @@ data class EventSourceConfig(
             val source = asMap(root["eventSource"], "eventSource")
             val repos = (source["repositories"] as? List<*>).orEmpty()
             require(repos.isNotEmpty()) { "eventSource.repositories must list at least one repository" }
+            val cloneBase = text(source, "cloneBase") ?: RepositoryBinding.DEFAULT_CLONE_BASE
             return EventSourceConfig(
                 tokenEnv = (source["tokenEnv"] as? String)?.takeIf { it.isNotBlank() }
                     ?: error("eventSource.tokenEnv is required"),
                 pollIntervalSeconds = (source["pollIntervalSeconds"] as? Number)?.toLong() ?: DEFAULT_POLL_SECONDS,
                 baseUrl = (source["baseUrl"] as? String)?.takeIf { it.isNotBlank() } ?: DEFAULT_BASE_URL,
-                bindings = repos.mapIndexed { i, raw -> binding(asMap(raw, "repositories[$i]"), baseDir) },
+                bindings = repos.mapIndexed { i, raw -> binding(asMap(raw, "repositories[$i]"), baseDir, cloneBase) },
             )
         }
 
-        private fun binding(map: Map<String, Any?>, baseDir: Path?): RepositoryBinding {
+        private fun binding(map: Map<String, Any?>, baseDir: Path?, cloneBase: String): RepositoryBinding {
             val owner = required(map, "owner")
             val name = required(map, "name")
             return RepositoryBinding(
@@ -90,6 +96,7 @@ data class EventSourceConfig(
                 prPipeline = resolve(required(map, "prPipeline"), baseDir),
                 pushPipeline = (map["pushPipeline"] as? String)?.takeIf { it.isNotBlank() }?.let { resolve(it, baseDir) },
                 trackedBranch = (map["trackedBranch"] as? String)?.takeIf { it.isNotBlank() } ?: "main",
+                cloneBase = text(map, "cloneBase") ?: cloneBase,
             )
         }
 
@@ -97,6 +104,9 @@ data class EventSourceConfig(
             val path = Path.of(value)
             return if (path.isAbsolute || baseDir == null) path else baseDir.resolve(path)
         }
+
+        private fun text(map: Map<String, Any?>, key: String): String? =
+            (map[key] as? String)?.takeIf { it.isNotBlank() }
 
         private fun required(map: Map<String, Any?>, key: String): String =
             (map[key] as? String)?.takeIf { it.isNotBlank() } ?: error("repository config is missing '$key'")
