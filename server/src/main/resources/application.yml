@@ -53,6 +53,16 @@ kontinuance:
   # dispatch may build. Shares KONTINUANCE_CI_CONFIG with the poll CLI so one file governs both paths.
   ci:
     config: ${KONTINUANCE_CI_CONFIG:${user.home}/.kontinuance/ci.yaml}
+  # Gitea webhook receiver (043): POST /api/hooks/gitea. `secret` is the shared secret Gitea signs each
+  # delivery with (X-Gitea-Signature, HMAC-SHA256 of the raw body); leave it empty and every delivery is
+  # refused with 401. `api-url` + `token` let the receiver ask Gitea for a branch's current head, which
+  # is what stops a captured push delivery being replayed to redeliver an old commit — without them a
+  # push delivery is refused, while pull-request deliveries still run. Never commit either secret.
+  hooks:
+    gitea:
+      secret: ${KONTINUANCE_GITEA_WEBHOOK_SECRET:}
+      api-url: ${KONTINUANCE_GITEA_API_URL:}
+      token: ${KONTINUANCE_GITEA_TOKEN:}
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.
   stream:

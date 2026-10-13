@@ -37,7 +37,11 @@ class CiDispatcher(
     private val bindings: CiBindings,
 ) {
 
-    suspend fun dispatch(request: CiDispatchRequest): Result {
+    /**
+     * [trigger] is recorded on the run as how it was started. It is a parameter rather than a field of
+     * the request so a caller on the wire cannot choose it.
+     */
+    suspend fun dispatch(request: CiDispatchRequest, trigger: String = TRIGGER): Result {
         val bound = when (val resolution = resolve(request)) {
             is Refused -> return Result.Rejected(resolution.reason)
             is Bound -> resolution
@@ -48,15 +52,16 @@ class CiDispatcher(
         }
 
         // Pin the checkout to the dispatched commit: the injector's SHA rule (034) rewrites the first git
-        // step's url + sha, so the descriptor and the code always come from the commit GitHub named.
+        // step's url + sha, so the descriptor and the code always come from the commit the caller named —
+        // and from the host the binding says this repository lives on (043), not an assumed github.com.
         val pipeline = ProjectSourceInjector.apply(
             declared,
-            ProjectSource(repo = "https://github.com/${binding.repo.slug}.git", branch = request.sha),
+            ProjectSource(repo = binding.cloneUrl, branch = request.sha),
         )
 
         inFlight(binding.repo.slug, request.sha, pipeline.name)?.let { return Result.Existing(it) }
 
-        return Result.Accepted(start(binding.repo.slug, request.sha, pipeline))
+        return Result.Accepted(start(binding.repo.slug, request.sha, pipeline, trigger))
     }
 
     /** The binding and descriptor this request may run, or why it may not. */
@@ -89,7 +94,7 @@ class CiDispatcher(
     }
 
     /** Records the in-flight run and hands it to the engine; returns its id. */
-    private fun start(repo: String, sha: String, pipeline: Pipeline): String {
+    private fun start(repo: String, sha: String, pipeline: Pipeline, trigger: String): String {
         val id = "run-" + UUID.randomUUID().toString().substring(0, ID_LEN)
         val startedAt = Instant.now()
         store.record(
@@ -100,7 +105,7 @@ class CiDispatcher(
                 startedAt = startedAt,
                 repo = repo,
                 sha = sha,
-                trigger = TRIGGER,
+                trigger = trigger,
                 project = pipeline.project,
                 stages = RunRecord.skeleton(pipeline),
             ),
@@ -109,7 +114,7 @@ class CiDispatcher(
             id,
             pipeline,
             startedAt,
-            context = RunContext(repo = repo, project = pipeline.project, sha = sha, trigger = TRIGGER),
+            context = RunContext(repo = repo, project = pipeline.project, sha = sha, trigger = trigger),
         )
         return id
     }

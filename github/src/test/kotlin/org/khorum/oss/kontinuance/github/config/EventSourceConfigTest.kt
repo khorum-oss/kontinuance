@@ -119,4 +119,30 @@ class EventSourceConfigTest {
             )
         }
     }
+
+    @Test
+    fun `clone base defaults to GitHub, is set per source, and a repository can override it`() {
+        val config = EventSourceConfig.parse(
+            """
+            eventSource:
+              tokenEnv: "T"
+              cloneBase: "https://gitea.example/"
+              repositories:
+                - owner: "a"
+                  name: "one"
+                  prPipeline: "pr.yaml"
+                - owner: "a"
+                  name: "two"
+                  prPipeline: "pr.yaml"
+                  cloneBase: "https://github.com"
+            """.trimIndent(),
+        )
+
+        assertEquals("https://gitea.example/a/one.git", config.bindings[0].cloneUrl)
+        assertEquals("https://github.com/a/two.git", config.bindings[1].cloneUrl)
+        assertEquals(config.bindings, EventSourceConfig.parse(config.render()).bindings.map { it.copy() })
+
+        val plain = EventSourceConfig.parse("eventSource:\n  tokenEnv: T\n  repositories:\n    - {owner: a, name: b, prPipeline: /p.yaml}")
+        assertEquals("https://github.com/a/b.git", plain.bindings.single().cloneUrl)
+    }
 }

@@ -1,5 +1,6 @@
 package org.khorum.oss.kontinuance.server.config
 
+import org.khorum.oss.kontinuance.server.controller.GiteaWebhookController
 import org.khorum.oss.kontinuance.server.domain.SessionResponse
 import org.khorum.oss.kontinuance.server.service.AuthCredentials
 import org.khorum.oss.kontinuance.server.service.CiToken
@@ -81,7 +82,11 @@ class AuthWebFilter(
         // Prefixes reachable without a session in every mode: the auth endpoints (else no one could sign
         // in), the API health check, and actuator (health only is exposed). Matched as an exact path or a
         // `<prefix>/…` sub-path so `/api/authx` does NOT match `/api/auth`.
-        val publicPaths = listOf("/api/auth", "/api/health", "/actuator")
+        //
+        // `/api/hooks/gitea` is here because it cannot present a session or a bearer token: a Gitea
+        // delivery authenticates with an HMAC signature over its body, which only the handler can check
+        // (043). It is public to THIS filter and nothing else — an unsigned request gets a 401 there.
+        val publicPaths = listOf("/api/auth", "/api/health", "/actuator", GiteaWebhookController.PATH)
 
         const val BEARER = "Bearer "
     }
