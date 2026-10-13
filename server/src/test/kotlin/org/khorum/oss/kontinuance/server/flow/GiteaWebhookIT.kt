@@ -89,7 +89,25 @@ class GiteaWebhookIT(
         val run = run(id)
         assert(run.contains("\"relikquary-pr\"")) { "a pull request must gate: $run" }
         assert(run.contains(sha)) { "the run must be pinned to the head commit: $run" }
-        assert(run.contains("gitea-webhook")) { "the run must say how it was started: $run" }
+        assert(run.contains("gitea-pr")) { "the run must say how it was started: $run" }
+    }
+
+    @Test
+    fun `a webhook run reports pending and then its verdict to gitea as kontinuance-ci`() {
+        val sha = "7".repeat(40)
+        deliver("pull_request", pullRequest("opened", sha)).expectStatus().isAccepted
+
+        val deadline = System.currentTimeMillis() + 30_000
+        fun mine() = statuses.filter { it.first == sha }.map { it.second }
+        while (mine().none { !it.contains("\"pending\"") } && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+        val posted = mine()
+        assert(posted.first().contains("\"pending\"")) { "the first status must be pending: $posted" }
+        assert(posted.size == 2) { "exactly pending then a verdict: $posted" }
+        assert(posted.all { it.contains("\"kontinuance/ci\"") }) { "the check name must be stable: $posted" }
+        // The noop descriptor has no checkout to rewrite, so the injector adds one, and it cannot reach
+        // gitea.example — the verdict is a failure, which is exactly what must be reported.
+        assert(posted.last().contains("\"failure\"") || posted.last().contains("\"success\"")) { "$posted" }
     }
 
     @Test
@@ -156,8 +174,16 @@ class GiteaWebhookIT(
             Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(secret.toByteArray(), "HmacSHA256")) }
                 .doFinal(body.toByteArray()).joinToString("") { "%02x".format(it) }
 
-        /** Stands in for Gitea: `main` points at [HEAD]. */
+        /** Every commit status posted to the stand-in Gitea, as (sha, body). */
+        val statuses = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
+
+        /** Stands in for Gitea: `main` points at [HEAD], and statuses are recorded. */
         private val gitea: HttpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+            createContext("/api/v1/repos/$REPO/statuses/") { exchange ->
+                statuses += exchange.requestURI.path.substringAfterLast('/') to String(exchange.requestBody.readAllBytes())
+                exchange.sendResponseHeaders(201, -1)
+                exchange.close()
+            }
             createContext("/api/v1/repos/$REPO/branches/main") { exchange ->
                 val bytes = """{"name":"main","commit":{"id":"$HEAD"}}""".toByteArray()
                 exchange.sendResponseHeaders(200, bytes.size.toLong())

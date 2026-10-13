@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: In progress — receiver built; reporting, publishing and the start-up reconcile are not
+**Status**: In progress — receiver and status reporting built; publishing and the start-up reconcile are not
 
 **Input**: User: "I need to rework relikquary and kontinuance to not poll for kontinuance since we are
 inverting the control. Gitea as source and updates github on merge to main."
@@ -27,7 +27,7 @@ a webhook secret.
 
 1. **Given** a configured repository, **When** Gitea delivers `pull_request` with action `opened`,
    `reopened` or `synchronized`, **Then** the repository's `prPipeline` runs at `pull_request.head.sha`
-   and the run records `gitea-webhook` as its trigger.
+   and the run records `gitea-pr` as its trigger (`gitea-push` for a delivery).
 2. **Given** a pull request whose head repository is not the configured repository — or is not stated —
    **Then** nothing runs (`204`). The head commit is built on the host; unknown provenance fails closed.
 3. **Given** any other action (`closed`, `labeled`, …) or any other event, **Then** nothing runs (`204`).
@@ -49,11 +49,19 @@ a webhook secret.
 2. **Given** no secret is configured, **Then** every delivery is `401`.
 3. **Given** a correctly signed delivery for a repository outside the allow-list, **Then** `400` naming it.
 
-### User Story 4 - Gitea shows the verdict (Priority: P1) — not built
+### User Story 4 - Gitea shows the verdict (Priority: P1) — built
 
 A webhook-started run posts `pending` and then its terminal state to Gitea's commit-status API, as
 `kontinuance/ci` for a pull request and `kontinuance/deliver` for a push, so branch protection in Gitea can
 require the check.
+
+1. **Given** a webhook-started run, **Then** Gitea receives `pending` once, then exactly one verdict:
+   `success`, `failure` (failed or timed out) or `error` (cancelled, or an unexpected end).
+2. **Given** a run paused at an approval gate, **Then** it stays `pending` until it is resumed and ends.
+3. **Given** a run started any other way (manual dispatch, the dashboard, the poll loop), **Then** nothing
+   is posted to Gitea.
+4. **Given** Gitea cannot be reached, **Then** the post is retried, then logged; the run is unaffected.
+5. **Given** `kontinuance.hooks.gitea.run-url-base` is set, **Then** each status links to the run.
 
 ### User Story 5 - Kontinuance publishes the tracked branch (Priority: P2) — not built
 
@@ -87,6 +95,12 @@ of the last successful delivery, dispatch it. Not a poll loop — it runs once.
   restart and would also swallow Gitea's own *Redeliver* button, which is the manual recovery path.
 - **`synchronize` is accepted alongside Gitea's `synchronized`**, so a spelling difference between
   versions cannot silently stop a pull request being re-checked.
+
+- **The reporter watches the run store instead of being called by the dispatcher.** A run can end by
+  being resumed from an approval gate by a different request; every such road ends in a store write.
+- **A run still `Running` when the server stops leaves a `pending` status behind.** Nothing resumes it.
+  Gitea's *Redeliver* starts a fresh run, whose verdict replaces it. The start-up reconcile (User Story
+  6) does not cover pull requests.
 
 ## Not verified against a real Gitea
 
