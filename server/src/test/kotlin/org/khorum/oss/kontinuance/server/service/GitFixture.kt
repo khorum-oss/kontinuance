@@ -15,11 +15,14 @@ object GitFixture {
         return output
     }
 
-    /** A repository at `<base>/<owner>/<name>.git` — where a binding with `cloneBase: <base>` clones from — on `main`. */
+    /**
+     * A repository at `<base>/<owner>/<name>.git` — where a binding with `cloneBase: <base>` clones from — on
+     * `main`. Its first commit names the repository, so two sources made in the same second never share a commit id.
+     */
     fun source(base: Path, owner: String, name: String): Path =
         Files.createDirectories(base.resolve(owner).resolve("$name.git")).also {
             git(it, "init", "--quiet", "-b", "main")
-            commit(it, "first")
+            commit(it, "first commit of $owner/$name")
         }
 
     /** An empty bare repository standing in for the publish remote. */
