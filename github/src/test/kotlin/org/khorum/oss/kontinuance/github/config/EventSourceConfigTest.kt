@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.github.config
 
 import org.junit.jupiter.api.Test
 import org.khorum.oss.kontinuance.github.client.RepoRef
+import org.khorum.oss.kontinuance.github.trigger.PublishTarget
 import org.khorum.oss.kontinuance.github.trigger.RepositoryBinding
 import java.nio.file.Path
 import kotlin.test.assertEquals
@@ -144,5 +145,45 @@ class EventSourceConfigTest {
 
         val plain = EventSourceConfig.parse("eventSource:\n  tokenEnv: T\n  repositories:\n    - {owner: a, name: b, prPipeline: /p.yaml}")
         assertEquals("https://github.com/a/b.git", plain.bindings.single().cloneUrl)
+    }
+
+    @Test
+    fun `a publish block names one remote and one branch, and is absent unless written`() {
+        val config = EventSourceConfig.parse(
+            """
+            eventSource:
+              tokenEnv: "T"
+              repositories:
+                - owner: "a"
+                  name: "one"
+                  prPipeline: "/pr.yaml"
+                  trackedBranch: "trunk"
+                  publish:
+                    remote: "https://github.com/a/one.git"
+                - owner: "a"
+                  name: "two"
+                  prPipeline: "/pr.yaml"
+                  publish:
+                    remote: "https://github.com/a/two.git"
+                    branch: "public"
+                - owner: "a"
+                  name: "three"
+                  prPipeline: "/pr.yaml"
+            """.trimIndent(),
+        )
+
+        assertEquals(PublishTarget("https://github.com/a/one.git", "trunk"), config.bindings[0].publish)
+        assertEquals(PublishTarget("https://github.com/a/two.git", "public"), config.bindings[1].publish)
+        assertEquals(null, config.bindings[2].publish)
+        assertEquals(config.bindings, EventSourceConfig.parse(config.render()).bindings)
+    }
+
+    @Test
+    fun `a publish block without a remote, or with a credential in it, is rejected`() {
+        fun parse(publish: String) = EventSourceConfig.parse(
+            "eventSource:\n  tokenEnv: T\n  repositories:\n    - {owner: a, name: b, prPipeline: /p.yaml, publish: $publish}",
+        )
+        assertFailsWith<IllegalStateException> { parse("{branch: main}") }
+        assertFailsWith<IllegalArgumentException> { parse("{remote: 'https://user:secret@github.com/a/b.git'}") }
     }
 }

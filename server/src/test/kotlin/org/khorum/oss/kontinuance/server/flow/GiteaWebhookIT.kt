@@ -2,6 +2,7 @@ package org.khorum.oss.kontinuance.server.flow
 
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Test
+import org.khorum.oss.kontinuance.server.service.GitFixture
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
@@ -45,8 +46,8 @@ class GiteaWebhookIT(
         return """{"action":"$action","number":7,"pull_request":{"head":$head},"repository":{"full_name":"$repo"}}"""
     }
 
-    private fun push(ref: String, after: String): String =
-        """{"ref":"$ref","before":"${"1".repeat(40)}","after":"$after","repository":{"full_name":"$REPO"}}"""
+    private fun push(ref: String, after: String, repo: String = REPO): String =
+        """{"ref":"$ref","before":"${"1".repeat(40)}","after":"$after","repository":{"full_name":"$repo"}}"""
 
     private fun runIdOf(result: WebTestClient.ResponseSpec): String =
         Regex("\"runId\"\\s*:\\s*\"([^\"]+)\"")
@@ -145,6 +146,38 @@ class GiteaWebhookIT(
     }
 
     @Test
+    fun `a push to a publishing repository pushes that commit to the remote, reports it, and still delivers`() {
+        val body = push("refs/heads/main", PUBLISHED_HEAD, repo = PUBLISHED)
+        val id = runIdOf(deliver("push", body).expectStatus().isAccepted)
+
+        awaitPublished(PUBLISHED_HEAD, PUBLISHED_REMOTE)
+        assert(GitFixture.refs(PUBLISHED_REMOTE) == mapOf("refs/heads/main" to PUBLISHED_HEAD)) { "only main may leave" }
+        assert(run(id).contains("\"relikquary-cd-stage\"")) { "the delivery must still run" }
+    }
+
+    @Test
+    fun `a repository that publishes but has no delivery pipeline is published and starts no run`() {
+        deliver("push", push("refs/heads/main", PUBLISH_ONLY_HEAD, repo = PUBLISH_ONLY))
+            .expectStatus().isNoContent
+            .expectHeader().exists("X-Kontinuance-Ignored")
+
+        awaitPublished(PUBLISH_ONLY_HEAD, PUBLISH_ONLY_REMOTE)
+    }
+
+    /** Waits for the publish verdict on [sha], then checks it and where the remote's `main` now points. */
+    private fun awaitPublished(sha: String, remote: Path) {
+        val deadline = System.currentTimeMillis() + 30_000
+        fun mine() = statuses.filter { it.first == sha && it.second.contains("\"kontinuance/publish\"") }.map { it.second }
+        while (mine().size < 2 && System.currentTimeMillis() < deadline) Thread.sleep(50)
+
+        val posted = mine()
+        assert(posted.size == 2 && posted[0].contains("\"pending\"") && posted[1].contains("\"success\"")) {
+            "publishing must report pending then success: $posted"
+        }
+        assert(GitFixture.refs(remote)["refs/heads/main"] == sha) { "the remote must be at $sha: ${GitFixture.refs(remote)}" }
+    }
+
+    @Test
     fun `a replayed push for a commit that is no longer the head delivers nothing`() {
         deliver("push", push("refs/heads/main", "9".repeat(40))).expectStatus().isNoContent
     }
@@ -177,22 +210,42 @@ class GiteaWebhookIT(
         /** Every commit status posted to the stand-in Gitea, as (sha, body). */
         val statuses = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String>>()
 
-        /** Stands in for Gitea: `main` points at [HEAD], and statuses are recorded. */
+        private val dir: Path = Files.createTempDirectory("gitea-webhook-it")
+
+        // Two repositories that publish, each a real git repository under a local clone base with a bare
+        // remote beside it: one also delivers, one only publishes.
+        const val PUBLISHED = "khorum-oss/published"
+        const val PUBLISH_ONLY = "khorum-oss/publish-only"
+        private val sources: Path = dir.resolve("sources")
+        val PUBLISHED_REMOTE: Path = GitFixture.remote(dir.resolve("published-remote.git"))
+        val PUBLISH_ONLY_REMOTE: Path = GitFixture.remote(dir.resolve("publish-only-remote.git"))
+        val PUBLISHED_HEAD: String = headOfNewSource("published")
+        val PUBLISH_ONLY_HEAD: String = headOfNewSource("publish-only")
+
+        /** Creates the source with an unmerged branch beside `main`, and returns `main`'s head. */
+        private fun headOfNewSource(name: String): String {
+            val repo = GitFixture.source(sources, "khorum-oss", name)
+            GitFixture.git(repo, "branch", "unmerged")
+            return GitFixture.git(repo, "rev-parse", "main")
+        }
+
+        /** Stands in for Gitea: each repository's `main` points at its head, and statuses are recorded. */
         private val gitea: HttpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
-            createContext("/api/v1/repos/$REPO/statuses/") { exchange ->
-                statuses += exchange.requestURI.path.substringAfterLast('/') to String(exchange.requestBody.readAllBytes())
-                exchange.sendResponseHeaders(201, -1)
-                exchange.close()
-            }
-            createContext("/api/v1/repos/$REPO/branches/main") { exchange ->
-                val bytes = """{"name":"main","commit":{"id":"$HEAD"}}""".toByteArray()
-                exchange.sendResponseHeaders(200, bytes.size.toLong())
-                exchange.responseBody.use { it.write(bytes) }
+            mapOf(REPO to HEAD, PUBLISHED to PUBLISHED_HEAD, PUBLISH_ONLY to PUBLISH_ONLY_HEAD).forEach { (repo, head) ->
+                createContext("/api/v1/repos/$repo/statuses/") { exchange ->
+                    statuses += exchange.requestURI.path.substringAfterLast('/') to String(exchange.requestBody.readAllBytes())
+                    exchange.sendResponseHeaders(201, -1)
+                    exchange.close()
+                }
+                createContext("/api/v1/repos/$repo/branches/main") { exchange ->
+                    val bytes = """{"name":"main","commit":{"id":"$head"}}""".toByteArray()
+                    exchange.sendResponseHeaders(200, bytes.size.toLong())
+                    exchange.responseBody.use { it.write(bytes) }
+                }
             }
             start()
         }
 
-        private val dir: Path = Files.createTempDirectory("gitea-webhook-it")
         private val config: Path = dir.resolve("ci.yaml").also {
             listOf("relikquary-pr", "relikquary-cd-stage").forEach { name ->
                 Files.writeString(
@@ -219,6 +272,19 @@ class GiteaWebhookIT(
                       name: "relikquary"
                       prPipeline: "relikquary-pr.yaml"
                       pushPipeline: "relikquary-cd-stage.yaml"
+                    - owner: "khorum-oss"
+                      name: "published"
+                      prPipeline: "relikquary-pr.yaml"
+                      pushPipeline: "relikquary-cd-stage.yaml"
+                      cloneBase: "$sources"
+                      publish:
+                        remote: "$PUBLISHED_REMOTE"
+                    - owner: "khorum-oss"
+                      name: "publish-only"
+                      prPipeline: "relikquary-pr.yaml"
+                      cloneBase: "$sources"
+                      publish:
+                        remote: "$PUBLISH_ONLY_REMOTE"
                 """.trimIndent(),
             )
         }
@@ -233,6 +299,7 @@ class GiteaWebhookIT(
             registry.add("kontinuance.hooks.gitea.secret") { SECRET }
             registry.add("kontinuance.hooks.gitea.api-url") { "http://127.0.0.1:${gitea.address.port}" }
             registry.add("kontinuance.github.autostart") { "false" }
+            registry.add("kontinuance.publish.work-dir") { dir.resolve("publish").toString() }
         }
     }
 }
