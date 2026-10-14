@@ -69,6 +69,9 @@ kontinuance:
       # Where a human reaches this server's dashboard, e.g. https://kontinuance.example — a status posted
       # to Gitea then links to the run (<base>/runs/<id>). Optional; statuses carry no link without it.
       run-url-base: ${KONTINUANCE_RUN_URL_BASE:}
+      # Once at start-up, deliver (and publish) each tracked branch's head if no delivery of it has
+      # succeeded — the merge whose webhook arrived while the server was down. Needs `api-url`.
+      reconcile-on-start: ${KONTINUANCE_GITEA_RECONCILE_ON_START:true}
   # Publishing (043): a repository whose binding carries a `publish:` block has each commit that lands on
   # its tracked branch pushed to that one remote branch. `token` is what the push authenticates with
   # (for GitHub, a fine-grained token with Contents and Workflows write on the published repositories);

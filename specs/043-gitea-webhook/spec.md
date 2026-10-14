@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: In progress — receiver, status reporting and publishing built; the start-up reconcile is not
+**Status**: In progress — receiver, status reporting, publishing and the start-up reconcile built; removing the poll loop is not
 
 **Input**: User: "I need to rework relikquary and kontinuance to not poll for kontinuance since we are
 inverting the control. Gitea as source and updates github on merge to main."
@@ -80,10 +80,19 @@ one ref: a private repository's other branches never leave.
 5. **Given** a binding with no `publish:` block, **Then** nothing is pushed anywhere.
 6. **Given** publishing fails, **Then** delivery still runs: the two are reported separately.
 
-### User Story 6 - A delivery missed while the server was down is not lost (Priority: P2) — not built
+### User Story 6 - A delivery missed while the server was down is not lost (Priority: P2) — built
 
-Once, at start-up, for each binding with a `pushPipeline`: if Gitea's tracked-branch head is not the commit
-of the last successful delivery, dispatch it. Not a poll loop — it runs once.
+Once, at start-up, for each binding with a `pushPipeline` or a `publish:` block, Kontinuance asks Gitea
+for the tracked branch's head. Not a poll loop — it runs once.
+
+1. **Given** no run of the binding's push pipeline has succeeded at the head, **Then** it is dispatched
+   through `CiDispatcher`, recorded as `gitea-reconcile`, and reports as `kontinuance/deliver`. A head whose
+   last delivery failed counts as not delivered.
+2. **Given** a successful run of that pipeline at the head, however it was started, **Then** nothing runs.
+3. **Given** the binding publishes, **Then** the head is published. Publishing a commit already on the
+   remote changes nothing.
+4. **Given** Gitea cannot answer for one binding, **Then** that binding is logged and the rest proceed.
+5. **Given** no `api-url`, or `kontinuance.hooks.gitea.reconcile-on-start: false`, **Then** nothing happens.
 
 ## Requirements
 
@@ -125,6 +134,12 @@ of the last successful delivery, dispatch it. Not a poll loop — it runs once.
   without publishing. The start-up reconcile (User Story 6) is what covers a missed merge.
 - **A publish interrupted by a restart leaves `kontinuance/publish` pending.** Redelivering the push from
   Gitea publishes it again; publishing a commit twice is harmless.
+
+- **A delivery counts by pipeline name, not by trigger.** Deliveries started by the GitHub dispatch
+  before cutover are recognised, so the first restart after cutover does not redeliver what stage has.
+- **A run left `Running` by a restart blocks its own reconcile.** Nothing marks an interrupted run as
+  ended, so the in-flight guard treats it as still building and the reconcile logs it instead of
+  dispatching. Redelivering from Gitea, or a manual dispatch once the record is cleared, is the remedy.
 
 ## Not verified against a real Gitea
 

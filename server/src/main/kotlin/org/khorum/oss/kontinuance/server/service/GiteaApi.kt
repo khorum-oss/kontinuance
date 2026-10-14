@@ -33,6 +33,9 @@ class GiteaApi(
 ) : CommitStatusPoster {
     private val http: HttpClient = HttpClient.newBuilder().connectTimeout(TIMEOUT).build()
 
+    /** False when no `api-url` is set: every call would fail, so a caller that is optional can skip. */
+    val configured: Boolean = apiUrl.isNotBlank()
+
     /** The commit [branch] of [repo] currently points at. */
     suspend fun head(repo: RepoRef, branch: String): Result<String> =
         send("${repo.slug}/branches/$branch") { GET() }.mapCatching { body ->
