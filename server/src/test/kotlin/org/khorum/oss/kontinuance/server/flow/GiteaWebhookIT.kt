@@ -299,6 +299,8 @@ class GiteaWebhookIT(
             registry.add("kontinuance.hooks.gitea.secret") { SECRET }
             registry.add("kontinuance.hooks.gitea.api-url") { "http://127.0.0.1:${gitea.address.port}" }
             registry.add("kontinuance.github.autostart") { "false" }
+            // The start-up reconcile would deliver each head before a test runs; GiteaReconcileIT covers it.
+            registry.add("kontinuance.hooks.gitea.reconcile-on-start") { "false" }
             registry.add("kontinuance.publish.work-dir") { dir.resolve("publish").toString() }
         }
     }

@@ -101,6 +101,7 @@ class GiteaStatusReporter(
         private val CONTEXTS = mapOf(
             GiteaWebhookReceiver.PR_TRIGGER to KONTINUANCE_CHECK_CONTEXT,
             GiteaWebhookReceiver.PUSH_TRIGGER to DELIVER_CONTEXT,
+            GiteaReconciler.RECONCILE_TRIGGER to DELIVER_CONTEXT,
         )
         private const val ATTEMPTS = 4
         private const val BACKOFF_MILLIS = 500L
