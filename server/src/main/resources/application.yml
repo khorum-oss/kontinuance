@@ -57,12 +57,18 @@ kontinuance:
   # delivery with (X-Gitea-Signature, HMAC-SHA256 of the raw body); leave it empty and every delivery is
   # refused with 401. `api-url` + `token` let the receiver ask Gitea for a branch's current head, which
   # is what stops a captured push delivery being replayed to redeliver an old commit — without them a
-  # push delivery is refused, while pull-request deliveries still run. Never commit either secret.
+  # push delivery is refused, while pull-request deliveries still run. The same pair posts each
+  # webhook-started run's verdict back as a commit status (kontinuance/ci for a pull request,
+  # kontinuance/deliver for a push); the token needs write access to the repository for that.
+  # Never commit either secret.
   hooks:
     gitea:
       secret: ${KONTINUANCE_GITEA_WEBHOOK_SECRET:}
       api-url: ${KONTINUANCE_GITEA_API_URL:}
       token: ${KONTINUANCE_GITEA_TOKEN:}
+      # Where a human reaches this server's dashboard, e.g. https://kontinuance.example — a status posted
+      # to Gitea then links to the run (<base>/runs/<id>). Optional; statuses carry no link without it.
+      run-url-base: ${KONTINUANCE_RUN_URL_BASE:}
   # Live SSE (/api/runs/stream) + WebSocket (/ws/runs): how often to re-read the store for new runs,
   # and the bound on the initial newest-first snapshot sent on connect.
   stream:

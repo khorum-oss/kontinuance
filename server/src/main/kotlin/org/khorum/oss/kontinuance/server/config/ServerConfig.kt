@@ -7,10 +7,12 @@ import org.khorum.oss.kontinuance.server.domain.RunApi
 import org.khorum.oss.kontinuance.server.domain.ci.CiBindings
 import org.khorum.oss.kontinuance.server.domain.project.DescriptorResolver
 import org.khorum.oss.kontinuance.server.domain.project.GitHubClientProvider
+import org.khorum.oss.kontinuance.server.service.GiteaStatusReporter
 import org.khorum.oss.kontinuance.server.service.RunChangeNotifier
 import org.khorum.oss.kontinuance.server.store.ProjectStore
 import org.khorum.oss.kontinuance.server.store.NotifyingRunLogStore
 import org.khorum.oss.kontinuance.server.store.NotifyingRunStore
+import org.khorum.oss.kontinuance.server.store.ReportingRunStore
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -45,9 +47,10 @@ class ServerConfig {
     ): RunStores.Stores = RunStores.open(storeDirectory(storeDir), RunStores.Backend.of(backend))
 
     @Bean
-    fun runStore(stores: RunStores.Stores, notifier: RunChangeNotifier): RunStore =
-        // Decorate so every in-process write signals the push streams (025); reads are unaffected.
-        NotifyingRunStore(stores.runs, notifier)
+    fun runStore(stores: RunStores.Stores, notifier: RunChangeNotifier, reporter: GiteaStatusReporter): RunStore =
+        // Decorate so every in-process write signals the push streams (025) and is shown to the Gitea
+        // status reporter (043); reads are unaffected.
+        ReportingRunStore(NotifyingRunStore(stores.runs, notifier), reporter)
 
     @Bean
     fun runApi(store: RunStore): RunApi = RunApi(store)

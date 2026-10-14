@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper
 class GiteaWebhookReceiver(
     private val dispatcher: CiDispatcher,
     private val bindings: CiBindings,
-    private val heads: GiteaBranchHeads,
+    private val heads: GiteaApi,
     private val mapper: ObjectMapper,
 ) {
 
@@ -80,7 +80,7 @@ class GiteaWebhookReceiver(
     }
 
     private suspend fun dispatch(binding: RepositoryBinding, sha: String, event: CiEvent): Outcome =
-        when (val result = dispatcher.dispatch(CiDispatchRequest(repo = binding.repo.slug, sha = sha, event = event), TRIGGER)) {
+        when (val result = dispatcher.dispatch(CiDispatchRequest(repo = binding.repo.slug, sha = sha, event = event), triggerFor(event))) {
             is CiDispatcher.Result.Accepted -> Outcome.Started(result.id)
             is CiDispatcher.Result.Existing -> Outcome.AlreadyRunning(result.id)
             is CiDispatcher.Result.Rejected -> Outcome.Refused(result.reason)
@@ -99,11 +99,17 @@ class GiteaWebhookReceiver(
         data class Refused(val reason: String) : Outcome
     }
 
-    private companion object {
-        const val TRIGGER = "gitea-webhook"
+    companion object {
+        /** How a webhook-started gate run is recorded — and how [GiteaStatusReporter] recognises one. */
+        const val PR_TRIGGER = "gitea-pr"
+
+        /** How a webhook-started delivery run is recorded. */
+        const val PUSH_TRIGGER = "gitea-push"
+
+        private fun triggerFor(event: CiEvent): String = if (event == CiEvent.PUSH) PUSH_TRIGGER else PR_TRIGGER
 
         // Gitea spells a new commit on an open PR "synchronized"; "synchronize" is GitHub's spelling,
         // accepted so a difference between versions cannot silently stop PRs being re-checked.
-        val BUILDING_ACTIONS = setOf("opened", "reopened", "synchronized", "synchronize")
+        private val BUILDING_ACTIONS = setOf("opened", "reopened", "synchronized", "synchronize")
     }
 }
