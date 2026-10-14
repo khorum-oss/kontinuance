@@ -24,6 +24,7 @@ class GiteaWebhookReceiver(
     private val dispatcher: CiDispatcher,
     private val bindings: CiBindings,
     private val heads: GiteaApi,
+    private val publisher: TrackedBranchPublisher,
     private val mapper: ObjectMapper,
 ) {
 
@@ -75,6 +76,12 @@ class GiteaWebhookReceiver(
         }
         if (current != sha) {
             return Outcome.Ignored("$sha is no longer the head of ${binding.trackedBranch}; nothing to deliver")
+        }
+        // Publishing is the binding's, not the pipeline's: it is queued before delivery is dispatched and
+        // does not depend on how — or whether — that delivery goes.
+        val publishing = publisher.enqueue(binding, sha)
+        if (publishing && binding.pushPipeline == null) {
+            return Outcome.Ignored("${binding.repo.slug} has no pushPipeline; publishing $sha only")
         }
         return dispatch(binding, sha, CiEvent.PUSH)
     }

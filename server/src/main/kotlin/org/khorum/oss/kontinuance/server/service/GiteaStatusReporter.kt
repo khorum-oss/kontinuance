@@ -59,6 +59,14 @@ class GiteaStatusReporter(
         queue.trySend(Pending(RepoRef(owner, name), sha, CommitStatusPoster.Status(state, context, description, url)))
     }
 
+    /**
+     * Queues a status that is not a run's — publishing the tracked branch has a verdict but no run. It
+     * shares the queue, so it is retried the same way and keeps its order relative to everything else.
+     */
+    fun report(repo: RepoRef, sha: String, status: CommitStatusPoster.Status) {
+        queue.trySend(Pending(repo, sha, status))
+    }
+
     private suspend fun deliver(item: Pending) {
         repeat(ATTEMPTS) { attempt ->
             val result = poster.post(item.repo, item.sha, item.status)

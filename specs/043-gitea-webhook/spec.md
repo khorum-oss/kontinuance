@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: In progress — receiver and status reporting built; publishing and the start-up reconcile are not
+**Status**: In progress — receiver, status reporting and publishing built; the start-up reconcile is not
 
 **Input**: User: "I need to rework relikquary and kontinuance to not poll for kontinuance since we are
 inverting the control. Gitea as source and updates github on merge to main."
@@ -63,11 +63,22 @@ require the check.
 4. **Given** Gitea cannot be reached, **Then** the post is retried, then logged; the run is unaffected.
 5. **Given** `kontinuance.hooks.gitea.run-url-base` is set, **Then** each status links to the run.
 
-### User Story 5 - Kontinuance publishes the tracked branch (Priority: P2) — not built
+### User Story 5 - Kontinuance publishes the tracked branch (Priority: P2) — built
 
 A binding may carry a `publish:` block (a remote and a branch). On a push to the tracked branch Kontinuance
-pushes that one commit to that one ref before running the pipeline, and reports it as
-`kontinuance/publish`. One commit, one ref: a private repository's other branches never leave.
+pushes that one commit to that one ref, and reports it on the commit as `kontinuance/publish`. One commit,
+one ref: a private repository's other branches never leave.
+
+1. **Given** a binding with `publish:`, **When** a push delivery for the tracked branch's current head
+   arrives, **Then** that commit is pushed to `publish.branch` on `publish.remote`, and Gitea receives
+   `pending` then `success` as `kontinuance/publish`.
+2. **Given** the source has other branches or tags, **Then** none of them reach the remote.
+3. **Given** the remote has a commit the source does not, **Then** the push is refused, the remote is
+   unchanged, and the status is `failure` with git's reason. Nothing is forced.
+4. **Given** a binding with `publish:` and no `pushPipeline`, **Then** the commit is published and no run
+   starts (`204`).
+5. **Given** a binding with no `publish:` block, **Then** nothing is pushed anywhere.
+6. **Given** publishing fails, **Then** delivery still runs: the two are reported separately.
 
 ### User Story 6 - A delivery missed while the server was down is not lost (Priority: P2) — not built
 
@@ -85,6 +96,11 @@ of the last successful delivery, dispatch it. Not a poll loop — it runs once.
   `https://github.com`). A dispatch checks out from the binding's host instead of assuming GitHub.
 - **FR-004** Responses: `202` started, `200` already running, `204` not a reason to build (the reason in
   `X-Kontinuance-Ignored`), `400` should have built and could not, `401` not authenticated.
+- **FR-005** Publishing pushes with `git push <remote> <sha>:refs/heads/<branch>` from a scratch repository
+  that only ever fetches the tracked branch, and only a commit that is on that branch. It is never forced.
+  The token (`kontinuance.publish.token`) reaches git through a credential helper reading the child's
+  environment — never a URL or an argument — and a `publish.remote` that embeds a credential is rejected
+  when the config is read.
 
 ## Decisions
 
@@ -102,7 +118,18 @@ of the last successful delivery, dispatch it. Not a poll loop — it runs once.
   Gitea's *Redeliver* starts a fresh run, whose verdict replaces it. The start-up reconcile (User Story
   6) does not cover pull requests.
 
+- **A publish is queued, not awaited, and does not gate delivery.** A fetch and a push outlast the time a
+  webhook sender waits for its answer. One consumer publishes in arrival order, so two quick merges reach
+  the remote in order. A failed publish is its own red status; it does not stop the delivery run.
+- **Publishing runs only from a webhook push.** A manual `/api/ci/dispatch` with `event: push` delivers
+  without publishing. The start-up reconcile (User Story 6) is what covers a missed merge.
+- **A publish interrupted by a restart leaves `kontinuance/publish` pending.** Redelivering the push from
+  Gitea publishes it again; publishing a commit twice is harmless.
+
 ## Not verified against a real Gitea
 
 The payload fields and the `synchronized` spelling are from Gitea's documented webhook format; the
 integration test stands in for Gitea with a stub. The first delivery from a real instance is the proof.
+
+Publishing is tested against real git repositories on disk, which need no credential. The credential
+helper, a fetch from a private Gitea and a push to GitHub have not run against the real hosts.

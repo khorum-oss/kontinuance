@@ -1,6 +1,7 @@
 package org.khorum.oss.kontinuance.github.config
 
 import org.khorum.oss.kontinuance.github.client.RepoRef
+import org.khorum.oss.kontinuance.github.trigger.PublishTarget
 import org.khorum.oss.kontinuance.github.trigger.RepositoryBinding
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
@@ -25,6 +26,9 @@ import kotlin.io.path.readText
  *       pushPipeline: "pipelines/deliver.yaml"   # optional; run for a push to trackedBranch
  *       trackedBranch: "main"                    # optional; default "main"
  *       cloneBase: "https://gitea.example"       # optional; overrides the source-level cloneBase
+ *       publish:                                 # optional; also push trackedBranch's commits here
+ *         remote: "https://github.com/khorum-oss/relikquary.git"
+ *         branch: "main"                         # optional; default trackedBranch
  * ```
  */
 data class EventSourceConfig(
@@ -59,6 +63,11 @@ data class EventSourceConfig(
             if (binding.cloneBase != RepositoryBinding.DEFAULT_CLONE_BASE) {
                 appendLine("      cloneBase: ${quote(binding.cloneBase)}")
             }
+            binding.publish?.let {
+                appendLine("      publish:")
+                appendLine("        remote: ${quote(it.remote)}")
+                appendLine("        branch: ${quote(it.branch)}")
+            }
         }
     }
 
@@ -91,14 +100,21 @@ data class EventSourceConfig(
         private fun binding(map: Map<String, Any?>, baseDir: Path?, cloneBase: String): RepositoryBinding {
             val owner = required(map, "owner")
             val name = required(map, "name")
+            val trackedBranch = text(map, "trackedBranch") ?: "main"
             return RepositoryBinding(
                 repo = RepoRef(owner, name),
                 prPipeline = resolve(required(map, "prPipeline"), baseDir),
                 pushPipeline = (map["pushPipeline"] as? String)?.takeIf { it.isNotBlank() }?.let { resolve(it, baseDir) },
-                trackedBranch = (map["trackedBranch"] as? String)?.takeIf { it.isNotBlank() } ?: "main",
+                trackedBranch = trackedBranch,
                 cloneBase = text(map, "cloneBase") ?: cloneBase,
+                publish = map["publish"]?.let { publish(asMap(it, "publish"), trackedBranch) },
             )
         }
+
+        private fun publish(map: Map<String, Any?>, trackedBranch: String): PublishTarget = PublishTarget(
+            remote = text(map, "remote") ?: error("publish is missing 'remote'"),
+            branch = text(map, "branch") ?: trackedBranch,
+        )
 
         private fun resolve(value: String, baseDir: Path?): Path {
             val path = Path.of(value)
